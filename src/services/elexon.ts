@@ -235,6 +235,15 @@ function buildMockMILS(units: BMUnit[]): Map<number, Map<string, number>> {
 }
 
 // ---------------------------------------------------------------------------
+// Module-level mock constants — computed once at import time to keep mock
+// data stable across re-fetches (avoids non-deterministic Math.random() calls)
+// ---------------------------------------------------------------------------
+
+const MOCK_BM_UNITS = buildMockBmUnits()
+const MOCK_DEMAND = buildMockDemand()
+const MOCK_PN = buildMockPN(MOCK_BM_UNITS)
+
+// ---------------------------------------------------------------------------
 // Public API: fetchBmUnits
 // ---------------------------------------------------------------------------
 
@@ -254,7 +263,7 @@ export async function fetchBmUnits(): Promise<BMUnit[]> {
   // If reference data failed entirely, fall back to mock
   if (!refRaw || !Array.isArray(refRaw) || refRaw.length === 0) {
     console.warn('[elexon] BM unit reference data unavailable — using mock data')
-    return buildMockBmUnits()
+    return MOCK_BM_UNITS
   }
 
   // Build lookup maps for dynamic params (latest entry wins)
@@ -278,11 +287,11 @@ export async function fetchBmUnits(): Promise<BMUnit[]> {
     const bmUnitId = raw.elexonBmUnit ?? raw.nationalGridBmUnit
     if (!bmUnitId) continue
 
-    const selEntry = selMap.get(bmUnitId)
-    const silEntry = silMap.get(bmUnitId)
-    const ndzEntry = ndzMap.get(bmUnitId)
-    const mnztEntry = mnztMap.get(bmUnitId)
-    const mztEntry = mztMap.get(bmUnitId)
+    const selEntry = selMap.get(bmUnitId) ?? selMap.get(raw.nationalGridBmUnit)
+    const silEntry = silMap.get(bmUnitId) ?? silMap.get(raw.nationalGridBmUnit)
+    const ndzEntry = ndzMap.get(bmUnitId) ?? ndzMap.get(raw.nationalGridBmUnit)
+    const mnztEntry = mnztMap.get(bmUnitId) ?? mnztMap.get(raw.nationalGridBmUnit)
+    const mztEntry = mztMap.get(bmUnitId) ?? mztMap.get(raw.nationalGridBmUnit)
 
     units.push({
       bmUnitId,
@@ -301,7 +310,7 @@ export async function fetchBmUnits(): Promise<BMUnit[]> {
 
   if (units.length === 0) {
     console.warn('[elexon] No qualifying BM units after filtering — using mock data')
-    return buildMockBmUnits()
+    return MOCK_BM_UNITS
   }
 
   return units
@@ -319,7 +328,7 @@ export async function fetchDemandForecast(settlementDate: string): Promise<Map<n
 
   if (!raw?.data || raw.data.length === 0) {
     console.warn('[elexon] Demand forecast unavailable — using mock data')
-    return buildMockDemand()
+    return MOCK_DEMAND
   }
 
   const map = new Map<number, number>()
@@ -331,7 +340,7 @@ export async function fetchDemandForecast(settlementDate: string): Promise<Map<n
 
   if (map.size === 0) {
     console.warn('[elexon] Demand forecast had no entries for date — using mock data')
-    return buildMockDemand()
+    return MOCK_DEMAND
   }
 
   return map
@@ -344,6 +353,8 @@ export async function fetchDemandForecast(settlementDate: string): Promise<Map<n
 export async function fetchPN(
   settlementDate: string
 ): Promise<Map<number, Map<string, number>>> {
+  // Note: safeFetch is not used here because each SP is fetched independently
+  // with per-request .catch() to allow partial success (some SPs may be missing)
   const results = await Promise.all(
     Array.from({ length: 48 }, (_, i) => {
       const sp = i + 1
@@ -461,9 +472,14 @@ export async function fetchAllData(settlementDate: string): Promise<{
     fetchMILS(settlementDate),
   ])
 
-  // If PN came back completely empty, build mock PN based on the units we have
+  const nonEmptySps = Array.from(pnMap.values()).filter(m => m.size > 0).length
+  if (nonEmptySps > 0 && nonEmptySps < 48) {
+    console.warn(`[elexon] PN data partial: only ${nonEmptySps}/48 SPs returned data — remaining periods will show zero EOL`)
+  }
+
+  // If PN came back completely empty, use the stable module-level mock PN
   const isPnEmpty = Array.from(pnMap.values()).every((m) => m.size === 0)
-  const mockPn = isPnEmpty ? buildMockPN(units) : null
+  const mockPn = isPnEmpty ? MOCK_PN : null
 
   // If MELS came back completely empty, build mock MELS (= registeredCapacity)
   const isMelsEmpty = melsMap.size === 0
