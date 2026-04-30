@@ -130,9 +130,7 @@ export default function UnitGrid() {
   const rowData = useMemo<GridRow[]>(() => {
     return units
       .filter((unit) => {
-        // Must have positive MEL
-        if (unit.registeredCapacity <= 0) return false
-        // Exclude renewable/interconnector fuel types
+        // Exclude renewable/interconnector fuel types (melMW check happens after mapping)
         if (EXCLUDED_FUEL_TYPES.has(unit.fuelType)) return false
         return true
       })
