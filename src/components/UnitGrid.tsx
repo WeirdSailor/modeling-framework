@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useMemo, useRef } from 'react'
 import { AgGridReact } from 'ag-grid-react'
 import { ModuleRegistry, AllCommunityModule } from 'ag-grid-community'
 import type {
@@ -126,11 +126,10 @@ export default function UnitGrid() {
   const units = useModellingStore((state) => state.units)
   const modellingActions = useModellingStore((state) => state.modellingActions)
   const selectedUnits = useModellingStore((state) => state.selectedUnits)
-  const toggleUnitSelection = useModellingStore((state) => state.toggleUnitSelection)
+  const setSelectedUnits = useModellingStore((state) => state.setSelectedUnits)
   const settlementPeriods = useModellingStore((state) => state.settlementPeriods)
 
   const selectedUnitsRef = useRef(selectedUnits)
-  useEffect(() => { selectedUnitsRef.current = selectedUnits }, [selectedUnits])
 
   const rowData = useMemo<GridRow[]>(() => {
     return units
@@ -189,14 +188,9 @@ export default function UnitGrid() {
 
   const handleSelectionChanged = (event: SelectionChangedEvent<GridRow>) => {
     const selectedIds = new Set(
-      event.api.getSelectedRows().map((r: GridRow) => r.bmUnitId),
+      event.api.getSelectedRows().map((r: GridRow) => r.bmUnitId)
     )
-    selectedIds.forEach((id) => {
-      if (!selectedUnitsRef.current.has(id)) toggleUnitSelection(id)
-    })
-    selectedUnitsRef.current.forEach((id) => {
-      if (!selectedIds.has(id)) toggleUnitSelection(id)
-    })
+    setSelectedUnits(selectedIds)
   }
 
   if (units.length === 0) {

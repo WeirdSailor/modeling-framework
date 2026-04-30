@@ -39,6 +39,7 @@ interface ModellingState {
 
   toggleUnitSelection: (bmUnitId: string) => void
   clearSelection: () => void
+  setSelectedUnits: (ids: Set<string>) => void
 
   addModellingAction: (action: ModellingAction) => void
   clearAllModelling: () => void
@@ -74,6 +75,8 @@ export const useModellingStore = create<ModellingState>((set) => ({
 
   clearSelection: () => set({ selectedUnits: new Set<string>() }),
 
+  setSelectedUnits: (ids: Set<string>) => set({ selectedUnits: ids }),
+
   addModellingAction: (action) =>
     set(state => {
       const filtered = state.modellingActions.filter(
@@ -89,6 +92,10 @@ export const useModellingStore = create<ModellingState>((set) => ({
   clearAllModelling: () =>
     set(state => {
       const updatedPeriods = refreshAggregates(state.settlementPeriods, [], state.units)
-      return { modellingActions: [], settlementPeriods: updatedPeriods }
+      return {
+        modellingActions: [],
+        settlementPeriods: updatedPeriods,
+        selectedUnits: new Set<string>(),
+      }
     }),
 }))

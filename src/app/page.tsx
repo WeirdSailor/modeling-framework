@@ -16,8 +16,10 @@ export default function Home() {
   const setError = useModellingStore(state => state.setError)
   const setUnits = useModellingStore(state => state.setUnits)
   const setSettlementPeriods = useModellingStore(state => state.setSettlementPeriods)
+  const clearAllModelling = useModellingStore(state => state.clearAllModelling)
 
   const loadData = useCallback(async () => {
+    clearAllModelling()
     setLoading(true)
     setError(null)
     try {
@@ -29,7 +31,7 @@ export default function Home() {
     } finally {
       setLoading(false)
     }
-  }, [selectedDate, setLoading, setError, setUnits, setSettlementPeriods])
+  }, [selectedDate, setLoading, setError, setUnits, setSettlementPeriods, clearAllModelling])
 
   useEffect(() => {
     loadData()
