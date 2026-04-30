@@ -3,9 +3,8 @@ import type { BMUnit, SettlementPeriodData, ModellingAction } from '@/models/typ
 import { computeAggregates } from '@/utils/margin'
 
 function getTomorrow(): string {
-  const d = new Date()
-  d.setDate(d.getDate() + 1)
-  return d.toISOString().split('T')[0]
+  const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000)
+  return tomorrow.toISOString().split('T')[0]
 }
 
 function refreshAggregates(
@@ -57,7 +56,10 @@ export const useModellingStore = create<ModellingState>((set) => ({
 
   // Actions
   setUnits: (units) => set({ units }),
-  setSettlementPeriods: (periods) => set({ settlementPeriods: periods }),
+  setSettlementPeriods: (periods) =>
+    set(state => ({
+      settlementPeriods: refreshAggregates(periods, state.modellingActions, state.units),
+    })),
   setSelectedDate: (date) => set({ selectedDate: date }),
   setLoading: (loading) => set({ isLoading: loading }),
   setError: (error) => set({ error }),
@@ -74,9 +76,14 @@ export const useModellingStore = create<ModellingState>((set) => ({
 
   addModellingAction: (action) =>
     set(state => {
-      const newActions = [...state.modellingActions, action]
-      const updatedPeriods = refreshAggregates(state.settlementPeriods, newActions, state.units)
-      return { modellingActions: newActions, settlementPeriods: updatedPeriods }
+      const filtered = state.modellingActions.filter(
+        a => !(a.bmUnitId === action.bmUnitId && a.fromPeriod === action.fromPeriod && a.toPeriod === action.toPeriod)
+      )
+      const newActions = [...filtered, action]
+      return {
+        modellingActions: newActions,
+        settlementPeriods: refreshAggregates(state.settlementPeriods, newActions, state.units),
+      }
     }),
 
   clearAllModelling: () =>
