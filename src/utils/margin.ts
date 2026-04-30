@@ -26,21 +26,11 @@ export function calculateEmx(
   modellingActions: ModellingAction[],
   units: BMUnit[]
 ): number {
-  const spNum = sp.settlementPeriod
-  const modelledIds = new Set(
-    modellingActions
-      .filter((a) => a.fromPeriod <= spNum && a.toPeriod >= spNum)
-      .map((a) => a.bmUnitId)
-  )
-
   let emx = 0
 
   for (const unit of units) {
-    const id = unit.bmUnitId
-    if (isUnitCommitted(id, sp, modellingActions)) {
-      emx += sp.mel[id] ?? 0
-    } else if (modelledIds.has(id)) {
-      emx += sp.mel[id] ?? 0
+    if (isUnitCommitted(unit.bmUnitId, sp, modellingActions)) {
+      emx += sp.mel[unit.bmUnitId] ?? 0
     }
   }
 
