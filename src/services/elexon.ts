@@ -261,6 +261,9 @@ export async function fetchBmUnits(): Promise<BMUnit[]> {
   const units: BMUnit[] = []
 
   for (const raw of refRaw) {
+    // Only transmission-connected units (T_ prefix)
+    if (raw.bmUnitType !== 'T') continue
+
     // Exclude non-dispatchable / interconnectors
     if (EXCLUDED_FUEL_TYPES.has(raw.fuelType)) continue
 
