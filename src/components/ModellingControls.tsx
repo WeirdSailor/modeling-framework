@@ -1,11 +1,9 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { useModellingStore } from '@/store/useModellingStore'
 import type { ModellingAction } from '@/models/types'
 import { getAllSpLabels } from '@/utils/settlements'
-
-const spOptions = getAllSpLabels()
 
 export default function ModellingControls() {
   const selectedUnits = useModellingStore(state => state.selectedUnits)
@@ -16,8 +14,10 @@ export default function ModellingControls() {
   const [fromPeriod, setFromPeriod] = useState(1)
   const [toPeriod, setToPeriod] = useState(48)
   const [outputLevel, setOutputLevel] = useState(100)
-  const [reasonCode] = useState<ModellingAction['reasonCode']>('MARGIN')
+  const [reasonCode, setReasonCode] = useState<ModellingAction['reasonCode']>('MARGIN')
   const [error, setError] = useState<string | null>(null)
+
+  const spOptions = useMemo(() => getAllSpLabels(), [])
 
   const defaultOutputLevel = useMemo(() => {
     const sels = Array.from(selectedUnits)
@@ -26,9 +26,15 @@ export default function ModellingControls() {
     return sels.length > 0 ? Math.min(...sels) : 100
   }, [selectedUnits, units])
 
+  const prevSelectionSizeRef = useRef(0)
+
   useEffect(() => {
-    setOutputLevel(defaultOutputLevel)
-  }, [defaultOutputLevel])
+    const currentSize = selectedUnits.size
+    if (prevSelectionSizeRef.current === 0 && currentSize > 0) {
+      setOutputLevel(defaultOutputLevel)
+    }
+    prevSelectionSizeRef.current = currentSize
+  }, [selectedUnits.size, defaultOutputLevel])
 
   function handleApply() {
     if (fromPeriod > toPeriod) {
@@ -57,7 +63,7 @@ export default function ModellingControls() {
           <span className="text-xs text-gray-500 mb-0.5">From SP</span>
           <select
             value={fromPeriod}
-            onChange={e => setFromPeriod(Number(e.target.value))}
+            onChange={e => { setFromPeriod(Number(e.target.value)); setError(null) }}
             className="bg-white border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             {spOptions.map(({ sp, label }) => (
@@ -73,7 +79,7 @@ export default function ModellingControls() {
           <span className="text-xs text-gray-500 mb-0.5">To SP</span>
           <select
             value={toPeriod}
-            onChange={e => setToPeriod(Number(e.target.value))}
+            onChange={e => { setToPeriod(Number(e.target.value)); setError(null) }}
             className="bg-white border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             {spOptions.map(({ sp, label }) => (
@@ -90,6 +96,8 @@ export default function ModellingControls() {
           <input
             type="number"
             value={outputLevel}
+            min={0}
+            step={1}
             onChange={e => setOutputLevel(Number(e.target.value))}
             className="bg-white border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
@@ -100,10 +108,14 @@ export default function ModellingControls() {
           <span className="text-xs text-gray-500 mb-0.5">Reason Code</span>
           <select
             value={reasonCode}
-            onChange={() => {}}
+            onChange={e => setReasonCode(e.target.value as ModellingAction['reasonCode'])}
             className="bg-white border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="MARGIN">MARGIN</option>
+            <option value="INERTIA">INERTIA</option>
+            <option value="VOLTAGE">VOLTAGE</option>
+            <option value="CONSTRAINT">CONSTRAINT</option>
+            <option value="RESERVE">RESERVE</option>
           </select>
         </div>
 
