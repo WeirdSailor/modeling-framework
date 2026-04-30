@@ -46,7 +46,7 @@ export function calculateEol(
 
   // Sum of PN for originally committed units (PN > 1 MW, not just modelled)
   let eol = 0
-  for (const [bmUnitId, pn] of Object.entries(sp.pn)) {
+  for (const [, pn] of Object.entries(sp.pn)) {
     if (pn > 1) {
       eol += pn
     }
@@ -88,8 +88,8 @@ export function calculateEmi(
   return emi
 }
 
-// Recalculate all four aggregates for one SP.
-export function recalculateAggregates(
+// Compute all four aggregates for one SP.
+export function computeAggregates(
   sp: SettlementPeriodData,
   modellingActions: ModellingAction[],
   units: BMUnit[]

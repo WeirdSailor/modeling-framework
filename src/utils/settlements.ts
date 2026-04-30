@@ -1,6 +1,9 @@
 // SP n starts at (n-1)*30 minutes from midnight
 // Returns "HH:MM" string
 export function spToTime(sp: number): string {
+  if (sp < 1 || sp > 48 || !Number.isInteger(sp)) {
+    throw new RangeError(`Settlement period must be an integer 1–48, got ${sp}`)
+  }
   const totalMinutes = (sp - 1) * 30
   const hours = Math.floor(totalMinutes / 60)
   const minutes = totalMinutes % 60
@@ -8,7 +11,16 @@ export function spToTime(sp: number): string {
 }
 
 // Returns ISO datetime string for the start of SP n on the given date (YYYY-MM-DD)
+/**
+ * @param sp - Settlement period (1-48)
+ * @param date - YYYY-MM-DD settlement date. The returned ISO string uses UTC offset (Z suffix).
+ *   In BST (UTC+1), SP 1 starts at T23:00Z the prior day — callers must account for this if
+ *   precise UTC times are needed.
+ */
 export function spToStartTime(sp: number, date: string): string {
+  if (sp < 1 || sp > 48 || !Number.isInteger(sp)) {
+    throw new RangeError(`Settlement period must be an integer 1–48, got ${sp}`)
+  }
   const totalMinutes = (sp - 1) * 30
   const hours = Math.floor(totalMinutes / 60)
   const minutes = totalMinutes % 60
@@ -33,7 +45,16 @@ export function dateToSettlementDate(date: Date): string {
 }
 
 // Returns the start Date object for SP n on the given settlement date
+/**
+ * @param sp - Settlement period (1-48)
+ * @param settlementDate - YYYY-MM-DD settlement date. The returned ISO string uses UTC offset (Z suffix).
+ *   In BST (UTC+1), SP 1 starts at T23:00Z the prior day — callers must account for this if
+ *   precise UTC times are needed.
+ */
 export function spToDate(sp: number, settlementDate: string): Date {
+  if (sp < 1 || sp > 48 || !Number.isInteger(sp)) {
+    throw new RangeError(`Settlement period must be an integer 1–48, got ${sp}`)
+  }
   const totalMinutes = (sp - 1) * 30
   const hours = Math.floor(totalMinutes / 60)
   const minutes = totalMinutes % 60
