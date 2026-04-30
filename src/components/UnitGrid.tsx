@@ -20,6 +20,7 @@ ModuleRegistry.registerModules([AllCommunityModule])
 
 interface GridRow {
   bmUnitId: string
+  nationalGridBmUnit: string
   fuelType: string
   registeredCapacity: number
   melMW: number
@@ -44,8 +45,8 @@ const columnDefs: ColDef<GridRow>[] = [
     resizable: false,
   },
   {
-    field: 'bmUnitId',
-    headerName: 'BMU ID',
+    field: 'nationalGridBmUnit',
+    headerName: 'BMU',
     width: 130,
     pinned: 'left',
   },
@@ -155,6 +156,7 @@ export default function UnitGrid() {
 
         return {
           bmUnitId: unit.bmUnitId,
+          nationalGridBmUnit: unit.nationalGridBmUnit,
           fuelType: unit.fuelType,
           registeredCapacity: unit.registeredCapacity,
           melMW,
