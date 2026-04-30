@@ -12,7 +12,7 @@ import {
   CartesianGrid,
   ResponsiveContainer,
 } from 'recharts'
-import type { TooltipContentProps, TooltipPayload, TooltipValueType, TooltipPayloadEntry } from 'recharts'
+import type { TooltipContentProps, TooltipPayloadEntry } from 'recharts'
 import { useModellingStore } from '@/store/useModellingStore'
 import { spToTime } from '@/utils/settlements'
 
@@ -78,7 +78,7 @@ export function MarginChart() {
     return (
       <div className="bg-white rounded-lg shadow p-4">
         <h2 className="text-sm font-medium text-gray-600 mb-2">
-          Margin Analysis — 48 Settlement Periods
+          Margin Analysis — {settlementPeriods.length} Settlement Periods
         </h2>
         <div className="h-80 flex items-center justify-center text-gray-400">
           {isLoading ? 'Loading data...' : 'No data available'}
@@ -88,7 +88,6 @@ export function MarginChart() {
   }
 
   const chartData: ChartDataPoint[] = settlementPeriods.map(sp => {
-    const margin = sp.emx - sp.demand
     return {
       sp: sp.settlementPeriod,
       label: spToTime(sp.settlementPeriod),
@@ -96,17 +95,21 @@ export function MarginChart() {
       emx: sp.emx,
       eol: sp.eol,
       emi: sp.emi,
-      margin,
-      marginPositive: Math.max(0, margin),
-      marginNegative: Math.min(0, margin),
+      margin: sp.margin,
+      marginPositive: Math.max(0, sp.margin),
+      marginNegative: Math.min(0, sp.margin),
     }
   })
 
   return (
     <div className="bg-white rounded-lg shadow p-4">
-      <h2 className="text-sm font-medium text-gray-600 mb-2">
-        Margin Analysis — 48 Settlement Periods
-      </h2>
+      <div className="flex items-center justify-between mb-2">
+        <h2 className="text-sm font-medium text-gray-600">Margin Analysis — {chartData.length} Settlement Periods</h2>
+        <div className="flex items-center gap-3 text-xs text-gray-500">
+          <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm bg-green-500 opacity-60" />Surplus margin</span>
+          <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm bg-red-500 opacity-60" />Deficit</span>
+        </div>
+      </div>
       <ResponsiveContainer width="100%" height={320}>
         <ComposedChart data={chartData} margin={{ top: 8, right: 16, left: 8, bottom: 8 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -132,7 +135,7 @@ export function MarginChart() {
           <Area
             dataKey="marginPositive"
             name="Surplus margin"
-            stackId="pos"
+            baseValue={0}
             fill="#22c55e"
             fillOpacity={0.3}
             stroke="none"
@@ -143,7 +146,7 @@ export function MarginChart() {
           <Area
             dataKey="marginNegative"
             name="Deficit margin"
-            stackId="neg"
+            baseValue={0}
             fill="#ef4444"
             fillOpacity={0.3}
             stroke="none"
