@@ -217,7 +217,7 @@ export default function UnitGrid() {
           rowData={rowData}
           columnDefs={columnDefs}
           defaultColDef={defaultColDef}
-          rowSelection={{ mode: 'multiRow', checkboxes: false }}
+          rowSelection={{ mode: 'multiRow', checkboxes: false, headerCheckbox: false }}
           getRowStyle={getRowStyle}
           onGridReady={handleGridReady}
           onSelectionChanged={handleSelectionChanged}
