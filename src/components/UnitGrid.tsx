@@ -1,27 +1,22 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { AgGridReact } from 'ag-grid-react'
 import { ModuleRegistry, AllCommunityModule } from 'ag-grid-community'
-import type { ColDef, SelectionChangedEvent } from 'ag-grid-community'
+import type {
+  ColDef,
+  GridReadyEvent,
+  RowClassParams,
+  RowStyle,
+  SelectionChangedEvent,
+} from 'ag-grid-community'
 import 'ag-grid-community/styles/ag-grid.css'
 import 'ag-grid-community/styles/ag-theme-alpine.css'
 import { useModellingStore } from '@/store/useModellingStore'
 import { isUnitCommitted } from '@/utils/margin'
+import { EXCLUDED_FUEL_TYPES } from '@/utils/fuelTypes'
 
 ModuleRegistry.registerModules([AllCommunityModule])
-
-const EXCLUDED_FUEL_TYPES = new Set([
-  'WIND',
-  'SOLAR',
-  'INTNEM',
-  'INTFR',
-  'INTIRL',
-  'INTEW',
-  'INTNED',
-  'INTIFA2',
-  'INTELEC',
-])
 
 interface GridRow {
   bmUnitId: string
@@ -99,12 +94,14 @@ const columnDefs: ColDef<GridRow>[] = [
     field: 'ndz',
     headerName: 'NDZ (min)',
     width: 90,
+    type: 'numericColumn',
     valueFormatter: (p) => (p.value != null ? String(p.value) : 'N/A'),
   },
   {
     field: 'mnzt',
     headerName: 'MNZT (min)',
     width: 90,
+    type: 'numericColumn',
     valueFormatter: (p) => (p.value != null ? String(p.value) : 'N/A'),
   },
   {
@@ -120,12 +117,20 @@ const defaultColDef: ColDef<GridRow> = {
   resizable: true,
 }
 
+const getRowStyle = (params: RowClassParams<GridRow>): RowStyle | undefined => {
+  if (params.data?.isModelled) return { background: '#dbeafe' }
+  return undefined
+}
+
 export default function UnitGrid() {
   const units = useModellingStore((state) => state.units)
   const modellingActions = useModellingStore((state) => state.modellingActions)
   const selectedUnits = useModellingStore((state) => state.selectedUnits)
   const toggleUnitSelection = useModellingStore((state) => state.toggleUnitSelection)
   const settlementPeriods = useModellingStore((state) => state.settlementPeriods)
+
+  const selectedUnitsRef = useRef(selectedUnits)
+  useEffect(() => { selectedUnitsRef.current = selectedUnits }, [selectedUnits])
 
   const rowData = useMemo<GridRow[]>(() => {
     return units
@@ -174,39 +179,55 @@ export default function UnitGrid() {
       })
   }, [units, modellingActions, settlementPeriods])
 
+  const handleGridReady = useCallback((event: GridReadyEvent<GridRow>) => {
+    event.api.forEachNode((node) => {
+      if (node.data && selectedUnitsRef.current.has(node.data.bmUnitId)) {
+        node.setSelected(true)
+      }
+    })
+  }, [])
+
   const handleSelectionChanged = (event: SelectionChangedEvent<GridRow>) => {
     const selectedIds = new Set(
       event.api.getSelectedRows().map((r: GridRow) => r.bmUnitId),
     )
     selectedIds.forEach((id) => {
-      if (!selectedUnits.has(id)) toggleUnitSelection(id)
+      if (!selectedUnitsRef.current.has(id)) toggleUnitSelection(id)
     })
-    selectedUnits.forEach((id) => {
+    selectedUnitsRef.current.forEach((id) => {
       if (!selectedIds.has(id)) toggleUnitSelection(id)
     })
   }
 
+  if (units.length === 0) {
+    return (
+      <div className="flex-1 min-h-0 flex items-center justify-center text-gray-400">
+        Loading units...
+      </div>
+    )
+  }
+
+  if (units.length > 0 && settlementPeriods.length === 0) {
+    return (
+      <div className="flex-1 min-h-0 flex items-center justify-center text-gray-400">
+        Loading settlement data...
+      </div>
+    )
+  }
+
   return (
     <div className="flex-1 min-h-0 overflow-hidden">
-      {units.length === 0 ? (
-        <div className="h-full flex items-center justify-center text-gray-400">
-          Loading units...
-        </div>
-      ) : (
-        <div className="ag-theme-alpine h-full w-full">
-          <AgGridReact<GridRow>
-            rowData={rowData}
-            columnDefs={columnDefs}
-            defaultColDef={defaultColDef}
-            rowSelection="multiple"
-            getRowStyle={(params) => {
-              if (params.data?.isModelled) return { background: '#dbeafe' }
-              return undefined
-            }}
-            onSelectionChanged={handleSelectionChanged}
-          />
-        </div>
-      )}
+      <div className="ag-theme-alpine h-full w-full">
+        <AgGridReact<GridRow>
+          rowData={rowData}
+          columnDefs={columnDefs}
+          defaultColDef={defaultColDef}
+          rowSelection={{ mode: 'multiRow' }}
+          getRowStyle={getRowStyle}
+          onGridReady={handleGridReady}
+          onSelectionChanged={handleSelectionChanged}
+        />
+      </div>
     </div>
   )
 }

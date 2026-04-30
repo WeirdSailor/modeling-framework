@@ -1,0 +1,3 @@
+export const EXCLUDED_FUEL_TYPES = new Set([
+  'WIND', 'SOLAR', 'INTNEM', 'INTFR', 'INTIRL', 'INTEW', 'INTNED', 'INTIFA2', 'INTELEC',
+])

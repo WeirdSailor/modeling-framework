@@ -1,22 +1,7 @@
 import type { BMUnit, SettlementPeriodData } from '@/models/types'
 import { spToStartTime } from '@/utils/settlements'
 import { computeAggregates } from '@/utils/margin'
-
-// ---------------------------------------------------------------------------
-// Fuel type filter
-// ---------------------------------------------------------------------------
-
-const EXCLUDED_FUEL_TYPES = new Set([
-  'WIND',
-  'SOLAR',
-  'INTNEM',
-  'INTFR',
-  'INTIRL',
-  'INTEW',
-  'INTNED',
-  'INTIFA2',
-  'INTELEC',
-])
+import { EXCLUDED_FUEL_TYPES } from '@/utils/fuelTypes'
 
 // ---------------------------------------------------------------------------
 // Raw API response shapes
