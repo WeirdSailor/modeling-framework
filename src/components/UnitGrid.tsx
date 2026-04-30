@@ -55,13 +55,6 @@ const columnDefs: ColDef<GridRow>[] = [
     width: 100,
   },
   {
-    field: 'registeredCapacity',
-    headerName: 'Cap (MW)',
-    width: 90,
-    type: 'numericColumn',
-    valueFormatter: (p) => p.value?.toFixed(0) ?? '',
-  },
-  {
     field: 'melMW',
     headerName: 'MEL (MW)',
     width: 90,
@@ -73,14 +66,6 @@ const columnDefs: ColDef<GridRow>[] = [
     headerName: 'PN (MW)',
     width: 90,
     type: 'numericColumn',
-    valueFormatter: (p) => p.value?.toFixed(0) ?? '',
-  },
-  {
-    field: 'incrementalMW',
-    headerName: 'Inc. MW',
-    width: 90,
-    type: 'numericColumn',
-    sort: 'desc',
     valueFormatter: (p) => p.value?.toFixed(0) ?? '',
   },
   {
