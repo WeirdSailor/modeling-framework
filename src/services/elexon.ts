@@ -66,8 +66,9 @@ function dayRange(settlementDate: string): { from: string; to: string } {
 function dynamicParamRange(): { from: string; to: string } {
   const now = new Date()
   const sevenDays = 7 * 24 * 60 * 60 * 1000
+  // API enforces a max 7-day window — use 7 days back to now
   const from = new Date(now.getTime() - sevenDays).toISOString()
-  const to = new Date(now.getTime() + sevenDays).toISOString()
+  const to = now.toISOString()
   return { from, to }
 }
 
