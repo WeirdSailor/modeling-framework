@@ -35,16 +35,6 @@ interface GridRow {
 
 const columnDefs: ColDef<GridRow>[] = [
   {
-    headerName: '',
-    checkboxSelection: true,
-    headerCheckboxSelection: false,
-    width: 50,
-    pinned: 'left',
-    sortable: false,
-    filter: false,
-    resizable: false,
-  },
-  {
     field: 'nationalGridBmUnit',
     headerName: 'BMU',
     width: 130,
@@ -218,7 +208,7 @@ export default function UnitGrid() {
           rowData={rowData}
           columnDefs={columnDefs}
           defaultColDef={defaultColDef}
-          rowSelection={{ mode: 'multiRow' }}
+          rowSelection={{ mode: 'multiRow', checkboxes: true, headerCheckbox: false }}
           getRowStyle={getRowStyle}
           onGridReady={handleGridReady}
           onSelectionChanged={handleSelectionChanged}
