@@ -59,8 +59,8 @@ export default function Home() {
       {/* Modelling controls — between chart and grid */}
       <ModellingControls />
 
-      {/* Unit grid — remaining space */}
-      <div className="flex-1 min-h-0 px-6 pb-4">
+      {/* Unit grid — remaining space; flex-col so UnitGrid's flex-1 fills it */}
+      <div className="flex-1 min-h-0 px-6 pb-4 flex flex-col">
         <UnitGrid />
       </div>
     </div>

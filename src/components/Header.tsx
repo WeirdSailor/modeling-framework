@@ -26,7 +26,9 @@ export function Header({ onRefresh }: HeaderProps) {
           value={selectedDate}
           onChange={(e) => {
             setSelectedDate(e.target.value)
-            onRefresh()
+            // Don't call onRefresh here — page.tsx's useEffect re-fires when
+            // selectedDate changes, triggering a fresh fetch with the new date.
+            // Calling onRefresh() here would also fire a stale-date fetch first.
           }}
           className="bg-gray-700 text-white rounded px-2 py-1 text-sm border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
