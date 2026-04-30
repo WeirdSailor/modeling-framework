@@ -63,13 +63,24 @@ function dayRange(settlementDate: string): { from: string; to: string } {
   }
 }
 
-function dynamicParamRange(): { from: string; to: string } {
-  const now = new Date()
+// API enforces a max 7-day window. Fetch multiple windows in parallel to cover
+// the last 35 days so we capture units that haven't been active recently.
+async function fetchDynParam(endpoint: string): Promise<RawDynParam[]> {
+  const now = Date.now()
   const sevenDays = 7 * 24 * 60 * 60 * 1000
-  // API enforces a max 7-day window — use 7 days back to now
-  const from = new Date(now.getTime() - sevenDays).toISOString()
-  const to = now.toISOString()
-  return { from, to }
+  const windows = Array.from({ length: 5 }, (_, i) => ({
+    from: new Date(now - (i + 1) * sevenDays).toISOString(),
+    to: new Date(now - i * sevenDays).toISOString(),
+  }))
+  const results = await Promise.all(
+    windows.map(({ from, to }) =>
+      safeFetch<{ data?: RawDynParam[] } | null>(
+        `/api/elexon/${endpoint}?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
+        null,
+      ),
+    ),
+  )
+  return results.flatMap((r) => r?.data ?? [])
 }
 
 // ---------------------------------------------------------------------------
@@ -234,16 +245,14 @@ const MOCK_PN = buildMockPN(MOCK_BM_UNITS)
 // ---------------------------------------------------------------------------
 
 export async function fetchBmUnits(): Promise<BMUnit[]> {
-  const { from, to } = dynamicParamRange()
-
-  // Parallel fetches
-  const [refRaw, selRaw, silRaw, ndzRaw, mnztRaw, mztRaw] = await Promise.all([
+  // Parallel fetches — dynamic params fan out across 5 × 7-day windows each
+  const [refRaw, selEntries, silEntries, ndzEntries, mnztEntries, mztEntries] = await Promise.all([
     safeFetch<RawBmUnitRef[] | null>('/api/elexon/reference/bmunits/all', null),
-    safeFetch<{ data?: RawDynParam[] } | null>(`/api/elexon/datasets/SEL?from=${from}&to=${to}`, null),
-    safeFetch<{ data?: RawDynParam[] } | null>(`/api/elexon/datasets/SIL?from=${from}&to=${to}`, null),
-    safeFetch<{ data?: RawDynParam[] } | null>(`/api/elexon/datasets/NDZ?from=${from}&to=${to}`, null),
-    safeFetch<{ data?: RawDynParam[] } | null>(`/api/elexon/datasets/MNZT?from=${from}&to=${to}`, null),
-    safeFetch<{ data?: RawDynParam[] } | null>(`/api/elexon/datasets/MZT?from=${from}&to=${to}`, null),
+    fetchDynParam('datasets/SEL'),
+    fetchDynParam('datasets/SIL'),
+    fetchDynParam('datasets/NDZ'),
+    fetchDynParam('datasets/MNZT'),
+    fetchDynParam('datasets/MZT'),
   ])
 
   // If reference data failed entirely, fall back to mock
@@ -253,11 +262,11 @@ export async function fetchBmUnits(): Promise<BMUnit[]> {
   }
 
   // Build lookup maps for dynamic params (latest entry wins)
-  const selMap = latestByBmu(selRaw?.data ?? [])
-  const silMap = latestByBmu(silRaw?.data ?? [])
-  const ndzMap = latestByBmu(ndzRaw?.data ?? [])
-  const mnztMap = latestByBmu(mnztRaw?.data ?? [])
-  const mztMap = latestByBmu(mztRaw?.data ?? [])
+  const selMap = latestByBmu(selEntries)
+  const silMap = latestByBmu(silEntries)
+  const ndzMap = latestByBmu(ndzEntries)
+  const mnztMap = latestByBmu(mnztEntries)
+  const mztMap = latestByBmu(mztEntries)
 
   const units: BMUnit[] = []
 
