@@ -9,6 +9,7 @@ interface Props {
   unitById: Map<string, BMUnit>
   unitPnByBmUnit: Record<string, number>
   readOnly: boolean
+  scenario: string
   onRemoveUnit: (bmUnitId: string) => void
   onUpdateNotes: (bmUnitId: string, notes: string) => void
 }
@@ -46,9 +47,10 @@ function Stat({ label, value }: { label: string; value: string }) {
 }
 
 export default function SelectedTable({
-  draft, unitById, unitPnByBmUnit, readOnly,
+  draft, unitById, unitPnByBmUnit, readOnly, scenario,
   onRemoveUnit, onUpdateNotes,
 }: Props) {
+  const showPn = scenario === 'pullback'
   const uniqueUnitIds = Array.from(new Set(draft.actions.map(a => a.bmUnitId)))
 
   const totals = uniqueUnitIds.reduce(
@@ -97,10 +99,14 @@ export default function SelectedTable({
             <thead>
               <tr>
                 <th>BMU</th>
-                <th className="num">PN</th>
-                <th className="num">MEL</th>
+                <th>Type</th>
+                <th className="num">NDZ</th>
+                <th className="num">MZT</th>
+                <th className="num">MNZT</th>
                 <th className="num">SEL</th>
-                <th className="num">Price</th>
+                <th className="num">MEL</th>
+                <th className="num">£ SEL/MEL</th>
+                {showPn && <th className="num">PN</th>}
                 <th className="notes-col">Notes</th>
                 {!readOnly && <th className="action-col" />}
               </tr>
@@ -115,17 +121,20 @@ export default function SelectedTable({
                   <tr key={bmUnitId}>
                     <td className="mono bmu-cell">
                       <span>{u.nationalGridBmUnit}</span>
-                      <span className="site-sub">
-                        {u.gspGroup}
-                        <span style={{ marginLeft: 4 }}>
-                          <TypeChip fuelType={u.fuelType} />
-                        </span>
-                      </span>
+                      <span className="site-sub">{u.gspGroup}</span>
                     </td>
-                    <td className="mono num">{pn > 0 ? pn.toFixed(0) : '—'}</td>
-                    <td className="mono num">{u.registeredCapacity.toFixed(0)}</td>
+                    <td><TypeChip fuelType={u.fuelType} /></td>
+                    <td className="mono num">{u.ndz  ? `${u.ndz}m`  : '—'}</td>
+                    <td className="mono num">{u.mzt  ? `${u.mzt}m`  : '—'}</td>
+                    <td className="mono num">{u.mnzt ? `${u.mnzt}m` : '—'}</td>
                     <td className="mono num">{u.sel != null && u.sel > 0 ? u.sel.toFixed(0) : '—'}</td>
-                    <td className="mono num">£{STATIC_PRICE}</td>
+                    <td className="mono num">{u.registeredCapacity.toFixed(0)}</td>
+                    <td className="mono num price-tier-cell">
+                      {u.priceToSel ? `£${u.priceToSel}` : '—'}
+                      {' / '}
+                      {u.priceToMel ? `£${u.priceToMel}` : '—'}
+                    </td>
+                    {showPn && <td className="mono num">{pn > 0 ? pn.toFixed(0) : '—'}</td>}
                     <td className="notes-col">
                       {readOnly ? (
                         <span className="notes-readonly">{notes || <em className="muted">—</em>}</span>

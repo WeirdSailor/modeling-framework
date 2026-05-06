@@ -220,9 +220,10 @@ export default function Home() {
   }
 
   function handleReopen() {
-    if (!activeDraftId) return
+    if (!activeDraftId || !activeDraft) return
+    const wasCommitted = activeDraft.status === 'committed'
     reopenDraft(activeDraftId)
-    flashToast('Draft reopened')
+    flashToast(wasCommitted ? 'Draft uncommitted' : 'Draft restored')
   }
 
   function handleDelete() {
@@ -370,6 +371,7 @@ export default function Home() {
                     unitById={unitById}
                     unitPnByBmUnit={unitPnByBmUnit}
                     readOnly={readOnly}
+                    scenario={scenario}
                     onRemoveUnit={handleRemoveUnit}
                     onUpdateNotes={(bmUnitId, notes) =>
                       updateUnitNotes(activeDraftId!, bmUnitId, notes)

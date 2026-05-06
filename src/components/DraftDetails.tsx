@@ -141,7 +141,7 @@ export default function DraftDetails({
           {draft.status === 'committed' && (
             <>
               <span className="dd-readonly-hint">Committed — read only</span>
-              <button className="btn btn-ghost" onClick={onReopen}>Reopen</button>
+              <button className="btn btn-ghost" onClick={onReopen}>Uncommit</button>
             </>
           )}
           {draft.status === 'discarded' && (

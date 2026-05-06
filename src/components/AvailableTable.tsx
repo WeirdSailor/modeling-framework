@@ -4,7 +4,6 @@ import { useState, useMemo, useCallback } from 'react'
 import type { BMUnit } from '@/models/types'
 import { SCENARIOS } from '@/config/scenarios'
 
-const STATIC_PRICE = 120
 
 interface Props {
   units: BMUnit[]
@@ -19,7 +18,7 @@ interface Props {
   onAddUnits: (ids: string[]) => void
 }
 
-type SortKey = 'bmUnitId' | 'nationalGridBmUnit' | 'fuelType' | 'pn' | 'mel' | 'sel' | 'price'
+type SortKey = 'bmUnitId' | 'nationalGridBmUnit' | 'fuelType' | 'pn' | 'mel' | 'sel' | 'ndz' | 'mnzt' | 'mzt' | 'priceToMel'
 
 interface UnitRow {
   bmUnitId: string
@@ -29,8 +28,11 @@ interface UnitRow {
   pn: number
   mel: number
   sel: number
-  ndz: number   // minutes; 0 = unknown
-  price: number
+  ndz: number
+  mnzt: number
+  mzt: number
+  priceToSel: number  // 0 = no SEL data
+  priceToMel: number
 }
 
 const SYNCHRONOUS_TYPES = new Set(['CCGT', 'COAL', 'NUCLEAR', 'OCGT', 'NPSHYD', 'PS', 'BIOMASS', 'OIL', 'GAS'])
@@ -116,7 +118,10 @@ export default function AvailableTable({
       mel: u.registeredCapacity,
       sel: u.sel ?? 0,
       ndz: u.ndz ?? 0,
-      price: STATIC_PRICE,
+      mnzt: u.mnzt ?? 0,
+      mzt: u.mzt ?? 0,
+      priceToSel: u.priceToSel ?? 0,
+      priceToMel: u.priceToMel ?? 0,
     }))
   }, [units, unitPnByBmUnit])
 
@@ -200,7 +205,9 @@ export default function AvailableTable({
 
   const showCheckbox = selectionPattern === 'buttons' && !readOnly
   const showAddBtn   = selectionPattern === 'buttons' && !readOnly
-  const colSpan = [showCheckbox, true, true, true, true, true, true, showAddBtn].filter(Boolean).length
+  const showPn       = scenario === 'pullback'
+  // BMU, Type, NDZ, MZT, MNZT, SEL, MEL, £ SEL/MEL = 8 fixed; PN optional
+  const colSpan = [showCheckbox, true, true, true, true, true, true, true, true, showPn, showAddBtn].filter(Boolean).length
 
   return (
     <div className="panel available-panel">
@@ -258,10 +265,13 @@ export default function AvailableTable({
               )}
               <SortTh col="nationalGridBmUnit" sort={sort} onSort={toggleSort}>BMU</SortTh>
               <SortTh col="fuelType" sort={sort} onSort={toggleSort}>Type</SortTh>
-              <SortTh col="pn"    sort={sort} onSort={toggleSort} numeric>PN</SortTh>
-              <SortTh col="mel"   sort={sort} onSort={toggleSort} numeric>MEL</SortTh>
+              <SortTh col="ndz"   sort={sort} onSort={toggleSort} numeric>NDZ</SortTh>
+              <SortTh col="mzt"   sort={sort} onSort={toggleSort} numeric>MZT</SortTh>
+              <SortTh col="mnzt"  sort={sort} onSort={toggleSort} numeric>MNZT</SortTh>
               <SortTh col="sel"   sort={sort} onSort={toggleSort} numeric>SEL</SortTh>
-              <SortTh col="price" sort={sort} onSort={toggleSort} numeric>Price</SortTh>
+              <SortTh col="mel"        sort={sort} onSort={toggleSort} numeric>MEL</SortTh>
+              <SortTh col="priceToMel" sort={sort} onSort={toggleSort} numeric>£ SEL/MEL</SortTh>
+              {showPn && <SortTh col="pn" sort={sort} onSort={toggleSort} numeric>PN</SortTh>}
               {showAddBtn && <th className="action-col" />}
             </tr>
           </thead>
@@ -302,10 +312,17 @@ export default function AvailableTable({
                     {inOther && <span className="badge badge-other" title={`Also in ${otherName}`}>Also in {otherName}</span>}
                   </td>
                   <td><TypeChip fuelType={row.fuelType} /></td>
-                  <td className="mono num">{row.pn > 0 ? row.pn.toFixed(0) : '—'}</td>
+                  <td className="mono num">{row.ndz  > 0 ? `${row.ndz}m`  : '—'}</td>
+                  <td className="mono num">{row.mzt  > 0 ? `${row.mzt}m`  : '—'}</td>
+                  <td className="mono num">{row.mnzt > 0 ? `${row.mnzt}m` : '—'}</td>
+                  <td className="mono num">{row.sel  > 0 ? row.sel.toFixed(0)  : '—'}</td>
                   <td className="mono num">{row.mel.toFixed(0)}</td>
-                  <td className="mono num">{row.sel > 0 ? row.sel.toFixed(0) : '—'}</td>
-                  <td className="mono num">£{row.price}</td>
+                  <td className="mono num price-tier-cell">
+                    {row.priceToSel > 0 ? `£${row.priceToSel}` : '—'}
+                    {' / '}
+                    {row.priceToMel > 0 ? `£${row.priceToMel}` : '—'}
+                  </td>
+                  {showPn && <td className="mono num">{row.pn > 0 ? row.pn.toFixed(0) : '—'}</td>}
                   {showAddBtn && (
                     <td className="action-col" onClick={e => e.stopPropagation()}>
                       <button

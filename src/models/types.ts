@@ -10,6 +10,9 @@ export interface BMUnit {
   mzt?: number;  // Minimum Zero Time (minutes) — API field: `periodMin`
   sel?: number;  // Stable Export Limit (MW) — API field: `level`
   sil?: number;  // Stable Import Limit (MW) — API field: `level`
+  // Price tiers (£/MWh) — fake placeholder until offer data is available
+  priceToSel?: number; // highest offer tier price on the way to SEL output
+  priceToMel?: number; // highest offer tier price on the way to MEL output
 }
 
 export interface SettlementPeriodData {

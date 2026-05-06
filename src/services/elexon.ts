@@ -130,6 +130,23 @@ function latestByBmu(entries: RawDynParam[]): Map<string, RawDynParam> {
 }
 
 // ---------------------------------------------------------------------------
+// Price tier helpers — fake placeholder until offer data is wired up
+// ---------------------------------------------------------------------------
+
+const OFFER_PRICE_TIERS = [105, 120, 135, 150, 157, 175, 185, 210]
+
+// Returns fake highest-tier prices on the path to SEL and MEL output.
+// priceToMel >= priceToSel; SEL price is undefined when hasSel is false.
+function fakePriceTiers(hasSel: boolean): { priceToSel?: number; priceToMel: number } {
+  const baseIdx = Math.floor(Math.random() * (OFFER_PRICE_TIERS.length - 2))
+  const melIdx  = Math.min(OFFER_PRICE_TIERS.length - 1, baseIdx + Math.floor(Math.random() * 3))
+  return {
+    priceToSel: hasSel ? OFFER_PRICE_TIERS[baseIdx] : undefined,
+    priceToMel: OFFER_PRICE_TIERS[melIdx],
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Mock data generators
 // ---------------------------------------------------------------------------
 
@@ -163,6 +180,7 @@ function buildMockBmUnits(): BMUnit[] {
         mzt: 30 + Math.round(Math.random() * 90),
         sel: Math.round(cap * selFraction),
         sil: 0,
+        ...fakePriceTiers(true),
       })
     }
   }
@@ -303,6 +321,7 @@ export async function fetchBmUnits(): Promise<BMUnit[]> {
       ndz: ndzEntry?.notice !== undefined ? Math.round(ndzEntry.notice / 60) : undefined,
       mnzt: mnztEntry?.periodMin !== undefined ? mnztEntry.periodMin : undefined,
       mzt: mztEntry?.periodMin !== undefined ? mztEntry.periodMin : undefined,
+      ...fakePriceTiers(selEntry?.level !== undefined),
     })
   }
 

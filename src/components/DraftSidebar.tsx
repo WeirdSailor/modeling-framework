@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import type { DraftPlan, SettlementPeriodData } from '@/models/types'
 
 interface Props {
@@ -59,8 +60,10 @@ export default function DraftSidebar({
   drafts, activeId, onSelect, onCreate, showArchive, setShowArchive,
   settlementPeriods, isLoading, onRefresh,
 }: Props) {
-  const editing = drafts.filter(d => d.status === 'draft')
-  const archive = drafts.filter(d => d.status !== 'draft')
+  const [showCommitted, setShowCommitted] = useState(true)
+  const editing   = drafts.filter(d => d.status === 'draft')
+  const committed = drafts.filter(d => d.status === 'committed')
+  const archive   = drafts.filter(d => d.status === 'discarded')
 
   const windowStart = settlementPeriods[0]?.startTime
   const windowEnd   = settlementPeriods[settlementPeriods.length - 1]?.startTime
@@ -121,16 +124,40 @@ export default function DraftSidebar({
       <div className="sidebar-section">
         <button
           className="sidebar-label-toggle"
+          onClick={() => setShowCommitted(!showCommitted)}
+        >
+          <span>Committed</span>
+          <span className="count-pill count-pill-sm">{committed.length}</span>
+          <span className={`caret ${showCommitted ? 'open' : ''}`}>▾</span>
+        </button>
+        {showCommitted && (
+          <ul className="draft-list">
+            {committed.length === 0 && (
+              <li className="draft-list-empty">No committed drafts</li>
+            )}
+            {committed.map(d => (
+              <DraftListItem
+                key={d.id} draft={d} active={d.id === activeId}
+                onClick={() => onSelect(d.id)} periods={settlementPeriods}
+              />
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <div className="sidebar-section">
+        <button
+          className="sidebar-label-toggle"
           onClick={() => setShowArchive(!showArchive)}
         >
-          <span>Archive</span>
+          <span>Discarded</span>
           <span className="count-pill count-pill-sm">{archive.length}</span>
           <span className={`caret ${showArchive ? 'open' : ''}`}>▾</span>
         </button>
         {showArchive && (
           <ul className="draft-list">
             {archive.length === 0 && (
-              <li className="draft-list-empty">Nothing archived yet</li>
+              <li className="draft-list-empty">Nothing discarded yet</li>
             )}
             {archive.map(d => (
               <DraftListItem
