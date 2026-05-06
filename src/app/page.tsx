@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useModellingStore } from '@/store/useModellingStore'
+import type { ModellingAction, OperationType } from '@/models/types'
 import { fetchAllData } from '@/services/elexon'
 import { isUnitPnCommitted } from '@/utils/margin'
 import { EXCLUDED_FUEL_TYPES, PULLBACK_FUEL_TYPES } from '@/utils/fuelTypes'
@@ -68,6 +69,8 @@ export default function Home() {
   const renameDraft       = useModellingStore(s => s.renameDraft)
   const updateDraftWindow = useModellingStore(s => s.updateDraftWindow)
   const updateUnitNotes   = useModellingStore(s => s.updateUnitNotes)
+  const updateUnitReason        = useModellingStore(s => s.updateUnitReason)
+  const updateUnitOperationType = useModellingStore(s => s.updateUnitOperationType)
   const commitDraft       = useModellingStore(s => s.commitDraft)
   const discardDraft      = useModellingStore(s => s.discardDraft)
   const reopenDraft       = useModellingStore(s => s.reopenDraft)
@@ -240,9 +243,19 @@ export default function Home() {
     })
   }
 
+  const SCENARIO_REASON: Record<string, ModellingAction['reasonCode']> = {
+    margin:   'MARGIN',
+    inertia:  'INERTIA',
+    voltage:  'VOLTAGE',
+    reserve:  'RESERVE',
+    response: 'RESERVE',
+    pullback: 'CONSTRAINT',
+  }
+
   function handleAddUnits(ids: string[]) {
     if (!activeDraftId) return
-    addUnitsToDraft(activeDraftId, ids)
+    const reasonCode = SCENARIO_REASON[scenario] ?? 'MARGIN'
+    addUnitsToDraft(activeDraftId, ids, reasonCode)
     flashToast(ids.length === 1 ? `Added ${ids[0]}` : `Added ${ids.length} units`)
   }
 
@@ -375,6 +388,12 @@ export default function Home() {
                     onRemoveUnit={handleRemoveUnit}
                     onUpdateNotes={(bmUnitId, notes) =>
                       updateUnitNotes(activeDraftId!, bmUnitId, notes)
+                    }
+                    onUpdateReason={(bmUnitId, reasonCode) =>
+                      updateUnitReason(activeDraftId!, bmUnitId, reasonCode)
+                    }
+                    onUpdateOperationType={(bmUnitId, operationType) =>
+                      updateUnitOperationType(activeDraftId!, bmUnitId, operationType)
                     }
                   />
                 </div>

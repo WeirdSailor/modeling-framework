@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { BMUnit, SettlementPeriodData, ModellingAction, DraftPlan } from '@/models/types'
+import type { BMUnit, SettlementPeriodData, ModellingAction, DraftPlan, OperationType } from '@/models/types'
 import { computeAggregates } from '@/utils/margin'
 
 const DRAFT_COLORS = ['#f59e0b', '#8b5cf6', '#06b6d4', '#f97316', '#ec4899']
@@ -35,7 +35,9 @@ interface ModellingState {
 
   createDraft: () => string
   setActiveDraft: (id: string | null) => void
-  addUnitsToDraft: (draftId: string, bmUnitIds: string[]) => void
+  addUnitsToDraft: (draftId: string, bmUnitIds: string[], reasonCode?: ModellingAction['reasonCode']) => void
+  updateUnitReason: (draftId: string, bmUnitId: string, reasonCode: ModellingAction['reasonCode']) => void
+  updateUnitOperationType: (draftId: string, bmUnitId: string, operationType: OperationType | undefined) => void
   removeUnitFromDraft: (draftId: string, bmUnitId: string) => void
   renameDraft: (id: string, name: string) => void
   updateDraftWindow: (id: string, fromPeriod: number, toPeriod: number) => void
@@ -95,7 +97,7 @@ export const useModellingStore = create<ModellingState>((set, get) => ({
 
   setActiveDraft: (id) => set({ activeDraftId: id }),
 
-  addUnitsToDraft: (draftId, bmUnitIds) =>
+  addUnitsToDraft: (draftId, bmUnitIds, reasonCode = 'MARGIN') =>
     set(state => {
       const draft = state.drafts.find(d => d.id === draftId)
       if (!draft || draft.status !== 'draft') return {}
@@ -112,7 +114,7 @@ export const useModellingStore = create<ModellingState>((set, get) => ({
             fromPeriod,
             toPeriod,
             outputLevel,
-            reasonCode: 'MARGIN' as const,
+            reasonCode,
             timestamp: new Date(),
           }
         })
@@ -172,6 +174,24 @@ export const useModellingStore = create<ModellingState>((set, get) => ({
       drafts: state.drafts.map(d =>
         d.id === draftId
           ? { ...d, unitNotes: { ...d.unitNotes, [bmUnitId]: notes } }
+          : d
+      ),
+    })),
+
+  updateUnitReason: (draftId, bmUnitId, reasonCode) =>
+    set(state => ({
+      drafts: state.drafts.map(d =>
+        d.id === draftId
+          ? { ...d, actions: d.actions.map(a => a.bmUnitId === bmUnitId ? { ...a, reasonCode } : a) }
+          : d
+      ),
+    })),
+
+  updateUnitOperationType: (draftId, bmUnitId, operationType) =>
+    set(state => ({
+      drafts: state.drafts.map(d =>
+        d.id === draftId
+          ? { ...d, actions: d.actions.map(a => a.bmUnitId === bmUnitId ? { ...a, operationType } : a) }
           : d
       ),
     })),

@@ -18,7 +18,7 @@ interface Props {
   onAddUnits: (ids: string[]) => void
 }
 
-type SortKey = 'bmUnitId' | 'nationalGridBmUnit' | 'fuelType' | 'pn' | 'mel' | 'sel' | 'ndz' | 'mnzt' | 'mzt' | 'priceToMel'
+type SortKey = 'bmUnitId' | 'nationalGridBmUnit' | 'fuelType' | 'pn' | 'mel' | 'sel' | 'ndz' | 'mnzt' | 'mzt' | 'priceToSel' | 'priceToMel'
 
 interface UnitRow {
   bmUnitId: string
@@ -206,8 +206,8 @@ export default function AvailableTable({
   const showCheckbox = selectionPattern === 'buttons' && !readOnly
   const showAddBtn   = selectionPattern === 'buttons' && !readOnly
   const showPn       = scenario === 'pullback'
-  // BMU, Type, NDZ, MZT, MNZT, SEL, MEL, £ SEL/MEL = 8 fixed; PN optional
-  const colSpan = [showCheckbox, true, true, true, true, true, true, true, true, showPn, showAddBtn].filter(Boolean).length
+  // BMU, Type, NDZ, MZT, MNZT, SEL, MEL, £ SEL, £ MEL = 9 fixed; PN optional
+  const colSpan = [showCheckbox, true, true, true, true, true, true, true, true, true, showPn, showAddBtn].filter(Boolean).length
 
   return (
     <div className="panel available-panel">
@@ -270,7 +270,8 @@ export default function AvailableTable({
               <SortTh col="mnzt"  sort={sort} onSort={toggleSort} numeric>MNZT</SortTh>
               <SortTh col="sel"   sort={sort} onSort={toggleSort} numeric>SEL</SortTh>
               <SortTh col="mel"        sort={sort} onSort={toggleSort} numeric>MEL</SortTh>
-              <SortTh col="priceToMel" sort={sort} onSort={toggleSort} numeric>£ SEL/MEL</SortTh>
+              <SortTh col="priceToSel" sort={sort} onSort={toggleSort} numeric>£ SEL</SortTh>
+              <SortTh col="priceToMel" sort={sort} onSort={toggleSort} numeric>£ MEL</SortTh>
               {showPn && <SortTh col="pn" sort={sort} onSort={toggleSort} numeric>PN</SortTh>}
               {showAddBtn && <th className="action-col" />}
             </tr>
@@ -317,11 +318,8 @@ export default function AvailableTable({
                   <td className="mono num">{row.mnzt > 0 ? `${row.mnzt}m` : '—'}</td>
                   <td className="mono num">{row.sel  > 0 ? row.sel.toFixed(0)  : '—'}</td>
                   <td className="mono num">{row.mel.toFixed(0)}</td>
-                  <td className="mono num price-tier-cell">
-                    {row.priceToSel > 0 ? `£${row.priceToSel}` : '—'}
-                    {' / '}
-                    {row.priceToMel > 0 ? `£${row.priceToMel}` : '—'}
-                  </td>
+                  <td className="mono num">{row.priceToSel > 0 ? `£${row.priceToSel}` : '—'}</td>
+                  <td className="mono num">{row.priceToMel > 0 ? `£${row.priceToMel}` : '—'}</td>
                   {showPn && <td className="mono num">{row.pn > 0 ? row.pn.toFixed(0) : '—'}</td>}
                   {showAddBtn && (
                     <td className="action-col" onClick={e => e.stopPropagation()}>
@@ -343,7 +341,12 @@ export default function AvailableTable({
       {selectionPattern === 'buttons' && !readOnly && (
         <footer className="panel-foot">
           <span className="foot-meta">
-            {pendingIds.size > 0 ? `${pendingIds.size} checked` : 'Tick rows or use + to add'}
+            {pendingIds.size > 0 ? (() => {
+              const pending = rows.filter(r => pendingIds.has(r.bmUnitId))
+              const totalSel = pending.reduce((s, r) => s + r.sel, 0)
+              const totalMel = pending.reduce((s, r) => s + r.mel, 0)
+              return `${pendingIds.size} checked — ${Math.round(totalSel)} to SEL, ${Math.round(totalMel)} to MEL`
+            })() : 'Tick rows or use + to add'}
           </span>
           <button
             className="btn btn-primary"

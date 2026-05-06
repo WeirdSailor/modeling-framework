@@ -1,6 +1,18 @@
 'use client'
 
-import type { DraftPlan, BMUnit } from '@/models/types'
+import type { DraftPlan, BMUnit, ModellingAction, OperationType } from '@/models/types'
+import { OPERATION_TYPE_LABELS } from '@/models/types'
+
+const REASON_CODES: ModellingAction['reasonCode'][] = ['MARGIN', 'INERTIA', 'VOLTAGE', 'CONSTRAINT', 'RESERVE']
+const REASON_LABEL: Record<ModellingAction['reasonCode'], string> = {
+  MARGIN:     'Margin',
+  INERTIA:    'Inertia',
+  VOLTAGE:    'Voltage',
+  CONSTRAINT: 'Constraint',
+  RESERVE:    'Reserve',
+}
+
+const OPERATION_TYPES = Object.keys(OPERATION_TYPE_LABELS) as OperationType[]
 
 const STATIC_PRICE = 120
 
@@ -12,6 +24,8 @@ interface Props {
   scenario: string
   onRemoveUnit: (bmUnitId: string) => void
   onUpdateNotes: (bmUnitId: string, notes: string) => void
+  onUpdateReason: (bmUnitId: string, reasonCode: ModellingAction['reasonCode']) => void
+  onUpdateOperationType: (bmUnitId: string, operationType: OperationType | undefined) => void
 }
 
 function getFuelDisplay(fuelType: string): { label: string; chipClass: string } {
@@ -48,7 +62,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 
 export default function SelectedTable({
   draft, unitById, unitPnByBmUnit, readOnly, scenario,
-  onRemoveUnit, onUpdateNotes,
+  onRemoveUnit, onUpdateNotes, onUpdateReason, onUpdateOperationType,
 }: Props) {
   const showPn = scenario === 'pullback'
   const uniqueUnitIds = Array.from(new Set(draft.actions.map(a => a.bmUnitId)))
@@ -105,8 +119,11 @@ export default function SelectedTable({
                 <th className="num">MNZT</th>
                 <th className="num">SEL</th>
                 <th className="num">MEL</th>
-                <th className="num">£ SEL/MEL</th>
+                <th className="num">£ SEL</th>
+                <th className="num">£ MEL</th>
                 {showPn && <th className="num">PN</th>}
+                <th className="reason-col">Event</th>
+                <th className="reason-col">Reason</th>
                 <th className="notes-col">Notes</th>
                 {!readOnly && <th className="action-col" />}
               </tr>
@@ -117,6 +134,9 @@ export default function SelectedTable({
                 if (!u) return null
                 const pn   = unitPnByBmUnit[bmUnitId] ?? 0
                 const notes = draft.unitNotes[bmUnitId] ?? ''
+                const action = draft.actions.find(a => a.bmUnitId === bmUnitId)
+                const reasonCode = action?.reasonCode ?? 'MARGIN'
+                const operationType = action?.operationType
                 return (
                   <tr key={bmUnitId}>
                     <td className="mono bmu-cell">
@@ -129,12 +149,40 @@ export default function SelectedTable({
                     <td className="mono num">{u.mnzt ? `${u.mnzt}m` : '—'}</td>
                     <td className="mono num">{u.sel != null && u.sel > 0 ? u.sel.toFixed(0) : '—'}</td>
                     <td className="mono num">{u.registeredCapacity.toFixed(0)}</td>
-                    <td className="mono num price-tier-cell">
-                      {u.priceToSel ? `£${u.priceToSel}` : '—'}
-                      {' / '}
-                      {u.priceToMel ? `£${u.priceToMel}` : '—'}
-                    </td>
+                    <td className="mono num">{u.priceToSel ? `£${u.priceToSel}` : '—'}</td>
+                    <td className="mono num">{u.priceToMel ? `£${u.priceToMel}` : '—'}</td>
                     {showPn && <td className="mono num">{pn > 0 ? pn.toFixed(0) : '—'}</td>}
+                    <td className="reason-col">
+                      {readOnly ? (
+                        <span className="notes-readonly">{operationType ?? '—'}</span>
+                      ) : (
+                        <select
+                          className="reason-select"
+                          value={operationType ?? ''}
+                          onChange={e => onUpdateOperationType(bmUnitId, (e.target.value as OperationType) || undefined)}
+                        >
+                          <option value="">—</option>
+                          {OPERATION_TYPES.map(t => (
+                            <option key={t} value={t} title={OPERATION_TYPE_LABELS[t]}>{t}</option>
+                          ))}
+                        </select>
+                      )}
+                    </td>
+                    <td className="reason-col">
+                      {readOnly ? (
+                        <span className="notes-readonly">{REASON_LABEL[reasonCode]}</span>
+                      ) : (
+                        <select
+                          className="reason-select"
+                          value={reasonCode}
+                          onChange={e => onUpdateReason(bmUnitId, e.target.value as ModellingAction['reasonCode'])}
+                        >
+                          {REASON_CODES.map(r => (
+                            <option key={r} value={r}>{REASON_LABEL[r]}</option>
+                          ))}
+                        </select>
+                      )}
+                    </td>
                     <td className="notes-col">
                       {readOnly ? (
                         <span className="notes-readonly">{notes || <em className="muted">—</em>}</span>

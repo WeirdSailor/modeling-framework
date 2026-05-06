@@ -34,12 +34,25 @@ export interface SettlementPeriodData {
   proxyEol: number;        // D-1 EOL estimate for unconfirmed slots (0 if confirmed or unavailable)
 }
 
+export type OperationType = 'AS' | 'DS' | 'AD' | 'DD' | 'ADS' | 'TS' | 'RT'
+
+export const OPERATION_TYPE_LABELS: Record<OperationType, string> = {
+  AS:  'Advanced Synch',
+  DS:  'Delayed Synch',
+  AD:  'Advanced De-synch',
+  DD:  'Delayed De-synch',
+  ADS: 'Additional Synch',
+  TS:  'Two Shift',
+  RT:  'Run Through',
+}
+
 export interface ModellingAction {
   bmUnitId: string;
   fromPeriod: number;    // Settlement period start (1-48)
   toPeriod: number;      // Settlement period end (1-48)
   outputLevel: number;   // MW
   reasonCode: 'MARGIN' | 'INERTIA' | 'VOLTAGE' | 'CONSTRAINT' | 'RESERVE';
+  operationType?: OperationType;
   timestamp: Date;
 }
 
