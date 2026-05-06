@@ -6,9 +6,22 @@ interface HeaderProps {
   onRefresh: () => void
 }
 
+function formatWindowTime(isoString: string): string {
+  // "2026-05-05T14:30:00.000Z" → "05 May 14:30"
+  const d = new Date(isoString)
+  const day = String(d.getUTCDate()).padStart(2, '0')
+  const month = d.toLocaleString('en-GB', { month: 'short', timeZone: 'UTC' })
+  const hh = String(d.getUTCHours()).padStart(2, '0')
+  const mm = String(d.getUTCMinutes()).padStart(2, '0')
+  return `${day} ${month} ${hh}:${mm}`
+}
+
 export function Header({ onRefresh }: HeaderProps) {
-  const selectedDate = useModellingStore(state => state.selectedDate)
-  const setSelectedDate = useModellingStore(state => state.setSelectedDate)
+  const settlementPeriods = useModellingStore(state => state.settlementPeriods)
+  const isLoading = useModellingStore(state => state.isLoading)
+
+  const windowStart = settlementPeriods[0]?.startTime
+  const windowEnd = settlementPeriods[settlementPeriods.length - 1]?.startTime
 
   return (
     <header className="flex items-center justify-between px-6 py-3 bg-gray-900 text-white shadow-md">
@@ -16,22 +29,15 @@ export function Header({ onRefresh }: HeaderProps) {
         Modelling Framework — Margin Analysis
       </h1>
 
-      <div className="flex items-center gap-3">
-        <label htmlFor="settlement-date" className="text-sm text-gray-300">
-          Settlement date
-        </label>
-        <input
-          id="settlement-date"
-          type="date"
-          value={selectedDate}
-          onChange={(e) => {
-            setSelectedDate(e.target.value)
-            // Don't call onRefresh here — page.tsx's useEffect re-fires when
-            // selectedDate changes, triggering a fresh fetch with the new date.
-            // Calling onRefresh() here would also fire a stale-date fetch first.
-          }}
-          className="bg-gray-700 text-white rounded px-2 py-1 text-sm border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
+      <div className="flex items-center gap-4">
+        {windowStart && windowEnd && !isLoading && (
+          <span className="text-sm text-gray-300">
+            {formatWindowTime(windowStart)}
+            <span className="mx-2 text-gray-500">→</span>
+            {formatWindowTime(windowEnd)}
+            <span className="ml-1 text-gray-500 text-xs">(UTC)</span>
+          </span>
+        )}
 
         <button
           onClick={onRefresh}

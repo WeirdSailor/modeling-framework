@@ -1,7 +1,7 @@
 import type { BMUnit, SettlementPeriodData } from '@/models/types'
-import { spToStartTime } from '@/utils/settlements'
+import { spToStartTime, dateToSp, dateToSettlementDate } from '@/utils/settlements'
 import { computeAggregates } from '@/utils/margin'
-import { EXCLUDED_FUEL_TYPES } from '@/utils/fuelTypes'
+import { FETCH_EXCLUDED_FUEL_TYPES } from '@/utils/fuelTypes'
 
 // ---------------------------------------------------------------------------
 // Raw API response shapes
@@ -274,8 +274,8 @@ export async function fetchBmUnits(): Promise<BMUnit[]> {
     // Only transmission-connected units (T_ prefix)
     if (raw.bmUnitType !== 'T') continue
 
-    // Exclude non-dispatchable / interconnectors
-    if (EXCLUDED_FUEL_TYPES.has(raw.fuelType)) continue
+    // Exclude interconnectors and solar; keep WIND so Pullback scenario can use it
+    if (FETCH_EXCLUDED_FUEL_TYPES.has(raw.fuelType)) continue
 
     // Only units with positive generation capacity
     const cap = parseFloat(raw.generationCapacity)
@@ -454,79 +454,137 @@ export async function fetchMILS(
 }
 
 // ---------------------------------------------------------------------------
-// Public API: fetchAllData
+// Internal helper: fetch PN for a single {date, sp} pair
 // ---------------------------------------------------------------------------
 
-export async function fetchAllData(settlementDate: string): Promise<{
+async function fetchSinglePN(settlementDate: string, sp: number): Promise<Map<string, number>> {
+  return fetch(
+    `/api/elexon/datasets/PN?settlementDate=${settlementDate}&settlementPeriod=${sp}`
+  )
+    .then(r => (r.ok ? r.json() : { data: [] }))
+    .then((d: { data?: RawPnEntry[] }) => {
+      const map = new Map<string, number>()
+      for (const entry of (d.data ?? [])) {
+        map.set(entry.bmUnit, (entry.levelFrom + entry.levelTo) / 2)
+      }
+      return map
+    })
+    .catch(() => new Map<string, number>())
+}
+
+// ---------------------------------------------------------------------------
+// Public API: fetchAllData — rolling 24-hour window from now
+// ---------------------------------------------------------------------------
+
+export async function fetchAllData(): Promise<{
   units: BMUnit[]
   settlementPeriods: SettlementPeriodData[]
 }> {
-  // Fetch everything in parallel
-  const [units, demandMap, pnMap, melsMap, milsMap] = await Promise.all([
-    fetchBmUnits(),
-    fetchDemandForecast(settlementDate),
-    fetchPN(settlementDate),
-    fetchMELS(settlementDate),
-    fetchMILS(settlementDate),
-  ])
+  const now = new Date()
+  const currentSp = dateToSp(now)
+  const todayDate = dateToSettlementDate(now)
+  const tomorrowDate = dateToSettlementDate(new Date(now.getTime() + 24 * 60 * 60 * 1000))
+  const yesterdayDate = dateToSettlementDate(new Date(now.getTime() - 24 * 60 * 60 * 1000))
 
-  const nonEmptySps = Array.from(pnMap.values()).filter(m => m.size > 0).length
-  if (nonEmptySps > 0 && nonEmptySps < 48) {
-    console.warn(`[elexon] PN data partial: only ${nonEmptySps}/48 SPs returned data — remaining periods will show zero EOL`)
+  // 48 slots starting from the current SP of today, wrapping into tomorrow.
+  // slot.slot is the 1-based index used as settlementPeriod in the store.
+  const slotPlan: Array<{ slot: number; date: string; sp: number }> = []
+  for (let sp = currentSp; sp <= 48; sp++) {
+    slotPlan.push({ slot: slotPlan.length + 1, date: todayDate, sp })
+  }
+  for (let sp = 1; sp < currentSp; sp++) {
+    slotPlan.push({ slot: slotPlan.length + 1, date: tomorrowDate, sp })
   }
 
-  // If PN came back completely empty, use the stable module-level mock PN
-  const isPnEmpty = Array.from(pnMap.values()).every((m) => m.size === 0)
-  const mockPn = isPnEmpty ? MOCK_PN : null
+  // Fetch base data, yesterday's PN, and per-slot PN in parallel
+  const [
+    [units, todayDemand, tomorrowDemand, todayMels, tomorrowMels, todayMils, tomorrowMils, yesterdayPN],
+    pnResults,
+  ] = await Promise.all([
+    Promise.all([
+      fetchBmUnits(),
+      fetchDemandForecast(todayDate),
+      fetchDemandForecast(tomorrowDate),
+      fetchMELS(todayDate),
+      fetchMELS(tomorrowDate),
+      fetchMILS(todayDate),
+      fetchMILS(tomorrowDate),
+      fetchPN(yesterdayDate),
+    ]),
+    Promise.all(slotPlan.map(({ date, sp }) => fetchSinglePN(date, sp))),
+  ])
 
-  // If MELS came back completely empty, build mock MELS (= registeredCapacity)
-  const isMelsEmpty = melsMap.size === 0
+  const isYesterdayPnUsable = [...yesterdayPN.values()].some(m => m.size > 0)
+
+  // If every slot came back empty fall back to mock PN (pure offline mode).
+  // When only tomorrow's slots are empty that is correct — no D+1 PNs yet.
+  const isPnGloballyEmpty = pnResults.every(m => m.size === 0)
+  const mockPn = isPnGloballyEmpty ? buildMockPN(units) : null
+  if (mockPn) console.warn('[elexon] All PN slots empty — using mock PN data')
+
+  const isMelsEmpty = todayMels.size === 0 && tomorrowMels.size === 0
   const mockMels = isMelsEmpty ? buildMockMELS(units) : null
 
-  // If MILS came back completely empty, build mock MILS (= 0)
-  const isMilsEmpty = milsMap.size === 0
+  const isMilsEmpty = todayMils.size === 0 && tomorrowMils.size === 0
   const mockMils = isMilsEmpty ? buildMockMILS(units) : null
 
   const settlementPeriods: SettlementPeriodData[] = []
 
-  for (let sp = 1; sp <= 48; sp++) {
-    const demand = demandMap.get(sp) ?? 33000
+  for (let i = 0; i < slotPlan.length; i++) {
+    const { slot, date, sp: actualSp } = slotPlan[i]
 
-    // Build pn record
-    const rawPnForSp = mockPn ? mockPn.get(sp) : pnMap.get(sp)
+    const demandMap = date === todayDate ? todayDemand : tomorrowDemand
+    const demand = demandMap.get(actualSp) ?? 33000
+
+    // PN — confirmed data first, D-1 proxy for unconfirmed slots, mock in offline mode
+    const rawPn = mockPn
+      ? (mockPn.get(actualSp) ?? new Map<string, number>())
+      : pnResults[i].size > 0
+        ? pnResults[i]
+        : isYesterdayPnUsable
+          ? (yesterdayPN.get(actualSp) ?? new Map<string, number>())
+          : new Map<string, number>()
     const pn: Record<string, number> = {}
-    if (rawPnForSp) {
-      for (const [bmUnit, value] of rawPnForSp) {
-        pn[bmUnit] = value
-      }
-    }
+    for (const [bmUnit, value] of rawPn) pn[bmUnit] = value
 
-    // Build mel record — fall back to registeredCapacity if MELS absent
-    const rawMelForSp = mockMels ? mockMels.get(sp) : melsMap.get(sp)
+    // MEL — real MELS is always empty from the API; fallback = registeredCapacity
+    const melsMap = date === todayDate ? todayMels : tomorrowMels
+    const rawMel = mockMels ? mockMels.get(actualSp) : melsMap.get(actualSp)
     const mel: Record<string, number> = {}
-    if (rawMelForSp) {
-      for (const [bmUnit, value] of rawMelForSp) {
-        mel[bmUnit] = value
-      }
+    if (rawMel) {
+      for (const [bmUnit, value] of rawMel) mel[bmUnit] = value
     } else {
-      // Fallback: use registeredCapacity for every unit
-      for (const unit of units) {
-        mel[unit.bmUnitId] = unit.registeredCapacity
-      }
+      for (const unit of units) mel[unit.bmUnitId] = unit.registeredCapacity
     }
 
-    // Build mil record — default to 0 if MILS absent
-    const rawMilForSp = mockMils ? mockMils.get(sp) : milsMap.get(sp)
+    // MIL — default to 0 when absent
+    const milsMap = date === todayDate ? todayMils : tomorrowMils
+    const rawMil = mockMils ? mockMils.get(actualSp) : milsMap.get(actualSp)
     const mil: Record<string, number> = {}
-    if (rawMilForSp) {
-      for (const [bmUnit, value] of rawMilForSp) {
-        mil[bmUnit] = value
+    if (rawMil) {
+      for (const [bmUnit, value] of rawMil) mil[bmUnit] = value
+    }
+
+    // Gate-closure status: mock mode treats all slots as confirmed
+    const hasConfirmedPn = isPnGloballyEmpty || pnResults[i].size > 0
+
+    // D-1 proxy: estimate EMX/EOL from yesterday's same-SP PN for unconfirmed slots
+    let proxyEmx = 0
+    let proxyEol = 0
+    if (!hasConfirmedPn && isYesterdayPnUsable) {
+      const d1Pn = yesterdayPN.get(actualSp) ?? new Map<string, number>()
+      for (const [bmUnit, pn] of d1Pn) {
+        if (pn > 1) {
+          proxyEmx += mel[bmUnit] ?? 0
+          proxyEol += pn
+        }
       }
     }
 
     const partial: SettlementPeriodData = {
-      settlementPeriod: sp,
-      startTime: spToStartTime(sp, settlementDate),
+      settlementDate: date,
+      settlementPeriod: slot,
+      startTime: spToStartTime(actualSp, date),
       pn,
       mel,
       mil,
@@ -535,13 +593,12 @@ export async function fetchAllData(settlementDate: string): Promise<{
       eol: 0,
       emi: 0,
       margin: 0,
+      hasConfirmedPn,
+      proxyEmx,
+      proxyEol,
     }
 
-    const aggregates = computeAggregates(partial, [], units)
-    settlementPeriods.push({
-      ...partial,
-      ...aggregates,
-    })
+    settlementPeriods.push({ ...partial, ...computeAggregates(partial, [], units) })
   }
 
   return { units, settlementPeriods }

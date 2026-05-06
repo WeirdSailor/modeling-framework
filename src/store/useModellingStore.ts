@@ -1,39 +1,31 @@
 import { create } from 'zustand'
-import type { BMUnit, SettlementPeriodData, ModellingAction } from '@/models/types'
+import type { BMUnit, SettlementPeriodData, ModellingAction, DraftPlan } from '@/models/types'
 import { computeAggregates } from '@/utils/margin'
 
-function getTomorrow(): string {
-  const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000)
-  return tomorrow.toISOString().split('T')[0]
-}
+const DRAFT_COLORS = ['#f59e0b', '#8b5cf6', '#06b6d4', '#f97316', '#ec4899']
 
 function refreshAggregates(
   periods: SettlementPeriodData[],
-  actions: ModellingAction[],
+  drafts: DraftPlan[],
   units: BMUnit[]
 ): SettlementPeriodData[] {
-  return periods.map(sp => {
-    const aggregates = computeAggregates(sp, actions, units)
-    return { ...sp, ...aggregates }
-  })
+  const committedActions = drafts
+    .filter(d => d.status === 'committed')
+    .flatMap(d => d.actions)
+  return periods.map(sp => ({ ...sp, ...computeAggregates(sp, committedActions, units) }))
 }
 
 interface ModellingState {
-  // Core data
   units: BMUnit[]
   settlementPeriods: SettlementPeriodData[]
-  modellingActions: ModellingAction[]
+  drafts: DraftPlan[]
+  activeDraftId: string | null
   selectedUnits: Set<string>
-  selectedDate: string
-
-  // Loading state
   isLoading: boolean
   error: string | null
 
-  // Actions
   setUnits: (units: BMUnit[]) => void
   setSettlementPeriods: (periods: SettlementPeriodData[]) => void
-  setSelectedDate: (date: string) => void
   setLoading: (loading: boolean) => void
   setError: (error: string | null) => void
 
@@ -41,27 +33,36 @@ interface ModellingState {
   clearSelection: () => void
   setSelectedUnits: (ids: Set<string>) => void
 
-  addModellingAction: (action: ModellingAction) => void
-  clearAllModelling: () => void
+  createDraft: () => string
+  setActiveDraft: (id: string | null) => void
+  addUnitsToDraft: (draftId: string, bmUnitIds: string[]) => void
+  removeUnitFromDraft: (draftId: string, bmUnitId: string) => void
+  renameDraft: (id: string, name: string) => void
+  updateDraftWindow: (id: string, fromPeriod: number, toPeriod: number) => void
+  updateUnitNotes: (draftId: string, bmUnitId: string, notes: string) => void
+  commitDraft: (id: string) => void
+  discardDraft: (id: string) => void
+  reopenDraft: (id: string) => void
+  deleteDraft: (id: string) => void
+  clearAllDrafts: () => void
 }
 
-export const useModellingStore = create<ModellingState>((set) => ({
-  // Initial state
+export const useModellingStore = create<ModellingState>((set, get) => ({
   units: [],
   settlementPeriods: [],
-  modellingActions: [],
+  drafts: [],
+  activeDraftId: null,
   selectedUnits: new Set<string>(),
-  selectedDate: getTomorrow(),
   isLoading: false,
   error: null,
 
-  // Actions
   setUnits: (units) => set({ units }),
+
   setSettlementPeriods: (periods) =>
     set(state => ({
-      settlementPeriods: refreshAggregates(periods, state.modellingActions, state.units),
+      settlementPeriods: refreshAggregates(periods, state.drafts, state.units),
     })),
-  setSelectedDate: (date) => set({ selectedDate: date }),
+
   setLoading: (loading) => set({ isLoading: loading }),
   setError: (error) => set({ error }),
 
@@ -74,28 +75,168 @@ export const useModellingStore = create<ModellingState>((set) => ({
     }),
 
   clearSelection: () => set({ selectedUnits: new Set<string>() }),
+  setSelectedUnits: (ids) => set({ selectedUnits: ids }),
 
-  setSelectedUnits: (ids: Set<string>) => set({ selectedUnits: ids }),
-
-  addModellingAction: (action) =>
+  createDraft: () => {
+    const id = crypto.randomUUID()
     set(state => {
-      const filtered = state.modellingActions.filter(
-        a => !(a.bmUnitId === action.bmUnitId && a.fromPeriod === action.fromPeriod && a.toPeriod === action.toPeriod)
+      const name = `Draft ${state.drafts.length + 1}`
+      const color = DRAFT_COLORS[state.drafts.length % DRAFT_COLORS.length]
+      const fromPeriod = state.settlementPeriods[0]?.settlementPeriod ?? 1
+      const toPeriod = 48
+      const newDraft: DraftPlan = {
+        id, name, actions: [], status: 'draft', color,
+        fromPeriod, toPeriod, unitNotes: {}, createdAt: Date.now(),
+      }
+      return { drafts: [...state.drafts, newDraft], activeDraftId: id }
+    })
+    return id
+  },
+
+  setActiveDraft: (id) => set({ activeDraftId: id }),
+
+  addUnitsToDraft: (draftId, bmUnitIds) =>
+    set(state => {
+      const draft = state.drafts.find(d => d.id === draftId)
+      if (!draft || draft.status !== 'draft') return {}
+      const { fromPeriod, toPeriod } = draft
+      const existingIds = new Set(draft.actions.map(a => a.bmUnitId))
+      const newActions: ModellingAction[] = bmUnitIds
+        .filter(id => !existingIds.has(id))
+        .map(bmUnitId => {
+          const unit = state.units.find(u => u.bmUnitId === bmUnitId)
+          const outputLevel =
+            unit?.sel != null && unit.sel > 0 ? unit.sel : (unit?.registeredCapacity ?? 100)
+          return {
+            bmUnitId,
+            fromPeriod,
+            toPeriod,
+            outputLevel,
+            reasonCode: 'MARGIN' as const,
+            timestamp: new Date(),
+          }
+        })
+      if (newActions.length === 0) return {}
+      const drafts = state.drafts.map(d =>
+        d.id === draftId ? { ...d, actions: [...d.actions, ...newActions] } : d
       )
-      const newActions = [...filtered, action]
+      return { drafts }
+    }),
+
+  removeUnitFromDraft: (draftId, bmUnitId) =>
+    set(state => {
+      const draft = state.drafts.find(d => d.id === draftId)
+      const isCommitted = draft?.status === 'committed'
+      const drafts = state.drafts.map(d =>
+        d.id === draftId
+          ? { ...d, actions: d.actions.filter(a => a.bmUnitId !== bmUnitId) }
+          : d
+      )
       return {
-        modellingActions: newActions,
-        settlementPeriods: refreshAggregates(state.settlementPeriods, newActions, state.units),
+        drafts,
+        settlementPeriods: isCommitted
+          ? refreshAggregates(state.settlementPeriods, drafts, state.units)
+          : state.settlementPeriods,
       }
     }),
 
-  clearAllModelling: () =>
+  renameDraft: (id, name) =>
+    set(state => ({
+      drafts: state.drafts.map(d => d.id === id ? { ...d, name } : d),
+    })),
+
+  updateDraftWindow: (id, fromPeriod, toPeriod) =>
     set(state => {
-      const updatedPeriods = refreshAggregates(state.settlementPeriods, [], state.units)
+      const drafts = state.drafts.map(d =>
+        d.id === id
+          ? {
+              ...d,
+              fromPeriod,
+              toPeriod,
+              actions: d.actions.map(a => ({ ...a, fromPeriod, toPeriod })),
+            }
+          : d
+      )
+      const draft = state.drafts.find(d => d.id === id)
+      const needsRefresh = draft?.status === 'committed'
       return {
-        modellingActions: [],
-        settlementPeriods: updatedPeriods,
+        drafts,
+        settlementPeriods: needsRefresh
+          ? refreshAggregates(state.settlementPeriods, drafts, state.units)
+          : state.settlementPeriods,
+      }
+    }),
+
+  updateUnitNotes: (draftId, bmUnitId, notes) =>
+    set(state => ({
+      drafts: state.drafts.map(d =>
+        d.id === draftId
+          ? { ...d, unitNotes: { ...d.unitNotes, [bmUnitId]: notes } }
+          : d
+      ),
+    })),
+
+  commitDraft: (id) =>
+    set(state => {
+      const drafts = state.drafts.map(d =>
+        d.id === id ? { ...d, status: 'committed' as const, committedAt: Date.now() } : d
+      )
+      return {
+        drafts,
+        settlementPeriods: refreshAggregates(state.settlementPeriods, drafts, state.units),
+      }
+    }),
+
+  discardDraft: (id) =>
+    set(state => {
+      const draft = state.drafts.find(d => d.id === id)
+      const wasCommitted = draft?.status === 'committed'
+      const drafts = state.drafts.map(d =>
+        d.id === id ? { ...d, status: 'discarded' as const, discardedAt: Date.now() } : d
+      )
+      return {
+        drafts,
+        settlementPeriods: wasCommitted
+          ? refreshAggregates(state.settlementPeriods, drafts, state.units)
+          : state.settlementPeriods,
+      }
+    }),
+
+  reopenDraft: (id) =>
+    set(state => {
+      const draft = state.drafts.find(d => d.id === id)
+      const wasCommitted = draft?.status === 'committed'
+      const drafts = state.drafts.map(d =>
+        d.id === id
+          ? { ...d, status: 'draft' as const, committedAt: undefined, discardedAt: undefined }
+          : d
+      )
+      return {
+        drafts,
+        settlementPeriods: wasCommitted
+          ? refreshAggregates(state.settlementPeriods, drafts, state.units)
+          : state.settlementPeriods,
+      }
+    }),
+
+  deleteDraft: (id) =>
+    set(state => {
+      const drafts = state.drafts.filter(d => d.id !== id)
+      const activeDraftId =
+        state.activeDraftId === id ? (drafts[0]?.id ?? null) : state.activeDraftId
+      return { drafts, activeDraftId }
+    }),
+
+  clearAllDrafts: () =>
+    set(state => {
+      const hadCommitted = state.drafts.some(d => d.status === 'committed')
+      return {
+        drafts: [],
+        activeDraftId: null,
         selectedUnits: new Set<string>(),
+        settlementPeriods: hadCommitted
+          ? refreshAggregates(state.settlementPeriods, [], state.units)
+          : state.settlementPeriods,
       }
     }),
 }))

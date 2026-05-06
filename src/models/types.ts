@@ -13,8 +13,9 @@ export interface BMUnit {
 }
 
 export interface SettlementPeriodData {
-  settlementPeriod: number; // 1-48
-  startTime: string;        // ISO datetime of start of this SP
+  settlementDate: string;   // YYYY-MM-DD for this slot (may differ across the 24h window)
+  settlementPeriod: number; // slot index 1-48 within the rolling 24h window (not the real SP within the day)
+  startTime: string;        // ISO datetime of the actual start of this slot
   // Per-unit data (keyed by bmUnitId = Elexon bmUnit string)
   pn: Record<string, number>;  // BMU ID -> PN level (MW) — use average of levelFrom+levelTo
   mel: Record<string, number>; // BMU ID -> MEL (MW)
@@ -25,6 +26,9 @@ export interface SettlementPeriodData {
   eol: number;    // Sum of PNs (expected operating level)
   emi: number;    // Sum of minimums for committed units
   margin: number; // emx - demand
+  hasConfirmedPn: boolean; // true if this slot has post-gate-closure PN data from Elexon
+  proxyEmx: number;        // D-1 EMX estimate for unconfirmed slots (0 if confirmed or unavailable)
+  proxyEol: number;        // D-1 EOL estimate for unconfirmed slots (0 if confirmed or unavailable)
 }
 
 export interface ModellingAction {
@@ -34,4 +38,18 @@ export interface ModellingAction {
   outputLevel: number;   // MW
   reasonCode: 'MARGIN' | 'INERTIA' | 'VOLTAGE' | 'CONSTRAINT' | 'RESERVE';
   timestamp: Date;
+}
+
+export interface DraftPlan {
+  id: string;
+  name: string;
+  actions: ModellingAction[];
+  status: 'draft' | 'committed' | 'discarded';
+  color: string;
+  fromPeriod: number;
+  toPeriod: number;
+  unitNotes: Record<string, string>;
+  createdAt: number;
+  committedAt?: number;
+  discardedAt?: number;
 }

@@ -1,103 +1,101 @@
 import type { BMUnit, SettlementPeriodData, ModellingAction } from '@/models/types'
 
-// Returns true if the unit has a non-trivial PN (> 1 MW) in the given SP,
-// OR if it appears in the modellingActions list for that SP.
-export function isUnitCommitted(
-  bmUnitId: string,
-  sp: SettlementPeriodData,
-  modellingActions: ModellingAction[]
-): boolean {
-  const pn = sp.pn[bmUnitId] ?? 0
-  if (pn > 1) return true
-
-  const spNum = sp.settlementPeriod
-  return modellingActions.some(
-    (action) =>
-      action.bmUnitId === bmUnitId &&
-      action.fromPeriod <= spNum &&
-      action.toPeriod >= spNum
-  )
+// Returns true if the unit has a non-trivial PN (> 1 MW) in the given SP.
+// Does not account for modelling actions — use computeAggregates for the full picture.
+export function isUnitPnCommitted(bmUnitId: string, sp: SettlementPeriodData): boolean {
+  return (sp.pn[bmUnitId] ?? 0) > 1
 }
 
-// For a set of committed + modelled units, compute EMX for a SP.
-// EMX = sum of MEL for all committed units + sum of MEL for modelled units.
-export function calculateEmx(
+// Build a SEL lookup map from the reference units array.
+function buildSelMap(units: BMUnit[]): Map<string, number | undefined> {
+  return new Map(units.map(u => [u.bmUnitId, u.sel]))
+}
+
+// Compute EMX, EOL, EMI, and margin for a SP.
+//
+// Baseline: all units with PN > 1 MW (iterates sp.pn directly — not filtered
+// through the reference units array, so committed units outside the dispatchable
+// reference list are still counted).
+//
+// Actions: units covered by the supplied actions list are added on top of the
+// baseline, skipping any unit already PN-committed to avoid double-counting.
+export function computeAggregates(
   sp: SettlementPeriodData,
-  modellingActions: ModellingAction[],
+  actions: ModellingAction[],
   units: BMUnit[]
-): number {
-  let emx = 0
-
-  for (const unit of units) {
-    if (isUnitCommitted(unit.bmUnitId, sp, modellingActions)) {
-      emx += sp.mel[unit.bmUnitId] ?? 0
-    }
-  }
-
-  return emx
-}
-
-// EOL = sum of PN for originally committed units + output level for modelled units.
-export function calculateEol(
-  sp: SettlementPeriodData,
-  modellingActions: ModellingAction[]
-): number {
+): { emx: number; eol: number; emi: number; margin: number } {
+  const selMap = buildSelMap(units)
   const spNum = sp.settlementPeriod
 
-  // Sum of PN for originally committed units (PN > 1 MW, not just modelled)
-  let eol = 0
-  for (const [, pn] of Object.entries(sp.pn)) {
+  let emx = 0, eol = 0, emi = 0
+
+  // Baseline — all PN-committed units (regardless of whether they appear in
+  // the reference units list)
+  for (const [bmUnit, pn] of Object.entries(sp.pn)) {
     if (pn > 1) {
+      emx += sp.mel[bmUnit] ?? 0
       eol += pn
+      const sel = selMap.get(bmUnit)
+      emi += sel !== undefined ? sel : (sp.mil[bmUnit] ?? 0)
     }
   }
 
-  // Add output levels for modelled units that are not already committed by PN
-  for (const action of modellingActions) {
-    if (action.fromPeriod <= spNum && action.toPeriod >= spNum) {
-      const existingPn = sp.pn[action.bmUnitId] ?? 0
-      if (existingPn <= 1) {
-        // Not already counted via PN
+  // Modelled units — deduplicated per unit, skipped if already PN-committed
+  const seen = new Set<string>()
+  for (const action of actions) {
+    if (action.fromPeriod <= spNum && action.toPeriod >= spNum && !seen.has(action.bmUnitId)) {
+      seen.add(action.bmUnitId)
+      if ((sp.pn[action.bmUnitId] ?? 0) <= 1) {
+        emx += sp.mel[action.bmUnitId] ?? 0
         eol += action.outputLevel
+        const sel = selMap.get(action.bmUnitId)
+        emi += sel !== undefined ? sel : (sp.mil[action.bmUnitId] ?? 0)
       }
     }
   }
 
-  return eol
+  return { emx, eol, emi, margin: emx - sp.demand }
 }
 
-// EMI = sum of SEL (or MIL if no SEL) for all committed + modelled units.
-export function calculateEmi(
+// Apply a draft's actions on top of an already-computed baseline (sp.emx/eol/emi
+// from the store, which already includes PN-committed units + any committed plan
+// actions). Used by the chart to render per-draft dotted overlays without
+// recomputing the full baseline from scratch each render.
+//
+// alreadyModelled: set of bmUnitIds already counted in the baseline for this SP
+// (PN-committed + committed plan units). Draft units in this set are skipped.
+export function applyDraftToBaseline(
   sp: SettlementPeriodData,
-  modellingActions: ModellingAction[],
+  baseEmx: number,
+  baseEol: number,
+  baseEmi: number,
+  draftActions: ModellingAction[],
+  alreadyModelled: Set<string>,
   units: BMUnit[]
-): number {
-  let emi = 0
+): { emx: number; eol: number; emi: number; margin: number } {
+  const selMap = buildSelMap(units)
+  const spNum = sp.settlementPeriod
 
-  for (const unit of units) {
-    if (isUnitCommitted(unit.bmUnitId, sp, modellingActions)) {
-      // Prefer SEL; fall back to MIL from sp.mil; if neither, 0
-      const minimum =
-        unit.sel !== undefined
-          ? unit.sel
-          : (sp.mil[unit.bmUnitId] ?? 0)
-      emi += minimum
+  let addEmx = 0, addEol = 0, addEmi = 0
+  const seen = new Set<string>()
+
+  for (const action of draftActions) {
+    if (
+      action.fromPeriod <= spNum &&
+      action.toPeriod >= spNum &&
+      !seen.has(action.bmUnitId) &&
+      !alreadyModelled.has(action.bmUnitId)
+    ) {
+      seen.add(action.bmUnitId)
+      addEmx += sp.mel[action.bmUnitId] ?? 0
+      addEol += action.outputLevel
+      const sel = selMap.get(action.bmUnitId)
+      addEmi += sel !== undefined ? sel : (sp.mil[action.bmUnitId] ?? 0)
     }
   }
 
-  return emi
-}
-
-// Compute all four aggregates for one SP.
-export function computeAggregates(
-  sp: SettlementPeriodData,
-  modellingActions: ModellingAction[],
-  units: BMUnit[]
-): { emx: number; eol: number; emi: number; margin: number } {
-  const emx = calculateEmx(sp, modellingActions, units)
-  const eol = calculateEol(sp, modellingActions)
-  const emi = calculateEmi(sp, modellingActions, units)
-  const margin = emx - sp.demand
-
-  return { emx, eol, emi, margin }
+  const emx = baseEmx + addEmx
+  const eol = baseEol + addEol
+  const emi = baseEmi + addEmi
+  return { emx, eol, emi, margin: emx - sp.demand }
 }
