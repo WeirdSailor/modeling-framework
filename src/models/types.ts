@@ -34,6 +34,8 @@ export interface SettlementPeriodData {
   proxyEol: number;        // D-1 EOL estimate for unconfirmed slots (0 if confirmed or unavailable)
 }
 
+export type ServiceType = 'SR' | 'QR'
+
 export type OperationType = 'AS' | 'DS' | 'AD' | 'DD' | 'ADS' | 'TS' | 'RT'
 
 export const OPERATION_TYPE_LABELS: Record<OperationType, string> = {

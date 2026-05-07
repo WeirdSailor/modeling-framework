@@ -85,6 +85,8 @@
 :root[data-theme="dark"] .chip-pumped    { background: rgba(34,211,238,.14);  color: #67e8f9; }
 :root[data-theme="dark"] .chip-ocgt      { background: rgba(251,146,60,.14);  color: #fdba74; }
 :root[data-theme="dark"] .chip-interconn { background: rgba(148,163,184,.16); color: #cbd5e1; }
+:root[data-theme="dark"] .chip-sr        { background: rgba(14,165,233,.16);  color: #7dd3fc; }
+:root[data-theme="dark"] .chip-qr        { background: rgba(139,92,246,.16);  color: #c4b5fd; }
 
 :root[data-theme="dark"] .btn-primary { color: #0b0f15; }
 :root[data-theme="dark"] .row-add-btn:hover:not(:disabled) { color: #0b0f15; }
@@ -513,6 +515,8 @@ input[type="checkbox"]:disabled { cursor: not-allowed; opacity: .4; }
 .chip-interconn { background: #f1f5f9; color: #334155; }
 .chip-coal      { background: #f3f4f6; color: #374151; }
 .chip-hydro     { background: #ecfeff; color: #155e75; }
+.chip-sr        { background: #e0f2fe; color: #0369a1; }
+.chip-qr        { background: #ede9fe; color: #6d28d9; }
 
 .badge { display: inline-flex; align-items: center; font-size: 10px; font-weight: 500; padding: 1px 6px; border-radius: 3px; margin-left: 4px; }
 .badge-in    { background: var(--accent-soft); color: var(--accent-strong); }

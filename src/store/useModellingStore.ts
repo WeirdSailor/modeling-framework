@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { BMUnit, SettlementPeriodData, ModellingAction, DraftPlan, OperationType, UserId, UnitSnapshot } from '@/models/types'
+import type { BMUnit, SettlementPeriodData, ModellingAction, DraftPlan, OperationType, UserId, UnitSnapshot, ServiceType } from '@/models/types'
 import { USERS } from '@/models/types'
 import { computeAggregates } from '@/utils/margin'
 
@@ -32,6 +32,7 @@ interface ModellingState {
   error: string | null
   currentUser: UserId
   dataOverrides: Record<string, Partial<UnitSnapshot>>
+  unitServices: Record<string, ServiceType>
 
   setUnits: (units: BMUnit[]) => void
   setSettlementPeriods: (periods: SettlementPeriodData[]) => void
@@ -45,6 +46,8 @@ interface ModellingState {
   setDataOverride: (bmUnitId: string, field: keyof UnitSnapshot, value: number) => void
   clearDataOverride: (bmUnitId: string) => void
   clearAllDataOverrides: () => void
+
+  setUnitService: (bmUnitId: string, service: ServiceType | undefined) => void
 
   setCurrentUser: (id: UserId) => void
   createDraft: () => string
@@ -76,6 +79,7 @@ export const useModellingStore = create<ModellingState>((set, get) => ({
   error: null,
   currentUser: getStoredUser(),
   dataOverrides: {},
+  unitServices: {},
 
   setDataOverride: (bmUnitId, field, value) =>
     set(state => ({
@@ -93,6 +97,14 @@ export const useModellingStore = create<ModellingState>((set, get) => ({
     }),
 
   clearAllDataOverrides: () => set({ dataOverrides: {} }),
+
+  setUnitService: (bmUnitId, service) =>
+    set(state => {
+      const next = { ...state.unitServices }
+      if (service === undefined) delete next[bmUnitId]
+      else next[bmUnitId] = service
+      return { unitServices: next }
+    }),
 
   setUnits: (units) => set({ units }),
 

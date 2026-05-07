@@ -1,13 +1,14 @@
 'use client'
 
 import { useState, useMemo, useCallback } from 'react'
-import type { BMUnit } from '@/models/types'
+import type { BMUnit, ServiceType } from '@/models/types'
 import { SCENARIOS } from '@/config/scenarios'
 
 
 interface Props {
   units: BMUnit[]
   unitPnByBmUnit: Record<string, number>
+  unitServices: Record<string, ServiceType>
   activeDraftUnitIds: Set<string>
   otherDraftUnitMap: Map<string, string>
   selectionPattern: 'buttons' | 'click'
@@ -81,6 +82,11 @@ function TypeChip({ fuelType }: { fuelType: string }) {
   return <span className={`chip ${chipClass}`}>{label}</span>
 }
 
+function ServiceChip({ service }: { service: ServiceType | undefined }) {
+  if (!service) return <span style={{ color: 'var(--text-faint)', fontSize: 11 }}>—</span>
+  return <span className={`chip chip-${service.toLowerCase()}`}>{service}</span>
+}
+
 function SortTh({ col, sort, onSort, children, numeric }: {
   col: SortKey; sort: { key: SortKey; dir: 'asc' | 'desc' }
   onSort: (k: SortKey) => void; children: React.ReactNode; numeric?: boolean
@@ -100,7 +106,7 @@ function SortTh({ col, sort, onSort, children, numeric }: {
 }
 
 export default function AvailableTable({
-  units, unitPnByBmUnit, activeDraftUnitIds, otherDraftUnitMap,
+  units, unitPnByBmUnit, unitServices, activeDraftUnitIds, otherDraftUnitMap,
   selectionPattern, readOnly, voltageArea, scenario, onScenarioChange, onAddUnits,
 }: Props) {
   const [search, setSearch] = useState('')
@@ -206,8 +212,8 @@ export default function AvailableTable({
   const showCheckbox = selectionPattern === 'buttons' && !readOnly
   const showAddBtn   = selectionPattern === 'buttons' && !readOnly
   const showPn       = scenario === 'pullback'
-  // BMU, Type, NDZ, MZT, MNZT, SEL, MEL, £ SEL, £ MEL = 9 fixed; PN optional
-  const colSpan = [showCheckbox, true, true, true, true, true, true, true, true, true, showPn, showAddBtn].filter(Boolean).length
+  // checkbox, BMU, Service, Type, NDZ, MZT, MNZT, SEL, MEL, £ SEL, £ MEL, PN (opt), add (opt)
+  const colSpan = [showCheckbox, true, true, true, true, true, true, true, true, true, true, showPn, showAddBtn].filter(Boolean).length
 
   return (
     <div className="panel available-panel">
@@ -264,6 +270,7 @@ export default function AvailableTable({
                 </th>
               )}
               <SortTh col="nationalGridBmUnit" sort={sort} onSort={toggleSort}>BMU</SortTh>
+              <th>Service</th>
               <SortTh col="fuelType" sort={sort} onSort={toggleSort}>Type</SortTh>
               <SortTh col="ndz"   sort={sort} onSort={toggleSort} numeric>NDZ</SortTh>
               <SortTh col="mzt"   sort={sort} onSort={toggleSort} numeric>MZT</SortTh>
@@ -312,6 +319,7 @@ export default function AvailableTable({
                     {inDraft && <span className="badge badge-in">In draft</span>}
                     {inOther && <span className="badge badge-other" title={`Also in ${otherName}`}>Also in {otherName}</span>}
                   </td>
+                  <td><ServiceChip service={unitServices[row.bmUnitId]} /></td>
                   <td><TypeChip fuelType={row.fuelType} /></td>
                   <td className="mono num">{row.ndz  > 0 ? `${row.ndz}m`  : '—'}</td>
                   <td className="mono num">{row.mzt  > 0 ? `${row.mzt}m`  : '—'}</td>

@@ -1,16 +1,18 @@
 'use client'
 
 import { useMemo } from 'react'
-import type { DraftPlan, BMUnit, ModellingAction, OperationType, UnitSnapshot } from '@/models/types'
+import type { DraftPlan, BMUnit, ModellingAction, OperationType, UnitSnapshot, ServiceType } from '@/models/types'
 
 interface Props {
   drafts: DraftPlan[]
   unitById: Map<string, BMUnit>
   unitPnByBmUnit: Record<string, number>
   dataOverrides: Record<string, Partial<UnitSnapshot>>
+  unitServices: Record<string, ServiceType>
   onSetOverride: (bmUnitId: string, field: keyof UnitSnapshot, value: number) => void
   onClearOverride: (bmUnitId: string) => void
   onClearAll: () => void
+  onSetService: (bmUnitId: string, service: ServiceType | undefined) => void
 }
 
 const REASON_LABEL: Record<ModellingAction['reasonCode'], string> = {
@@ -83,7 +85,8 @@ interface RedeclareRow {
 }
 
 export default function RedeclareTab({
-  drafts, unitById, unitPnByBmUnit, dataOverrides, onSetOverride, onClearOverride, onClearAll,
+  drafts, unitById, unitPnByBmUnit, dataOverrides, unitServices,
+  onSetOverride, onClearOverride, onClearAll, onSetService,
 }: Props) {
   const committedDrafts = useMemo(
     () => drafts.filter(d => d.status === 'committed'),
@@ -175,6 +178,7 @@ export default function RedeclareTab({
           <thead>
             <tr>
               <th>BMU</th>
+              <th>Service</th>
               <th>Type</th>
               <th className="num">NDZ (m)</th>
               <th className="num">MZT (m)</th>
@@ -202,6 +206,17 @@ export default function RedeclareTab({
                   <td className="mono bmu-cell">
                     <span>{row.nationalGridBmUnit}</span>
                     <span className="site-sub">{row.gspGroup}</span>
+                  </td>
+                  <td>
+                    <select
+                      className="reason-select"
+                      value={unitServices[row.bmUnitId] ?? ''}
+                      onChange={e => onSetService(row.bmUnitId, (e.target.value as ServiceType) || undefined)}
+                    >
+                      <option value="">—</option>
+                      <option value="SR">SR</option>
+                      <option value="QR">QR</option>
+                    </select>
                   </td>
                   <td><TypeChip fuelType={row.fuelType} /></td>
                   <td className="num">

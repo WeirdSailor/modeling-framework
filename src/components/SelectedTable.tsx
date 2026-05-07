@@ -1,6 +1,6 @@
 'use client'
 
-import type { DraftPlan, BMUnit, ModellingAction, OperationType } from '@/models/types'
+import type { DraftPlan, BMUnit, ModellingAction, OperationType, ServiceType } from '@/models/types'
 import { OPERATION_TYPE_LABELS } from '@/models/types'
 
 const REASON_CODES: ModellingAction['reasonCode'][] = ['MARGIN', 'INERTIA', 'VOLTAGE', 'CONSTRAINT', 'RESERVE']
@@ -20,6 +20,7 @@ interface Props {
   draft: DraftPlan
   unitById: Map<string, BMUnit>
   unitPnByBmUnit: Record<string, number>
+  unitServices: Record<string, ServiceType>
   readOnly: boolean
   scenario: string
   onRemoveUnit: (bmUnitId: string) => void
@@ -51,6 +52,11 @@ function TypeChip({ fuelType }: { fuelType: string }) {
   return <span className={`chip ${chipClass}`}>{label}</span>
 }
 
+function ServiceChip({ service }: { service: ServiceType | undefined }) {
+  if (!service) return <span style={{ color: 'var(--text-faint)', fontSize: 11 }}>—</span>
+  return <span className={`chip chip-${service.toLowerCase()}`}>{service}</span>
+}
+
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="stat">
@@ -61,7 +67,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 }
 
 export default function SelectedTable({
-  draft, unitById, unitPnByBmUnit, readOnly, scenario,
+  draft, unitById, unitPnByBmUnit, unitServices, readOnly, scenario,
   onRemoveUnit, onUpdateNotes, onUpdateReason, onUpdateOperationType,
 }: Props) {
   const showPn = scenario === 'pullback'
@@ -113,6 +119,7 @@ export default function SelectedTable({
             <thead>
               <tr>
                 <th>BMU</th>
+                <th>Service</th>
                 <th>Type</th>
                 <th className="num">NDZ</th>
                 <th className="num">MZT</th>
@@ -143,6 +150,7 @@ export default function SelectedTable({
                       <span>{u.nationalGridBmUnit}</span>
                       <span className="site-sub">{u.gspGroup}</span>
                     </td>
+                    <td><ServiceChip service={unitServices[bmUnitId]} /></td>
                     <td><TypeChip fuelType={u.fuelType} /></td>
                     <td className="mono num">{u.ndz  ? `${u.ndz}m`  : '—'}</td>
                     <td className="mono num">{u.mzt  ? `${u.mzt}m`  : '—'}</td>

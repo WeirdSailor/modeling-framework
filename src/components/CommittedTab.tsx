@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import type { DraftPlan, BMUnit, ModellingAction, OperationType, UnitSnapshot } from '@/models/types'
+import type { DraftPlan, BMUnit, ModellingAction, OperationType, UnitSnapshot, ServiceType } from '@/models/types'
 
 const CHANGE_THRESHOLD = 10 // percent
 
@@ -37,6 +37,7 @@ interface Props {
   unitById: Map<string, BMUnit>
   unitPnByBmUnit: Record<string, number>
   dataOverrides: Record<string, Partial<UnitSnapshot>>
+  unitServices: Record<string, ServiceType>
   onRemoveUnits: (removals: { draftId: string; bmUnitId: string }[]) => void
 }
 
@@ -60,6 +61,11 @@ interface CommittedRow {
   operationType?: OperationType
   notes: string
   snapshot?: UnitSnapshot
+}
+
+function ServiceChip({ service }: { service: ServiceType | undefined }) {
+  if (!service) return <span style={{ color: 'var(--text-faint)', fontSize: 11 }}>—</span>
+  return <span className={`chip chip-${service.toLowerCase()}`}>{service}</span>
 }
 
 function ChangeArrow({ current, snapshotVal, unit = '' }: { current: number; snapshotVal: number; unit?: string }) {
@@ -103,7 +109,7 @@ function TypeChip({ fuelType }: { fuelType: string }) {
 }
 
 export default function CommittedTab({
-  drafts, unitById, unitPnByBmUnit, dataOverrides, onRemoveUnits,
+  drafts, unitById, unitPnByBmUnit, dataOverrides, unitServices, onRemoveUnits,
 }: Props) {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [selectedReason, setSelectedReason] = useState<ModellingAction['reasonCode'] | null>(null)
@@ -317,6 +323,7 @@ export default function CommittedTab({
                 />
               </th>
               <th>BMU</th>
+              <th>Service</th>
               <th>Type</th>
               <th className="num">NDZ</th>
               <th className="num">MZT</th>
@@ -361,6 +368,7 @@ export default function CommittedTab({
                     <span>{row.nationalGridBmUnit}</span>
                     <span className="site-sub">{row.gspGroup}</span>
                   </td>
+                  <td><ServiceChip service={unitServices[row.bmUnitId]} /></td>
                   <td><TypeChip fuelType={row.fuelType} /></td>
                   <td className="mono num">
                     {effNdz > 0 ? `${effNdz}m` : '—'}

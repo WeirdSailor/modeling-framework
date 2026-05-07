@@ -85,6 +85,8 @@ export default function Home() {
   const setDataOverride   = useModellingStore(s => s.setDataOverride)
   const clearDataOverride = useModellingStore(s => s.clearDataOverride)
   const clearAllDataOverrides = useModellingStore(s => s.clearAllDataOverrides)
+  const unitServices      = useModellingStore(s => s.unitServices)
+  const setUnitService    = useModellingStore(s => s.setUnitService)
 
   // ── data fetch ──
   const loadData = useCallback(async () => {
@@ -400,6 +402,7 @@ export default function Home() {
                   <AvailableTable
                     units={unitsForAvailableTable}
                     unitPnByBmUnit={unitPnByBmUnit}
+                    unitServices={unitServices}
                     activeDraftUnitIds={activeDraftUnitIds}
                     otherDraftUnitMap={otherDraftUnitMap}
                     selectionPattern={tweaks.selectionPattern}
@@ -413,6 +416,7 @@ export default function Home() {
                     draft={activeDraft}
                     unitById={unitById}
                     unitPnByBmUnit={unitPnByBmUnit}
+                    unitServices={unitServices}
                     readOnly={readOnly}
                     scenario={scenario}
                     onRemoveUnit={handleRemoveUnit}
@@ -452,6 +456,7 @@ export default function Home() {
             unitById={unitById}
             unitPnByBmUnit={unitPnByBmUnit}
             dataOverrides={dataOverrides}
+            unitServices={unitServices}
             onRemoveUnits={handleRemoveCommittedUnits}
           />
         )}
@@ -463,9 +468,11 @@ export default function Home() {
             unitById={unitById}
             unitPnByBmUnit={unitPnByBmUnit}
             dataOverrides={dataOverrides}
+            unitServices={unitServices}
             onSetOverride={setDataOverride}
             onClearOverride={clearDataOverride}
             onClearAll={clearAllDataOverrides}
+            onSetService={setUnitService}
           />
         )}
 
