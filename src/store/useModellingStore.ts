@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { BMUnit, SettlementPeriodData, ModellingAction, DraftPlan, OperationType, UserId } from '@/models/types'
+import type { BMUnit, SettlementPeriodData, ModellingAction, DraftPlan, OperationType, UserId, UnitSnapshot } from '@/models/types'
 import { USERS } from '@/models/types'
 import { computeAggregates } from '@/utils/margin'
 
@@ -31,6 +31,7 @@ interface ModellingState {
   isLoading: boolean
   error: string | null
   currentUser: UserId
+  dataOverrides: Record<string, Partial<UnitSnapshot>>
 
   setUnits: (units: BMUnit[]) => void
   setSettlementPeriods: (periods: SettlementPeriodData[]) => void
@@ -40,6 +41,10 @@ interface ModellingState {
   toggleUnitSelection: (bmUnitId: string) => void
   clearSelection: () => void
   setSelectedUnits: (ids: Set<string>) => void
+
+  setDataOverride: (bmUnitId: string, field: keyof UnitSnapshot, value: number) => void
+  clearDataOverride: (bmUnitId: string) => void
+  clearAllDataOverrides: () => void
 
   setCurrentUser: (id: UserId) => void
   createDraft: () => string
@@ -70,6 +75,24 @@ export const useModellingStore = create<ModellingState>((set, get) => ({
   isLoading: false,
   error: null,
   currentUser: getStoredUser(),
+  dataOverrides: {},
+
+  setDataOverride: (bmUnitId, field, value) =>
+    set(state => ({
+      dataOverrides: {
+        ...state.dataOverrides,
+        [bmUnitId]: { ...state.dataOverrides[bmUnitId], [field]: value },
+      },
+    })),
+
+  clearDataOverride: (bmUnitId) =>
+    set(state => {
+      const next = { ...state.dataOverrides }
+      delete next[bmUnitId]
+      return { dataOverrides: next }
+    }),
+
+  clearAllDataOverrides: () => set({ dataOverrides: {} }),
 
   setUnits: (units) => set({ units }),
 
@@ -264,8 +287,27 @@ export const useModellingStore = create<ModellingState>((set, get) => ({
 
   commitDraft: (id) =>
     set(state => {
+      const draft = state.drafts.find(d => d.id === id)
+      if (!draft) return {}
+      const dataSnapshot: Record<string, UnitSnapshot> = {}
+      for (const action of draft.actions) {
+        const u = state.units.find(u => u.bmUnitId === action.bmUnitId)
+        if (!u) continue
+        const ov = state.dataOverrides[action.bmUnitId] ?? {}
+        dataSnapshot[action.bmUnitId] = {
+          mel:        ov.mel        ?? u.registeredCapacity,
+          sel:        ov.sel        ?? u.sel        ?? 0,
+          ndz:        ov.ndz        ?? u.ndz        ?? 0,
+          mzt:        ov.mzt        ?? u.mzt        ?? 0,
+          mnzt:       ov.mnzt       ?? u.mnzt       ?? 0,
+          priceToSel: ov.priceToSel ?? u.priceToSel ?? 0,
+          priceToMel: ov.priceToMel ?? u.priceToMel ?? 0,
+        }
+      }
       const drafts = state.drafts.map(d =>
-        d.id === id ? { ...d, status: 'committed' as const, committedAt: Date.now() } : d
+        d.id === id
+          ? { ...d, status: 'committed' as const, committedAt: Date.now(), dataSnapshot }
+          : d
       )
       return {
         drafts,

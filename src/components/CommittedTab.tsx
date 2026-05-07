@@ -1,7 +1,9 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import type { DraftPlan, BMUnit, ModellingAction, OperationType } from '@/models/types'
+import type { DraftPlan, BMUnit, ModellingAction, OperationType, UnitSnapshot } from '@/models/types'
+
+const CHANGE_THRESHOLD = 10 // percent
 
 const REASON_LABEL: Record<ModellingAction['reasonCode'], string> = {
   MARGIN:     'Margin',
@@ -34,6 +36,7 @@ interface Props {
   drafts: DraftPlan[]
   unitById: Map<string, BMUnit>
   unitPnByBmUnit: Record<string, number>
+  dataOverrides: Record<string, Partial<UnitSnapshot>>
   onRemoveUnits: (removals: { draftId: string; bmUnitId: string }[]) => void
 }
 
@@ -56,6 +59,24 @@ interface CommittedRow {
   reasonCode: ModellingAction['reasonCode']
   operationType?: OperationType
   notes: string
+  snapshot?: UnitSnapshot
+}
+
+function ChangeArrow({ current, snapshotVal, unit = '' }: { current: number; snapshotVal: number; unit?: string }) {
+  if (snapshotVal === 0) return null
+  const pct = (current - snapshotVal) / snapshotVal * 100
+  if (Math.abs(pct) < CHANGE_THRESHOLD) return null
+  const up = pct > 0
+  const sign = up ? '+' : ''
+  const tooltip = `Was: ${snapshotVal.toFixed(0)}${unit} → Now: ${current.toFixed(0)}${unit} (${sign}${pct.toFixed(0)}%)`
+  return (
+    <span
+      className={`change-arrow ${up ? 'change-up' : 'change-down'}`}
+      title={tooltip}
+    >
+      {up ? '↑' : '↓'}
+    </span>
+  )
 }
 
 function getFuelDisplay(fuelType: string): { label: string; chipClass: string } {
@@ -82,7 +103,7 @@ function TypeChip({ fuelType }: { fuelType: string }) {
 }
 
 export default function CommittedTab({
-  drafts, unitById, unitPnByBmUnit, onRemoveUnits,
+  drafts, unitById, unitPnByBmUnit, dataOverrides, onRemoveUnits,
 }: Props) {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [selectedReason, setSelectedReason] = useState<ModellingAction['reasonCode'] | null>(null)
@@ -119,6 +140,7 @@ export default function CommittedTab({
           reasonCode: action.reasonCode,
           operationType: action.operationType,
           notes: draft.unitNotes[action.bmUnitId] ?? '',
+          snapshot: draft.dataSnapshot?.[action.bmUnitId],
         })
       }
     }
@@ -311,55 +333,87 @@ export default function CommittedTab({
             </tr>
           </thead>
           <tbody>
-            {visibleRows.map(row => (
-              <tr
-                key={row.key}
-                className={selected.has(row.key) ? 'row-pending-remove' : ''}
-                onClick={() => toggleRow(row.key)}
-                style={{ cursor: 'pointer' }}
-              >
-                <td className="check-col" onClick={e => e.stopPropagation()}>
-                  <input
-                    type="checkbox"
-                    checked={selected.has(row.key)}
-                    onChange={() => toggleRow(row.key)}
-                  />
-                </td>
-                <td className="mono bmu-cell">
-                  <span>{row.nationalGridBmUnit}</span>
-                  <span className="site-sub">{row.gspGroup}</span>
-                </td>
-                <td><TypeChip fuelType={row.fuelType} /></td>
-                <td className="mono num">{row.ndz  > 0 ? `${row.ndz}m`  : '—'}</td>
-                <td className="mono num">{row.mzt  > 0 ? `${row.mzt}m`  : '—'}</td>
-                <td className="mono num">{row.mnzt > 0 ? `${row.mnzt}m` : '—'}</td>
-                <td className="mono num">{row.sel  > 0 ? row.sel.toFixed(0)  : '—'}</td>
-                <td className="mono num">{row.mel  > 0 ? row.mel.toFixed(0)  : '—'}</td>
-                <td className="mono num">{row.priceToSel > 0 ? `£${row.priceToSel}` : '—'}</td>
-                <td className="mono num">{row.priceToMel > 0 ? `£${row.priceToMel}` : '—'}</td>
-                <td className="mono num">{row.pn > 0 ? row.pn.toFixed(0) : '—'}</td>
-                <td className="reason-col">
-                  <span className="notes-readonly">{row.operationType ?? '—'}</span>
-                </td>
-                <td className="reason-col">
-                  <span className="notes-readonly">{REASON_LABEL[row.reasonCode]}</span>
-                </td>
-                <td>
-                  <span style={{
-                    fontSize: 12, fontWeight: 500,
-                    color: 'var(--green)',
-                    background: 'var(--green-soft)',
-                    padding: '2px 8px', borderRadius: 4,
-                    whiteSpace: 'nowrap',
-                  }}>
-                    {row.draftName}
-                  </span>
-                </td>
-                <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                  {row.notes || <em className="muted">—</em>}
-                </td>
-              </tr>
-            ))}
+            {visibleRows.map(row => {
+              const ov = dataOverrides[row.bmUnitId] ?? {}
+              const effMel        = ov.mel        ?? row.mel
+              const effSel        = ov.sel        ?? row.sel
+              const effNdz        = ov.ndz        ?? row.ndz
+              const effMzt        = ov.mzt        ?? row.mzt
+              const effMnzt       = ov.mnzt       ?? row.mnzt
+              const effPriceToSel = ov.priceToSel ?? row.priceToSel
+              const effPriceToMel = ov.priceToMel ?? row.priceToMel
+              const snap = row.snapshot
+              return (
+                <tr
+                  key={row.key}
+                  className={selected.has(row.key) ? 'row-pending-remove' : ''}
+                  onClick={() => toggleRow(row.key)}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <td className="check-col" onClick={e => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      checked={selected.has(row.key)}
+                      onChange={() => toggleRow(row.key)}
+                    />
+                  </td>
+                  <td className="mono bmu-cell">
+                    <span>{row.nationalGridBmUnit}</span>
+                    <span className="site-sub">{row.gspGroup}</span>
+                  </td>
+                  <td><TypeChip fuelType={row.fuelType} /></td>
+                  <td className="mono num">
+                    {effNdz > 0 ? `${effNdz}m` : '—'}
+                    {snap && <ChangeArrow current={effNdz} snapshotVal={snap.ndz} unit="m" />}
+                  </td>
+                  <td className="mono num">
+                    {effMzt > 0 ? `${effMzt}m` : '—'}
+                    {snap && <ChangeArrow current={effMzt} snapshotVal={snap.mzt} unit="m" />}
+                  </td>
+                  <td className="mono num">
+                    {effMnzt > 0 ? `${effMnzt}m` : '—'}
+                    {snap && <ChangeArrow current={effMnzt} snapshotVal={snap.mnzt} unit="m" />}
+                  </td>
+                  <td className="mono num">
+                    {effSel > 0 ? effSel.toFixed(0) : '—'}
+                    {snap && <ChangeArrow current={effSel} snapshotVal={snap.sel} unit=" MW" />}
+                  </td>
+                  <td className="mono num">
+                    {effMel > 0 ? effMel.toFixed(0) : '—'}
+                    {snap && <ChangeArrow current={effMel} snapshotVal={snap.mel} unit=" MW" />}
+                  </td>
+                  <td className="mono num">
+                    {effPriceToSel > 0 ? `£${effPriceToSel}` : '—'}
+                    {snap && <ChangeArrow current={effPriceToSel} snapshotVal={snap.priceToSel} unit="£" />}
+                  </td>
+                  <td className="mono num">
+                    {effPriceToMel > 0 ? `£${effPriceToMel}` : '—'}
+                    {snap && <ChangeArrow current={effPriceToMel} snapshotVal={snap.priceToMel} unit="£" />}
+                  </td>
+                  <td className="mono num">{row.pn > 0 ? row.pn.toFixed(0) : '—'}</td>
+                  <td className="reason-col">
+                    <span className="notes-readonly">{row.operationType ?? '—'}</span>
+                  </td>
+                  <td className="reason-col">
+                    <span className="notes-readonly">{REASON_LABEL[row.reasonCode]}</span>
+                  </td>
+                  <td>
+                    <span style={{
+                      fontSize: 12, fontWeight: 500,
+                      color: 'var(--green)',
+                      background: 'var(--green-soft)',
+                      padding: '2px 8px', borderRadius: 4,
+                      whiteSpace: 'nowrap',
+                    }}>
+                      {row.draftName}
+                    </span>
+                  </td>
+                  <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                    {row.notes || <em className="muted">—</em>}
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>

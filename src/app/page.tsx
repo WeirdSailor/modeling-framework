@@ -14,8 +14,9 @@ import SelectedTable from '@/components/SelectedTable'
 import ConfigPanel, { type TweakState } from '@/components/ConfigPanel'
 import ConfirmModal from '@/components/ConfirmModal'
 import CommittedTab from '@/components/CommittedTab'
+import RedeclareTab from '@/components/RedeclareTab'
 
-type Tab = 'workspace' | 'chart' | 'committed'
+type Tab = 'workspace' | 'chart' | 'committed' | 'redeclare'
 
 interface ConfirmState {
   message: string
@@ -80,6 +81,10 @@ export default function Home() {
   const discardDraft      = useModellingStore(s => s.discardDraft)
   const reopenDraft       = useModellingStore(s => s.reopenDraft)
   const deleteDraft       = useModellingStore(s => s.deleteDraft)
+  const dataOverrides     = useModellingStore(s => s.dataOverrides)
+  const setDataOverride   = useModellingStore(s => s.setDataOverride)
+  const clearDataOverride = useModellingStore(s => s.clearDataOverride)
+  const clearAllDataOverrides = useModellingStore(s => s.clearAllDataOverrides)
 
   // ── data fetch ──
   const loadData = useCallback(async () => {
@@ -336,6 +341,12 @@ export default function Home() {
           >
             Committed
           </button>
+          <button
+            className={`tab-btn${activeTab === 'redeclare' ? ' active' : ''}`}
+            onClick={() => setActiveTab('redeclare')}
+          >
+            Redeclare
+          </button>
           <div className="tab-spacer" />
           {!tweaks.showSidebar && (
             <button
@@ -440,7 +451,21 @@ export default function Home() {
             drafts={drafts}
             unitById={unitById}
             unitPnByBmUnit={unitPnByBmUnit}
+            dataOverrides={dataOverrides}
             onRemoveUnits={handleRemoveCommittedUnits}
+          />
+        )}
+
+        {/* Redeclare tab */}
+        {activeTab === 'redeclare' && (
+          <RedeclareTab
+            drafts={drafts}
+            unitById={unitById}
+            unitPnByBmUnit={unitPnByBmUnit}
+            dataOverrides={dataOverrides}
+            onSetOverride={setDataOverride}
+            onClearOverride={clearDataOverride}
+            onClearAll={clearAllDataOverrides}
           />
         )}
 

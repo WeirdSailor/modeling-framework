@@ -518,6 +518,25 @@ input[type="checkbox"]:disabled { cursor: not-allowed; opacity: .4; }
 .badge-in    { background: var(--accent-soft); color: var(--accent-strong); }
 .badge-other { background: var(--amber-soft);  color: var(--amber); }
 
+/* data-change indicators */
+.change-arrow {
+  font-size: 10px; font-weight: 700; margin-left: 3px;
+  cursor: help; line-height: 1;
+}
+.change-up   { color: #22c55e; }
+.change-down { color: #ef4444; }
+
+/* redeclare tab inputs */
+.redeclare-input {
+  width: 70px; text-align: right; font-family: monospace; font-size: 12px;
+  background: var(--bg-inset); border: 1px solid var(--border);
+  border-radius: 4px; padding: 3px 6px; color: var(--text);
+}
+.redeclare-input:focus {
+  outline: none; border-color: var(--accent);
+  background: var(--bg-panel);
+}
+
 .notes-input {
   width: 100%; border: 1px solid transparent; background: transparent;
   padding: 4px 8px; border-radius: 5px; font-size: 12px; color: var(--text);

@@ -59,6 +59,16 @@ export interface ModellingAction {
 export const USERS = ['ANSE', 'NSE', 'OSM', 'OEM', 'NBE', 'TSM', 'TSE'] as const
 export type UserId = typeof USERS[number]
 
+export interface UnitSnapshot {
+  mel: number;
+  sel: number;
+  ndz: number;
+  mzt: number;
+  mnzt: number;
+  priceToSel: number;
+  priceToMel: number;
+}
+
 export interface DraftPlan {
   id: string;
   name: string;
@@ -73,4 +83,5 @@ export interface DraftPlan {
   discardedAt?: number;
   ownerId: UserId;
   sharedWith: UserId[];
+  dataSnapshot?: Record<string, UnitSnapshot>;
 }
