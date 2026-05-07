@@ -207,6 +207,79 @@ export default function CommittedTab({
         ))}
       </div>
 
+      {/* Cost breakdown cards */}
+      <div style={{
+        padding: '10px 20px',
+        borderBottom: '1px solid var(--border)',
+        background: 'var(--bg-panel)',
+        display: 'flex',
+        gap: 8,
+        flexWrap: 'wrap',
+        flexShrink: 0,
+      }}>
+        {/* Total card */}
+        {(() => {
+          const isActive = selectedReason === null
+          return (
+            <div
+              onClick={() => handleReasonSelect(null)}
+              style={{
+                background: isActive ? 'color-mix(in srgb, #58a6ff 12%, var(--bg-inset))' : 'var(--bg-inset)',
+                border: `2px solid ${isActive ? '#58a6ff' : 'var(--border)'}`,
+                borderRadius: 6,
+                padding: '8px 14px',
+                cursor: 'pointer',
+                minWidth: 100,
+                transition: 'border-color 0.1s, background 0.1s',
+              }}
+            >
+              <div style={{ fontSize: 9, color: '#58a6ff', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.6px' }}>
+                Total
+              </div>
+              <div style={{ color: 'var(--text)', fontSize: 16, fontWeight: 700, margin: '3px 0', fontFamily: 'monospace' }}>
+                {formatCost(totalSummary.cost)}
+              </div>
+              <div style={{ color: 'var(--text-soft)', fontSize: 10 }}>
+                {totalSummary.count} unit{totalSummary.count !== 1 ? 's' : ''} · {Math.round(totalSummary.totalMel).toLocaleString()} MW
+              </div>
+            </div>
+          )
+        })()}
+
+        {/* Per-reason cards */}
+        {reasonSummaries.map(({ code, count, cost, totalMel }) => {
+          const isActive = selectedReason === code
+          const color = REASON_COLORS[code]
+          const isEmpty = count === 0
+          return (
+            <div
+              key={code}
+              onClick={() => handleReasonSelect(code)}
+              style={{
+                background: isActive ? `color-mix(in srgb, ${color} 12%, var(--bg-inset))` : 'var(--bg-inset)',
+                border: `2px solid ${isActive ? color : 'var(--border)'}`,
+                borderRadius: 6,
+                padding: '8px 14px',
+                cursor: 'pointer',
+                minWidth: 100,
+                opacity: isEmpty ? 0.4 : 1,
+                transition: 'border-color 0.1s, background 0.1s, opacity 0.1s',
+              }}
+            >
+              <div style={{ fontSize: 9, color, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.6px' }}>
+                {REASON_LABEL[code]}
+              </div>
+              <div style={{ color: 'var(--text)', fontSize: 16, fontWeight: 700, margin: '3px 0', fontFamily: 'monospace' }}>
+                {formatCost(cost)}
+              </div>
+              <div style={{ color: 'var(--text-soft)', fontSize: 10 }}>
+                {count} unit{count !== 1 ? 's' : ''}{count > 0 ? ` · ${Math.round(totalMel).toLocaleString()} MW` : ''}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
       {/* Table */}
       <div className="table-scroll" style={{ flex: 1 }}>
         <table className="data-table">
