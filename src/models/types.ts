@@ -56,6 +56,9 @@ export interface ModellingAction {
   timestamp: Date;
 }
 
+export const USERS = ['ANSE', 'NSE', 'OSM', 'OEM', 'NBE', 'TSM', 'TSE'] as const
+export type UserId = typeof USERS[number]
+
 export interface DraftPlan {
   id: string;
   name: string;
@@ -68,4 +71,6 @@ export interface DraftPlan {
   createdAt: number;
   committedAt?: number;
   discardedAt?: number;
+  ownerId: UserId;
+  sharedWith: UserId[];
 }

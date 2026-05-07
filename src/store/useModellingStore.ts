@@ -1,8 +1,15 @@
 import { create } from 'zustand'
-import type { BMUnit, SettlementPeriodData, ModellingAction, DraftPlan, OperationType } from '@/models/types'
+import type { BMUnit, SettlementPeriodData, ModellingAction, DraftPlan, OperationType, UserId } from '@/models/types'
+import { USERS } from '@/models/types'
 import { computeAggregates } from '@/utils/margin'
 
 const DRAFT_COLORS = ['#f59e0b', '#8b5cf6', '#06b6d4', '#f97316', '#ec4899']
+
+function getStoredUser(): UserId {
+  if (typeof window === 'undefined') return 'NSE'
+  const stored = localStorage.getItem('bm-current-user')
+  return (USERS as readonly string[]).includes(stored ?? '') ? stored as UserId : 'NSE'
+}
 
 function refreshAggregates(
   periods: SettlementPeriodData[],
@@ -23,6 +30,7 @@ interface ModellingState {
   selectedUnits: Set<string>
   isLoading: boolean
   error: string | null
+  currentUser: UserId
 
   setUnits: (units: BMUnit[]) => void
   setSettlementPeriods: (periods: SettlementPeriodData[]) => void
@@ -33,6 +41,7 @@ interface ModellingState {
   clearSelection: () => void
   setSelectedUnits: (ids: Set<string>) => void
 
+  setCurrentUser: (id: UserId) => void
   createDraft: () => string
   setActiveDraft: (id: string | null) => void
   addUnitsToDraft: (draftId: string, bmUnitIds: string[], reasonCode?: ModellingAction['reasonCode']) => void
@@ -42,6 +51,9 @@ interface ModellingState {
   renameDraft: (id: string, name: string) => void
   updateDraftWindow: (id: string, fromPeriod: number, toPeriod: number) => void
   updateUnitNotes: (draftId: string, bmUnitId: string, notes: string) => void
+  duplicateDraft: (id: string) => string
+  shareDraft: (draftId: string, userId: UserId) => void
+  unshareDraft: (draftId: string, userId: UserId) => void
   commitDraft: (id: string) => void
   discardDraft: (id: string) => void
   reopenDraft: (id: string) => void
@@ -57,6 +69,7 @@ export const useModellingStore = create<ModellingState>((set, get) => ({
   selectedUnits: new Set<string>(),
   isLoading: false,
   error: null,
+  currentUser: getStoredUser(),
 
   setUnits: (units) => set({ units }),
 
@@ -79,6 +92,15 @@ export const useModellingStore = create<ModellingState>((set, get) => ({
   clearSelection: () => set({ selectedUnits: new Set<string>() }),
   setSelectedUnits: (ids) => set({ selectedUnits: ids }),
 
+  setCurrentUser: (id) => {
+    localStorage.setItem('bm-current-user', id)
+    set(state => {
+      const myDrafts = state.drafts.filter(d => d.ownerId === id)
+      const firstDraft = myDrafts.find(d => d.status === 'draft') ?? myDrafts[0]
+      return { currentUser: id, activeDraftId: firstDraft?.id ?? null }
+    })
+  },
+
   createDraft: () => {
     const id = crypto.randomUUID()
     set(state => {
@@ -89,6 +111,7 @@ export const useModellingStore = create<ModellingState>((set, get) => ({
       const newDraft: DraftPlan = {
         id, name, actions: [], status: 'draft', color,
         fromPeriod, toPeriod, unitNotes: {}, createdAt: Date.now(),
+        ownerId: state.currentUser, sharedWith: [],
       }
       return { drafts: [...state.drafts, newDraft], activeDraftId: id }
     })
@@ -196,6 +219,49 @@ export const useModellingStore = create<ModellingState>((set, get) => ({
       ),
     })),
 
+  duplicateDraft: (id) => {
+    const newId = crypto.randomUUID()
+    set(state => {
+      const source = state.drafts.find(d => d.id === id)
+      if (!source) return {}
+      const color = DRAFT_COLORS[state.drafts.length % DRAFT_COLORS.length]
+      const copy: DraftPlan = {
+        ...source,
+        id: newId,
+        name: `Copy of ${source.name}`,
+        status: 'draft',
+        color,
+        actions: source.actions.map(a => ({ ...a, timestamp: new Date() })),
+        unitNotes: { ...source.unitNotes },
+        createdAt: Date.now(),
+        committedAt: undefined,
+        discardedAt: undefined,
+        ownerId: state.currentUser,
+        sharedWith: [],
+      }
+      return { drafts: [...state.drafts, copy], activeDraftId: newId }
+    })
+    return newId
+  },
+
+  shareDraft: (draftId, userId) =>
+    set(state => ({
+      drafts: state.drafts.map(d =>
+        d.id === draftId && !d.sharedWith.includes(userId)
+          ? { ...d, sharedWith: [...d.sharedWith, userId] }
+          : d
+      ),
+    })),
+
+  unshareDraft: (draftId, userId) =>
+    set(state => ({
+      drafts: state.drafts.map(d =>
+        d.id === draftId
+          ? { ...d, sharedWith: d.sharedWith.filter(u => u !== userId) }
+          : d
+      ),
+    })),
+
   commitDraft: (id) =>
     set(state => {
       const drafts = state.drafts.map(d =>
@@ -243,7 +309,7 @@ export const useModellingStore = create<ModellingState>((set, get) => ({
     set(state => {
       const drafts = state.drafts.filter(d => d.id !== id)
       const activeDraftId =
-        state.activeDraftId === id ? (drafts[0]?.id ?? null) : state.activeDraftId
+        state.activeDraftId === id ? (drafts.find(d => d.ownerId === state.currentUser)?.id ?? null) : state.activeDraftId
       return { drafts, activeDraftId }
     }),
 

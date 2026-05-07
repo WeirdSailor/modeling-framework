@@ -1,11 +1,14 @@
 'use client'
 
 import { useState } from 'react'
-import type { DraftPlan, SettlementPeriodData } from '@/models/types'
+import type { DraftPlan, SettlementPeriodData, UserId } from '@/models/types'
+import { USERS } from '@/models/types'
 
 interface Props {
   drafts: DraftPlan[]
   activeId: string | null
+  currentUser: UserId
+  onSelectUser: (id: UserId) => void
   onSelect: (id: string) => void
   onCreate: () => void
   showArchive: boolean
@@ -30,11 +33,12 @@ function slotTime(slot: number, periods: SettlementPeriodData[]): string {
   return sp ? sp.startTime.slice(11, 16) : `SP ${slot}`
 }
 
-function DraftListItem({ draft, active, onClick, periods }: {
+function DraftListItem({ draft, active, onClick, periods, sharedBy }: {
   draft: DraftPlan
   active: boolean
   onClick: () => void
   periods: SettlementPeriodData[]
+  sharedBy?: string
 }) {
   const unitCount = new Set(draft.actions.map(a => a.bmUnitId)).size
   const from = slotTime(draft.fromPeriod, periods)
@@ -52,18 +56,31 @@ function DraftListItem({ draft, active, onClick, periods }: {
         <span className="draft-item-meta mono">{from} → {to}</span>
         <span className="draft-item-count">{unitCount} unit{unitCount !== 1 ? 's' : ''}</span>
       </div>
+      {sharedBy && (
+        <div className="draft-item-row">
+          <span style={{ fontSize: 10, color: 'var(--text-soft)', fontStyle: 'italic' }}>
+            from {sharedBy}
+          </span>
+        </div>
+      )}
     </li>
   )
 }
 
 export default function DraftSidebar({
-  drafts, activeId, onSelect, onCreate, showArchive, setShowArchive,
-  settlementPeriods, isLoading, onRefresh,
+  drafts, activeId, currentUser, onSelectUser, onSelect, onCreate,
+  showArchive, setShowArchive, settlementPeriods, isLoading, onRefresh,
 }: Props) {
   const [showCommitted, setShowCommitted] = useState(true)
-  const editing   = drafts.filter(d => d.status === 'draft')
-  const committed = drafts.filter(d => d.status === 'committed')
-  const archive   = drafts.filter(d => d.status === 'discarded')
+  const [showShared, setShowShared] = useState(true)
+
+  const myDrafts   = drafts.filter(d => d.ownerId === currentUser)
+  const editing    = myDrafts.filter(d => d.status === 'draft')
+  const committed  = myDrafts.filter(d => d.status === 'committed')
+  const archive    = myDrafts.filter(d => d.status === 'discarded')
+  const sharedWithMe = drafts.filter(d =>
+    d.ownerId !== currentUser && d.sharedWith.includes(currentUser)
+  )
 
   const windowStart = settlementPeriods[0]?.startTime
   const windowEnd   = settlementPeriods[settlementPeriods.length - 1]?.startTime
@@ -81,6 +98,18 @@ export default function DraftSidebar({
             <span className="brand-title">BM Drafts</span>
             <span className="brand-sub">Balancing Mechanism</span>
           </div>
+        </div>
+
+        {/* Identity picker */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '8px 0 4px' }}>
+          <span style={{ fontSize: 11, color: 'var(--text-soft)', flexShrink: 0 }}>You are:</span>
+          <select
+            value={currentUser}
+            onChange={e => onSelectUser(e.target.value as UserId)}
+            style={{ flex: 1, fontSize: 12, fontWeight: 600 }}
+          >
+            {USERS.map(u => <option key={u} value={u}>{u}</option>)}
+          </select>
         </div>
 
         {windowStart && windowEnd && (
@@ -163,6 +192,31 @@ export default function DraftSidebar({
               <DraftListItem
                 key={d.id} draft={d} active={d.id === activeId}
                 onClick={() => onSelect(d.id)} periods={settlementPeriods}
+              />
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <div className="sidebar-section">
+        <button
+          className="sidebar-label-toggle"
+          onClick={() => setShowShared(!showShared)}
+        >
+          <span>Shared with me</span>
+          <span className="count-pill count-pill-sm">{sharedWithMe.length}</span>
+          <span className={`caret ${showShared ? 'open' : ''}`}>▾</span>
+        </button>
+        {showShared && (
+          <ul className="draft-list">
+            {sharedWithMe.length === 0 && (
+              <li className="draft-list-empty">Nothing shared with you</li>
+            )}
+            {sharedWithMe.map(d => (
+              <DraftListItem
+                key={d.id} draft={d} active={d.id === activeId}
+                onClick={() => onSelect(d.id)} periods={settlementPeriods}
+                sharedBy={d.ownerId}
               />
             ))}
           </ul>

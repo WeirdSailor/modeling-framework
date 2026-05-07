@@ -1,11 +1,14 @@
 'use client'
 
-import type { DraftPlan, SettlementPeriodData } from '@/models/types'
+import { useState } from 'react'
+import type { DraftPlan, SettlementPeriodData, UserId } from '@/models/types'
+import { USERS } from '@/models/types'
 
 interface Props {
   draft: DraftPlan
   settlementPeriods: SettlementPeriodData[]
   cost: number
+  currentUser: UserId
   onChangeName: (name: string) => void
   onChangeFrom: (period: number) => void
   onChangeTo: (period: number) => void
@@ -13,6 +16,9 @@ interface Props {
   onDiscard: () => void
   onReopen: () => void
   onDelete: () => void
+  onDuplicate: () => void
+  onShare: (userId: UserId) => void
+  onUnshare: (userId: UserId) => void
 }
 
 function StateBadge({ status }: { status: DraftPlan['status'] }) {
@@ -44,11 +50,15 @@ function formatCost(cost: number): string {
 }
 
 export default function DraftDetails({
-  draft, settlementPeriods, cost,
+  draft, settlementPeriods, cost, currentUser,
   onChangeName, onChangeFrom, onChangeTo,
-  onCommit, onDiscard, onReopen, onDelete,
+  onCommit, onDiscard, onReopen, onDelete, onDuplicate,
+  onShare, onUnshare,
 }: Props) {
-  const readOnly = draft.status !== 'draft'
+  const [shareOpen, setShareOpen] = useState(false)
+
+  const isOwner = draft.ownerId === currentUser
+  const readOnly = !isOwner || draft.status !== 'draft'
   const unitCount = new Set(draft.actions.map(a => a.bmUnitId)).size
   const from = slotLabel(draft.fromPeriod, settlementPeriods)
   const to   = slotLabel(draft.toPeriod,   settlementPeriods)
@@ -58,6 +68,10 @@ export default function DraftDetails({
     value: sp.settlementPeriod,
     label: `SP ${sp.settlementPeriod} · ${sp.startTime.slice(11, 16)}`,
   }))
+
+  const availableToShare = USERS.filter(
+    u => u !== draft.ownerId && !draft.sharedWith.includes(u)
+  )
 
   return (
     <div className="draft-details">
@@ -74,6 +88,15 @@ export default function DraftDetails({
             />
           )}
           <StateBadge status={draft.status} />
+          {!isOwner && (
+            <span style={{
+              fontSize: 11, color: 'var(--text-soft)',
+              background: 'var(--bg-inset)', border: '1px solid var(--border)',
+              borderRadius: 4, padding: '2px 8px', whiteSpace: 'nowrap',
+            }}>
+              Shared by {draft.ownerId}
+            </span>
+          )}
         </div>
         <div className="dd-meta">
           <span className="dd-meta-item">
@@ -93,6 +116,71 @@ export default function DraftDetails({
             <span className="dd-meta-value mono">{formatCost(cost)}</span>
           </span>
         </div>
+
+        {/* Share controls — owner only */}
+        {isOwner && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+            <span style={{ fontSize: 11, color: 'var(--text-soft)', flexShrink: 0 }}>Shared with:</span>
+            {draft.sharedWith.length === 0 && (
+              <span style={{ fontSize: 11, color: 'var(--text-muted)', fontStyle: 'italic' }}>nobody</span>
+            )}
+            {draft.sharedWith.map(u => (
+              <span key={u} style={{
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+                fontSize: 11, fontWeight: 600,
+                background: 'var(--bg-inset)', border: '1px solid var(--border)',
+                borderRadius: 4, padding: '2px 6px',
+              }}>
+                {u}
+                <button
+                  onClick={() => onUnshare(u)}
+                  style={{
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    color: 'var(--text-soft)', padding: 0, fontSize: 13, lineHeight: 1,
+                  }}
+                  title={`Unshare with ${u}`}
+                >×</button>
+              </span>
+            ))}
+            {availableToShare.length > 0 && (
+              <div style={{ position: 'relative' }}>
+                <button
+                  className="btn btn-ghost"
+                  style={{ fontSize: 11, padding: '2px 8px' }}
+                  onClick={() => setShareOpen(v => !v)}
+                >
+                  + Share
+                </button>
+                {shareOpen && (
+                  <div style={{
+                    position: 'absolute', top: '100%', left: 0, zIndex: 50,
+                    background: 'var(--bg-panel)', border: '1px solid var(--border)',
+                    borderRadius: 6, padding: 4, marginTop: 2,
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                    minWidth: 100,
+                  }}>
+                    {availableToShare.map(u => (
+                      <button
+                        key={u}
+                        onClick={() => { onShare(u); setShareOpen(false) }}
+                        style={{
+                          display: 'block', width: '100%', textAlign: 'left',
+                          background: 'none', border: 'none', cursor: 'pointer',
+                          padding: '5px 10px', fontSize: 12, fontWeight: 600,
+                          color: 'var(--text)', borderRadius: 4,
+                        }}
+                        onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-inset)')}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                      >
+                        {u}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="dd-right">
@@ -125,8 +213,10 @@ export default function DraftDetails({
         </div>
 
         <div className="dd-actions">
-          {draft.status === 'draft' && (
+          {/* Owner actions */}
+          {isOwner && draft.status === 'draft' && (
             <>
+              <button className="btn btn-ghost" onClick={onDuplicate}>Duplicate</button>
               <button className="btn btn-ghost" onClick={onDiscard}>Discard</button>
               <button
                 className="btn btn-primary"
@@ -138,17 +228,26 @@ export default function DraftDetails({
               </button>
             </>
           )}
-          {draft.status === 'committed' && (
+          {isOwner && draft.status === 'committed' && (
             <>
               <span className="dd-readonly-hint">Committed — read only</span>
+              <button className="btn btn-ghost" onClick={onDuplicate}>Duplicate</button>
               <button className="btn btn-ghost" onClick={onReopen}>Uncommit</button>
             </>
           )}
-          {draft.status === 'discarded' && (
+          {isOwner && draft.status === 'discarded' && (
             <>
               <span className="dd-readonly-hint">Discarded</span>
+              <button className="btn btn-ghost" onClick={onDuplicate}>Duplicate</button>
               <button className="btn btn-ghost" onClick={onReopen}>Restore</button>
               <button className="btn btn-danger-ghost" onClick={onDelete}>Delete</button>
+            </>
+          )}
+          {/* Shared-with-me: duplicate only */}
+          {!isOwner && (
+            <>
+              <span className="dd-readonly-hint">View only</span>
+              <button className="btn btn-ghost" onClick={onDuplicate}>Duplicate to my drafts</button>
             </>
           )}
         </div>

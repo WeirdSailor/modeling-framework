@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useModellingStore } from '@/store/useModellingStore'
-import type { ModellingAction, OperationType } from '@/models/types'
+import type { ModellingAction, OperationType, UserId } from '@/models/types'
 import { fetchAllData } from '@/services/elexon'
 import { isUnitPnCommitted } from '@/utils/margin'
 import { EXCLUDED_FUEL_TYPES, PULLBACK_FUEL_TYPES } from '@/utils/fuelTypes'
@@ -71,6 +71,11 @@ export default function Home() {
   const updateUnitNotes   = useModellingStore(s => s.updateUnitNotes)
   const updateUnitReason        = useModellingStore(s => s.updateUnitReason)
   const updateUnitOperationType = useModellingStore(s => s.updateUnitOperationType)
+  const currentUser       = useModellingStore(s => s.currentUser)
+  const setCurrentUser    = useModellingStore(s => s.setCurrentUser)
+  const duplicateDraft    = useModellingStore(s => s.duplicateDraft)
+  const shareDraft        = useModellingStore(s => s.shareDraft)
+  const unshareDraft      = useModellingStore(s => s.unshareDraft)
   const commitDraft       = useModellingStore(s => s.commitDraft)
   const discardDraft      = useModellingStore(s => s.discardDraft)
   const reopenDraft       = useModellingStore(s => s.reopenDraft)
@@ -97,10 +102,11 @@ export default function Home() {
   // ── auto-select first draft ──
   useEffect(() => {
     if (!activeDraftId && drafts.length > 0) {
-      const first = drafts.find(d => d.status === 'draft') ?? drafts[0]
+      const myDrafts = drafts.filter(d => d.ownerId === currentUser)
+      const first = myDrafts.find(d => d.status === 'draft') ?? myDrafts[0] ?? drafts[0]
       setActiveDraft(first.id)
     }
-  }, [drafts, activeDraftId, setActiveDraft])
+  }, [drafts, activeDraftId, setActiveDraft, currentUser])
 
   // ── toast ──
   const flashToast = useCallback((msg: string) => {
@@ -196,6 +202,12 @@ export default function Home() {
     flashToast('New draft created')
   }
 
+  function handleDuplicate() {
+    if (!activeDraftId) return
+    duplicateDraft(activeDraftId)
+    flashToast('Draft duplicated')
+  }
+
   function handleCommit() {
     if (!activeDraftId || !activeDraft) return
     setConfirmState({
@@ -276,7 +288,8 @@ export default function Home() {
     )
   }
 
-  const readOnly = !activeDraft || activeDraft.status !== 'draft'
+  const isOwner = activeDraft?.ownerId === currentUser
+  const readOnly = !activeDraft || activeDraft.status !== 'draft' || !isOwner
 
   const appClass = [
     'app',
@@ -290,6 +303,8 @@ export default function Home() {
         <DraftSidebar
           drafts={drafts}
           activeId={activeDraftId}
+          currentUser={currentUser}
+          onSelectUser={setCurrentUser}
           onSelect={setActiveDraft}
           onCreate={handleCreateDraft}
           showArchive={showArchive}
@@ -358,6 +373,7 @@ export default function Home() {
                   draft={activeDraft}
                   settlementPeriods={settlementPeriods}
                   cost={activeDraftCost}
+                  currentUser={currentUser}
                   onChangeName={name => renameDraft(activeDraftId!, name)}
                   onChangeFrom={from => updateDraftWindow(activeDraftId!, from, activeDraft.toPeriod)}
                   onChangeTo={to => updateDraftWindow(activeDraftId!, activeDraft.fromPeriod, to)}
@@ -365,6 +381,9 @@ export default function Home() {
                   onDiscard={handleDiscard}
                   onReopen={handleReopen}
                   onDelete={handleDelete}
+                  onDuplicate={handleDuplicate}
+                  onShare={userId => shareDraft(activeDraftId!, userId)}
+                  onUnshare={userId => unshareDraft(activeDraftId!, userId)}
                 />
                 <div className={`workspace-grid grid-${tweaks.layout}`}>
                   <AvailableTable
