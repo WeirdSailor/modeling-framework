@@ -105,7 +105,7 @@ Fetched across 5×7-day windows (35 days total) to capture units that haven't be
 | `src/app/page.tsx` | Top-level: data loading, layout, tab switching, derived data, confirm modals, sharing actions |
 | `src/components/DraftSidebar.tsx` | Identity picker ("You are: [NSE ▼]"), window time + Refresh, draft list filtered to current user, "Shared with me" collapsible section |
 | `src/components/DraftDetails.tsx` | Draft header: name, state badge, meta row (window/duration/units/cost), share controls (owner) or "Shared by X" badge (recipient), From/To SP pickers, action buttons |
-| `src/components/AvailableTable.tsx` | Available units table: search/filter/sort, checkbox or click selection, type + service chips |
+| `src/components/AvailableTable.tsx` | Available units table: search/filter/sort, GSP group filter popover, checkbox or click selection, type + service chips |
 | `src/components/SelectedTable.tsx` | Selected units in active draft: Σ PN / Σ MEL / Est. value totals, notes input, remove button, service chip |
 | `src/components/CommittedTab.tsx` | Committed-tab view: cost breakdown cards (Total + per-reason), click-to-filter table, change-indicator arrows (↑/↓), service chip, bulk remove |
 | `src/components/RedeclareTab.tsx` | Redeclare-tab view: editable data columns for committed units (simulates redeclarations); amber row highlight on override; Reset per-row and Reset all; Service (SR/QR) assign select |
@@ -131,6 +131,7 @@ Fetched across 5×7-day windows (35 days total) to capture units that haven't be
 - **`ownerId` on every draft** — `createDraft` and `duplicateDraft` both set `ownerId: state.currentUser`. Any new draft-creation path must do the same. Drafts without `ownerId` will be invisible to all users in the sidebar.
 - **`dataSnapshot` is set at commit time** — `commitDraft` in the store reads `state.units` and `state.dataOverrides` to build the snapshot. If you add new tracked fields to `UnitSnapshot`, update both `commitDraft` and `ChangeArrow`'s render logic.
 - **`dataOverrides` is separate from `unitServices`** — overrides are numeric value redeclarations for change-tracking; services are categorical assignments. Do not merge them.
+- **`gspFilter` in `AvailableTable` is local component state** — intentionally not in Zustand. Do not lift it to the store or pass it as a prop. The `visible` memo depends on it; `gspFilter` must remain in its dependency array.
 
 ---
 
@@ -215,6 +216,49 @@ A `ChangeArrow` component renders a coloured superscript arrow (↑ green, ↓ r
 - Service (SR/QR/—) `<select>` per row — assignments are stored in `unitServices` (separate from `dataOverrides`).
 - Overridden rows are highlighted amber. Per-row **Reset** button and top-level **Reset all** button.
 - PN, Event, Reason, Draft columns are read-only on this tab.
+
+## GSP Group Filter (AvailableTable)
+
+A "GSP ▾" button in the `AvailableTable` toolbar opens a floating popover listing all 14 GSP groups. Each zone has a 3-state segmented toggle: **+** (include), **·** (neutral), **−** (exclude). Multiple zones can be mixed — e.g. include `_F` + `_G`, exclude `_P`.
+
+### Filter state
+
+All state is **local to `AvailableTable`** — not in Zustand, not passed as props:
+
+```ts
+gspFilter: Record<string, 'include' | 'exclude'>  // absence = neutral
+gspPopoverOpen: boolean
+```
+
+### Filter logic
+
+Applied as an extra step in the `visible` useMemo, after the type-filter and search checks. `gspIncluded` and `gspExcluded` are hoisted outside the `.filter()` callback:
+
+```ts
+if (gspIncluded.length > 0 && !gspIncluded.includes(r.gspGroup)) return false
+if (gspExcluded.includes(r.gspGroup)) return false
+```
+
+A unit passes if its `gspGroup` is in at least one included zone (when any inclusions are set) **and** not in any excluded zone. Both conditions apply simultaneously.
+
+### GspFilterPopover subcomponent
+
+Defined inline above `export default function AvailableTable`. Accepts `gspFilter`, `onChange`, `onClose`, and `wrapperRef` (a ref to the wrapper div containing both the button and the popover — used for click-outside detection to prevent the toggle button's `mousedown` from conflicting with the popover's `click`). Dismiss via click-outside (`document.mousedown`) or Escape.
+
+### Data source
+
+Zone list comes from `GSP_AREAS` in `src/config/scenarios.ts` (14 entries, same data used by the Voltage scenario area picker). Zone membership uses `unit.gspGroup`. Mock data in `src/services/elexon.ts` (`MOCK_GSP_GROUPS`) covers all 14 zones.
+
+### Button badge states
+
+| State | Appearance |
+|-------|-----------|
+| Inactive | `GSP ▾` — default border |
+| Includes only | `GSP ▾ +N` — indigo border + badge |
+| Excludes only | `GSP ▾ −N` — red border + badge |
+| Mixed | `GSP ▾ +N −N` — indigo border, both badges |
+
+---
 
 ## Service Column (SR / QR)
 
