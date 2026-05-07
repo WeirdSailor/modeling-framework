@@ -2,7 +2,6 @@
 
 import { useState, useMemo } from 'react'
 import type { DraftPlan, BMUnit, ModellingAction, OperationType } from '@/models/types'
-import { OPERATION_TYPE_LABELS } from '@/models/types'
 
 const REASON_LABEL: Record<ModellingAction['reasonCode'], string> = {
   MARGIN:     'Margin',
