@@ -30,8 +30,11 @@ settlementPeriods: SettlementPeriodData[]   // 48 slots, rolling 24h from now
 drafts: DraftPlan[]
 activeDraftId: string | null
 selectedUnits: Set<string>
+currentUser: UserId                          // active operator identity
 isLoading: boolean
 error: string | null
+dataOverrides: Record<string, Partial<UnitSnapshot>>  // per-unit data redeclarations (prototype)
+unitServices: Record<string, ServiceType>             // per-unit service assignment (SR | QR)
 ```
 
 `refreshAggregates` is called inside the store on every draft commit/discard/clear. It recomputes EMX/EOL/EMI/Margin for each SP using committed draft actions. It does `{ ...sp, ...computeAggregates(...) }` — the spread preserves `hasConfirmedPn`, `proxyEmx`, `proxyEol` without any special handling.
@@ -42,7 +45,24 @@ error: string | null
 
 ### Draft Plans System
 
-Operators create independent draft plans. Each draft is a colour-coded group of `ModellingAction`s. Drafts can be overlaid simultaneously on the margin chart as dotted lines. Committing a draft absorbs it into the solid baseline and triggers `refreshAggregates`. The `DraftPanel` component manages draft lifecycle (create, commit, discard).
+Operators create independent draft plans. Each draft is a colour-coded group of `ModellingAction`s. Drafts can be overlaid simultaneously on the margin chart as dotted lines. Committing a draft absorbs it into the solid baseline and triggers `refreshAggregates`. The `DraftDetails` component manages draft lifecycle (create, commit, discard, duplicate, share).
+
+Every draft has an `ownerId` (the operator who created it) and a `sharedWith` list. Only the owner can edit, commit, discard, or share a draft. Other operators can view shared drafts read-only and duplicate them into their own workspace.
+
+### Draft Duplication
+
+`duplicateDraft(id)` in the store deep-copies any draft (any status) into a new `'draft'`-status plan owned by `currentUser`, with a fresh ID, colour, and name prefixed `"Copy of …"`. It sets the copy as the active draft. The "Duplicate" button appears in `DraftDetails` for all statuses (draft, committed, discarded) and for shared-with-me drafts ("Duplicate to my drafts").
+
+### User Identity & Sharing (prototype)
+
+Seven fixed operator identities: `ANSE | NSE | OSM | OEM | NBE | TSM | TSE` — defined as `USERS` constant in `src/models/types.ts`. No authentication; the active identity is selected from a dropdown in the sidebar and persisted to `localStorage`.
+
+- **Sidebar sections** (Editing / Committed / Discarded) show only the current user's own drafts.
+- **"Shared with me"** section at the bottom of the sidebar lists drafts from other operators that include `currentUser` in their `sharedWith` array.
+- **Share controls** in `DraftDetails` (owner only): inline chips per shared user with `×` to unshare, and a `+ Share` dropdown to add recipients.
+- Switching identity resets `activeDraftId` to the new user's first draft.
+
+> This is a UI prototype — no backend, no real data transport between machines. Sharing is simulated by switching the identity selector.
 
 ### Margin Calculation (`src/utils/margin.ts`)
 
@@ -82,16 +102,17 @@ Fetched across 5×7-day windows (35 days total) to capture units that haven't be
 
 | File | Role |
 |------|------|
-| `src/app/page.tsx` | Top-level: data loading, layout, tab switching, derived data, confirm modals |
-| `src/components/DraftSidebar.tsx` | Brand mark, window time + Refresh, draft list with collapsible Archive section |
-| `src/components/DraftDetails.tsx` | Draft header: name, state badge, meta row (window/duration/units/cost), From/To SP pickers, action buttons |
-| `src/components/AvailableTable.tsx` | Available units table: search/filter/sort, checkbox or click selection, type chips |
-| `src/components/SelectedTable.tsx` | Selected units in active draft: Σ PN / Σ MEL / Est. value totals, notes input, remove button |
-| `src/components/CommittedTab.tsx` | Committed-tab view: all units across committed drafts, bulk remove |
+| `src/app/page.tsx` | Top-level: data loading, layout, tab switching, derived data, confirm modals, sharing actions |
+| `src/components/DraftSidebar.tsx` | Identity picker ("You are: [NSE ▼]"), window time + Refresh, draft list filtered to current user, "Shared with me" collapsible section |
+| `src/components/DraftDetails.tsx` | Draft header: name, state badge, meta row (window/duration/units/cost), share controls (owner) or "Shared by X" badge (recipient), From/To SP pickers, action buttons |
+| `src/components/AvailableTable.tsx` | Available units table: search/filter/sort, checkbox or click selection, type + service chips |
+| `src/components/SelectedTable.tsx` | Selected units in active draft: Σ PN / Σ MEL / Est. value totals, notes input, remove button, service chip |
+| `src/components/CommittedTab.tsx` | Committed-tab view: cost breakdown cards (Total + per-reason), click-to-filter table, change-indicator arrows (↑/↓), service chip, bulk remove |
+| `src/components/RedeclareTab.tsx` | Redeclare-tab view: editable data columns for committed units (simulates redeclarations); amber row highlight on override; Reset per-row and Reset all; Service (SR/QR) assign select |
 | `src/components/MarginChart.tsx` | Recharts chart: confirmed baseline + draft overlays + D-1 proxy + gate-closure frontier; dark-mode aware via MutationObserver |
 | `src/components/TweaksPanel.tsx` | Floating tweaks panel: theme, layout, sidebar toggle, selection mode |
 | `src/components/ConfirmModal.tsx` | Dark-mode-aware confirm dialog (replaces native browser confirm) |
-| `src/models/types.ts` | All interfaces |
+| `src/models/types.ts` | All interfaces; `USERS`, `UserId`, `ServiceType`, `UnitSnapshot` |
 | `src/services/elexon.ts` | All fetch logic + mock fallback |
 | `src/store/useModellingStore.ts` | Zustand store |
 | `src/utils/margin.ts` | `computeAggregates`, `applyDraftToBaseline`, `isUnitPnCommitted` |
@@ -107,6 +128,9 @@ Fetched across 5×7-day windows (35 days total) to capture units that haven't be
 - **`settlementPeriod` in `SettlementPeriodData`** is the slot index 1–48, not the real SP number. All `ModellingAction.fromPeriod`/`toPeriod` comparisons use this slot index.
 - **`src/utils/fuelTypes.ts`** — shared exclusion list. Keep in sync if adding/removing fuel types from the grid.
 - **`fetchSinglePN` + 48 parallel calls** — do not collapse into a single date-range call; the Elexon PN endpoint requires per-SP queries. The `/datasets/PN` endpoint with only a date-range returns 404 — `settlementDate` + `settlementPeriod` are both mandatory.
+- **`ownerId` on every draft** — `createDraft` and `duplicateDraft` both set `ownerId: state.currentUser`. Any new draft-creation path must do the same. Drafts without `ownerId` will be invisible to all users in the sidebar.
+- **`dataSnapshot` is set at commit time** — `commitDraft` in the store reads `state.units` and `state.dataOverrides` to build the snapshot. If you add new tracked fields to `UnitSnapshot`, update both `commitDraft` and `ChangeArrow`'s render logic.
+- **`dataOverrides` is separate from `unitServices`** — overrides are numeric value redeclarations for change-tracking; services are categorical assignments. Do not merge them.
 
 ---
 
@@ -124,6 +148,39 @@ Cost = Σ max(0, MEL − PN) × £120   (per unique unit in the draft)
 
 Formatted as `£1,234` (rounded, GB locale). Shows `—` when no units are in the draft. Computed in `page.tsx` as `activeDraftCost` and passed to `DraftDetails` as a prop.
 
+The same formula is used in `CommittedTab` for the cost breakdown cards (`STATIC_PRICE = 120`).
+
+## Committed Tab — Cost Breakdown Cards
+
+A row of summary cards sits above the data table on the Committed tab:
+
+- **Total** (blue) — cost, unit count, and total MEL across all committed units.
+- **Margin / Inertia / Voltage / Reserve / Constraint** (colour-coded) — per-reason-code breakdown using the same cost formula.
+
+Cards with 0 units render at 40% opacity. Clicking a card sets `selectedReason` and filters the table to matching rows. Clicking the active card (or Total) resets the filter. All state is local to `CommittedTab` — no props needed.
+
+## Column Layout — All Three Tables
+
+`AvailableTable`, `SelectedTable`, and `CommittedTab` share the same column set:
+
+| Column | Notes |
+|--------|-------|
+| BMU | `nationalGridBmUnit` + `gspGroup` sub-label |
+| Service | SR or QR chip (blue/purple); `—` if unassigned. Set on Redeclare tab. |
+| Type | Fuel type chip |
+| NDZ | Notice to Deviate (minutes), `—` if zero |
+| MZT | Minimum Zero Time (minutes) |
+| MNZT | Minimum Non-Zero Time (minutes) |
+| SEL | Stable Export Limit (MW) |
+| MEL | `registeredCapacity` (MW) |
+| £ SEL | Price to SEL tier |
+| £ MEL | Price to MEL tier |
+| PN | Current physical notification (MW) — conditional on pullback scenario in Available/Selected; always shown in Committed |
+| Event | `operationType` (AS / DS / AD etc.) |
+| Reason | `reasonCode` (Margin / Inertia / Voltage / Reserve / Constraint) |
+
+CommittedTab also has: Draft (source draft name badge), Notes, a leading checkbox column for bulk remove, and change-indicator arrows (↑/↓) on data cells where the current value has drifted >10% from the commit-time snapshot.
+
 ## PN / SEL Fallback in `unitPnByBmUnit`
 
 `unitPnByBmUnit` (computed in `page.tsx`) is the per-unit PN used by both tables (AvailableTable, SelectedTable, CommittedTab) and the Cost calculation. Build order:
@@ -136,6 +193,38 @@ Units with no PN, no D-1 data, and no SEL show `—`. This is the honest answer 
 
 **Do not remove the SEL fallback** — cold CCGTs like BAGE-1 genuinely don't appear in the Elexon PN dataset and would otherwise show blank PN and a misleading Cost of MEL × £120.
 
+## Data-Change Tracking & Redeclare Tab
+
+### How it works
+
+When a draft is committed, `commitDraft` in the store snapshots the effective values of each unit at that moment into `draft.dataSnapshot: Record<string, UnitSnapshot>`. `UnitSnapshot` captures: `mel, sel, ndz, mzt, mnzt, priceToSel, priceToMel`.
+
+The **Redeclare tab** allows a tester to simulate unit redeclarations by editing those fields inline. Changes are stored in `dataOverrides: Record<string, Partial<UnitSnapshot>>` — a global store map, not tied to any draft. The Committed tab reads `dataOverrides` to compute "effective" values at render time, then compares against the draft's snapshot.
+
+### Change indicators in Committed tab
+
+A `ChangeArrow` component renders a coloured superscript arrow (↑ green, ↓ red) next to any cell whose effective value has drifted more than `CHANGE_THRESHOLD` (10%) from the commit-time snapshot. Hovering shows a `title` tooltip: `Was: 500 MW → Now: 400 MW (−20%)`.
+
+- The threshold constant is `CHANGE_THRESHOLD = 10` in `CommittedTab.tsx`.
+- Arrows only appear for units that have a snapshot (i.e., were committed after this feature was added).
+- `dataOverrides` is global — it persists across tab switches and simulates a live data feed changing underlying unit data.
+
+### Redeclare tab UX
+
+- Editable `<input type="number">` for MEL, SEL, NDZ, MZT, MNZT, £ SEL, £ MEL per row.
+- Service (SR/QR/—) `<select>` per row — assignments are stored in `unitServices` (separate from `dataOverrides`).
+- Overridden rows are highlighted amber. Per-row **Reset** button and top-level **Reset all** button.
+- PN, Event, Reason, Draft columns are read-only on this tab.
+
+## Service Column (SR / QR)
+
+`ServiceType = 'SR' | 'QR'` is defined in `src/models/types.ts`. Services are stored in `unitServices: Record<string, ServiceType>` in the Zustand store, separate from `dataOverrides`.
+
+- Assigned via the **Service** select on the Redeclare tab.
+- Displayed as a colour chip in the **Service** column (second column, after BMU) on Available, Selected, Committed, and Redeclare tabs.
+- SR = blue chip; QR = purple chip (light + dark mode variants in `globals.css`).
+- `setUnitService(bmUnitId, service | undefined)` — pass `undefined` to clear.
+
 ---
 
 ## Known Issues / Future Work
@@ -146,4 +235,5 @@ Units with no PN, no D-1 data, and no SEL show `—`. This is the honest answer 
 - **D-1 proxy + tomorrow slots** — tomorrow's SPs always have zero confirmed PN; they use yesterday's same-SP data as proxy. This is a reasonable heuristic but not operationally precise.
 - **PN / SEL columns still blank in practice** — The SEL fallback (`unit.sel ?? 0`) and D-1 PN backfill are implemented but field testing shows values are not rendering in the table. Root cause not yet isolated — candidates: (a) SEL data not being fetched/parsed correctly for these units, (b) rate limiting killing the D-1 PN fetch silently, (c) key mismatch between `bmUnitId` and what the dynamic-param endpoints return. Needs a focused debug session with browser dev tools open to inspect the store state.
 - **Rate limiting risk** — `fetchAllData` fires ~130 concurrent requests to the Elexon API (48 current PN + 48 D-1 PN + dynamic params). Failures are silently swallowed. If D-1 PN is unexpectedly blank, rate limiting is the likely cause.
+- **Sharing is UI-only** — no backend; switching identity is how you simulate another user seeing a shared draft. Shared state does not persist between browser sessions or machines.
 - **`Docs/overview.md` is stale** — describes the old single-date, single-action version. Should be rewritten if documentation is needed.
