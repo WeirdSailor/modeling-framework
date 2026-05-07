@@ -1,9 +1,35 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import type { DraftPlan, BMUnit } from '@/models/types'
+import type { DraftPlan, BMUnit, ModellingAction, OperationType } from '@/models/types'
+import { OPERATION_TYPE_LABELS } from '@/models/types'
+
+const REASON_LABEL: Record<ModellingAction['reasonCode'], string> = {
+  MARGIN:     'Margin',
+  INERTIA:    'Inertia',
+  VOLTAGE:    'Voltage',
+  CONSTRAINT: 'Constraint',
+  RESERVE:    'Reserve',
+}
 
 const STATIC_PRICE = 120
+
+const REASON_COLORS: Record<ModellingAction['reasonCode'], string> = {
+  MARGIN:     '#f59e0b',
+  INERTIA:    '#8b5cf6',
+  VOLTAGE:    '#06b6d4',
+  RESERVE:    '#f97316',
+  CONSTRAINT: '#ec4899',
+}
+
+const REASON_ORDER: ModellingAction['reasonCode'][] = ['MARGIN', 'INERTIA', 'VOLTAGE', 'RESERVE', 'CONSTRAINT']
+
+function formatCost(cost: number): string {
+  if (cost === 0) return '—'
+  if (cost >= 1_000_000) return `£${(cost / 1_000_000).toFixed(1)}m`
+  if (cost >= 1_000)     return `£${Math.round(cost / 1_000)}k`
+  return `£${Math.round(cost)}`
+}
 
 interface Props {
   drafts: DraftPlan[]
@@ -23,6 +49,13 @@ interface CommittedRow {
   pn: number
   mel: number
   sel: number
+  ndz: number
+  mzt: number
+  mnzt: number
+  priceToSel: number
+  priceToMel: number
+  reasonCode: ModellingAction['reasonCode']
+  operationType?: OperationType
   notes: string
 }
 
@@ -53,6 +86,7 @@ export default function CommittedTab({
   drafts, unitById, unitPnByBmUnit, onRemoveUnits,
 }: Props) {
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [selectedReason, setSelectedReason] = useState<ModellingAction['reasonCode'] | null>(null)
 
   const committedDrafts = useMemo(
     () => drafts.filter(d => d.status === 'committed'),
@@ -78,6 +112,13 @@ export default function CommittedTab({
           pn: unitPnByBmUnit[action.bmUnitId] ?? 0,
           mel: u?.registeredCapacity ?? 0,
           sel: u?.sel ?? 0,
+          ndz: u?.ndz ?? 0,
+          mzt: u?.mzt ?? 0,
+          mnzt: u?.mnzt ?? 0,
+          priceToSel: u?.priceToSel ?? 0,
+          priceToMel: u?.priceToMel ?? 0,
+          reasonCode: action.reasonCode,
+          operationType: action.operationType,
           notes: draft.unitNotes[action.bmUnitId] ?? '',
         })
       }
@@ -85,8 +126,30 @@ export default function CommittedTab({
     return out
   }, [committedDrafts, unitById, unitPnByBmUnit])
 
-  const allChecked = rows.length > 0 && rows.every(r => selected.has(r.key))
-  const someChecked = rows.some(r => selected.has(r.key))
+  const reasonSummaries = useMemo(() =>
+    REASON_ORDER.map(code => {
+      const matching = rows.filter(r => r.reasonCode === code)
+      return {
+        code,
+        count: matching.length,
+        cost: matching.reduce((s, r) => s + Math.max(0, r.mel - r.pn) * STATIC_PRICE, 0),
+        totalMel: matching.reduce((s, r) => s + r.mel, 0),
+      }
+    })
+  , [rows])
+
+  const totalSummary = useMemo(() => ({
+    count: rows.length,
+    cost: rows.reduce((s, r) => s + Math.max(0, r.mel - r.pn) * STATIC_PRICE, 0),
+    totalMel: rows.reduce((s, r) => s + r.mel, 0),
+  }), [rows])
+
+  const visibleRows = selectedReason
+    ? rows.filter(r => r.reasonCode === selectedReason)
+    : rows
+
+  const allChecked = visibleRows.length > 0 && visibleRows.every(r => selected.has(r.key))
+  const someChecked = visibleRows.some(r => selected.has(r.key))
 
   function toggleRow(key: string) {
     setSelected(prev => {
@@ -99,7 +162,7 @@ export default function CommittedTab({
   function toggleAll() {
     setSelected(prev => {
       if (allChecked) return new Set()
-      return new Set(rows.map(r => r.key))
+      return new Set(visibleRows.map(r => r.key))
     })
   }
 
@@ -108,6 +171,11 @@ export default function CommittedTab({
       .filter(r => selected.has(r.key))
       .map(r => ({ draftId: r.draftId, bmUnitId: r.bmUnitId }))
     onRemoveUnits(removals)
+    setSelected(new Set())
+  }
+
+  function handleReasonSelect(code: ModellingAction['reasonCode'] | null) {
+    setSelectedReason(prev => prev === code ? null : code)
     setSelected(new Set())
   }
 
@@ -156,16 +224,22 @@ export default function CommittedTab({
               </th>
               <th>BMU</th>
               <th>Type</th>
-              <th className="num">PN</th>
-              <th className="num">MEL</th>
+              <th className="num">NDZ</th>
+              <th className="num">MZT</th>
+              <th className="num">MNZT</th>
               <th className="num">SEL</th>
-              <th className="num">Price</th>
+              <th className="num">MEL</th>
+              <th className="num">£ SEL</th>
+              <th className="num">£ MEL</th>
+              <th className="num">PN</th>
+              <th className="reason-col">Event</th>
+              <th className="reason-col">Reason</th>
               <th>Draft</th>
               <th>Notes</th>
             </tr>
           </thead>
           <tbody>
-            {rows.map(row => (
+            {visibleRows.map(row => (
               <tr
                 key={row.key}
                 className={selected.has(row.key) ? 'row-pending-remove' : ''}
@@ -184,10 +258,20 @@ export default function CommittedTab({
                   <span className="site-sub">{row.gspGroup}</span>
                 </td>
                 <td><TypeChip fuelType={row.fuelType} /></td>
+                <td className="mono num">{row.ndz  > 0 ? `${row.ndz}m`  : '—'}</td>
+                <td className="mono num">{row.mzt  > 0 ? `${row.mzt}m`  : '—'}</td>
+                <td className="mono num">{row.mnzt > 0 ? `${row.mnzt}m` : '—'}</td>
+                <td className="mono num">{row.sel  > 0 ? row.sel.toFixed(0)  : '—'}</td>
+                <td className="mono num">{row.mel  > 0 ? row.mel.toFixed(0)  : '—'}</td>
+                <td className="mono num">{row.priceToSel > 0 ? `£${row.priceToSel}` : '—'}</td>
+                <td className="mono num">{row.priceToMel > 0 ? `£${row.priceToMel}` : '—'}</td>
                 <td className="mono num">{row.pn > 0 ? row.pn.toFixed(0) : '—'}</td>
-                <td className="mono num">{row.mel > 0 ? row.mel.toFixed(0) : '—'}</td>
-                <td className="mono num">{row.sel > 0 ? row.sel.toFixed(0) : '—'}</td>
-                <td className="mono num">£{STATIC_PRICE}</td>
+                <td className="reason-col">
+                  <span className="notes-readonly">{row.operationType ?? '—'}</span>
+                </td>
+                <td className="reason-col">
+                  <span className="notes-readonly">{REASON_LABEL[row.reasonCode]}</span>
+                </td>
                 <td>
                   <span style={{
                     fontSize: 12, fontWeight: 500,
