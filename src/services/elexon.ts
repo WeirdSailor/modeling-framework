@@ -151,7 +151,7 @@ function fakePriceTiers(hasSel: boolean): { priceToSel?: number; priceToMel: num
 // ---------------------------------------------------------------------------
 
 const MOCK_FUEL_TYPES = ['CCGT', 'NUCLEAR', 'COAL', 'HYDRO', 'OIL', 'BIOMASS', 'OCGT', 'PS']
-const MOCK_GSP_GROUPS = ['_A', '_B', '_C', '_D', '_E', '_F', '_G', '_H', '_J', '_K']
+const MOCK_GSP_GROUPS = ['_A', '_B', '_C', '_D', '_E', '_F', '_G', '_H', '_J', '_K', '_L', '_M', '_N', '_P']
 
 function buildMockBmUnits(): BMUnit[] {
   const units: BMUnit[] = []
