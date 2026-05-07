@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import type { BMUnit, ServiceType } from '@/models/types'
-import { SCENARIOS } from '@/config/scenarios'
+import { SCENARIOS, GSP_AREAS } from '@/config/scenarios'
 
 
 interface Props {
@@ -113,6 +113,8 @@ export default function AvailableTable({
   const [typeFilter, setTypeFilter] = useState('All')
   const [sort, setSort] = useState<{ key: SortKey; dir: 'asc' | 'desc' }>({ key: 'nationalGridBmUnit', dir: 'asc' })
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set())
+  const [gspFilter, setGspFilter] = useState<Record<string, 'include' | 'exclude'>>({})
+  const [gspPopoverOpen, setGspPopoverOpen] = useState(false)
 
   const rows = useMemo<UnitRow[]>(() => {
     return units.map(u => ({
