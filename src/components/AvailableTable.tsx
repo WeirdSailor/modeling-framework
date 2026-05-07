@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
+import { useState, useMemo, useCallback, useRef, useEffect, type RefObject } from 'react'
 import type { BMUnit, ServiceType } from '@/models/types'
 import { SCENARIOS, GSP_AREAS } from '@/config/scenarios'
 
@@ -109,14 +109,18 @@ interface GspFilterPopoverProps {
   gspFilter: Record<string, 'include' | 'exclude'>
   onChange: (filter: Record<string, 'include' | 'exclude'>) => void
   onClose: () => void
+  wrapperRef: RefObject<HTMLDivElement | null>
 }
 
-function GspFilterPopover({ gspFilter, onChange, onClose }: GspFilterPopoverProps) {
+function GspFilterPopover({ gspFilter, onChange, onClose, wrapperRef }: GspFilterPopoverProps) {
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     function handleMouseDown(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose()
+      if (
+        ref.current && !ref.current.contains(e.target as Node) &&
+        wrapperRef.current && !wrapperRef.current.contains(e.target as Node)
+      ) onClose()
     }
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') onClose()
@@ -130,6 +134,8 @@ function GspFilterPopover({ gspFilter, onChange, onClose }: GspFilterPopoverProp
   }, [onClose])
 
   function setZone(id: string, seg: 'include' | 'exclude' | null) {
+    const current = gspFilter[id] ?? null
+    if (current === seg) return
     const next = { ...gspFilter }
     if (seg === null) delete next[id]
     else next[id] = seg
@@ -187,6 +193,8 @@ function GspFilterPopover({ gspFilter, onChange, onClose }: GspFilterPopoverProp
                         borderRight: i < 2 ? '1px solid var(--border-strong)' : 'none',
                         cursor: 'pointer', lineHeight: 1.4,
                       }}
+                      aria-label={`${area.label}: ${seg === 'include' ? 'include' : seg === 'exclude' ? 'exclude' : 'neutral'}`}
+                      aria-pressed={active}
                       onClick={() => setZone(area.id, seg)}
                     >
                       {label}
@@ -307,6 +315,9 @@ export default function AvailableTable({
     })
   }, [allChecked, selectableVisible])
 
+  const closeGspPopover = useCallback(() => setGspPopoverOpen(false), [])
+  const gspWrapperRef = useRef<HTMLDivElement>(null)
+
   function handleAddOne(id: string) {
     if (readOnly) return
     onAddUnits([id])
@@ -369,6 +380,47 @@ export default function AvailableTable({
               <option key={s.id} value={s.id}>{s.name}</option>
             ))}
           </select>
+          {/* GSP filter */}
+          {(() => {
+            const incCount = Object.values(gspFilter).filter(v => v === 'include').length
+            const excCount = Object.values(gspFilter).filter(v => v === 'exclude').length
+            const active = incCount > 0 || excCount > 0
+            const excOnly = excCount > 0 && incCount === 0
+            return (
+              <div ref={gspWrapperRef} style={{ position: 'relative' }}>
+                <button
+                  style={{
+                    border: `1px solid ${active ? (excOnly ? '#dc2626' : '#4f46e5') : 'var(--border-strong)'}`,
+                    borderRadius: 6, padding: '5px 10px', fontSize: 12, cursor: 'pointer',
+                    background: active ? (excOnly ? 'rgba(220,38,38,.1)' : 'rgba(79,70,229,.1)') : 'var(--bg-panel)',
+                    color: active ? (excOnly ? '#fca5a5' : '#a5b4fc') : 'var(--text-soft)',
+                    display: 'flex', alignItems: 'center', gap: 6,
+                  }}
+                  onClick={() => setGspPopoverOpen(o => !o)}
+                >
+                  GSP ▾
+                  {incCount > 0 && (
+                    <span style={{ background: '#4f46e5', color: '#fff', fontSize: 10, borderRadius: 999, padding: '1px 5px', fontWeight: 600 }}>
+                      +{incCount}
+                    </span>
+                  )}
+                  {excCount > 0 && (
+                    <span style={{ background: '#dc2626', color: '#fff', fontSize: 10, borderRadius: 999, padding: '1px 5px', fontWeight: 600 }}>
+                      −{excCount}
+                    </span>
+                  )}
+                </button>
+                {gspPopoverOpen && (
+                  <GspFilterPopover
+                    gspFilter={gspFilter}
+                    onChange={setGspFilter}
+                    onClose={closeGspPopover}
+                    wrapperRef={gspWrapperRef}
+                  />
+                )}
+              </div>
+            )
+          })()}
         </div>
       </header>
 
