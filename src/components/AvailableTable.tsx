@@ -140,8 +140,12 @@ export default function AvailableTable({
 
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase()
+    const gspIncluded = Object.entries(gspFilter).filter(([, v]) => v === 'include').map(([k]) => k)
+    const gspExcluded = Object.entries(gspFilter).filter(([, v]) => v === 'exclude').map(([k]) => k)
     let filtered = rows.filter(r => {
       if (typeFilter !== 'All' && r.fuelType !== typeFilter) return false
+      if (gspIncluded.length > 0 && !gspIncluded.includes(r.gspGroup)) return false
+      if (gspExcluded.includes(r.gspGroup)) return false
       if (!q) return true
       return (
         r.bmUnitId.toLowerCase().includes(q) ||
@@ -161,7 +165,7 @@ export default function AvailableTable({
       })
     }
     return filtered
-  }, [rows, search, typeFilter, sort, scenario, voltageArea])
+  }, [rows, search, typeFilter, gspFilter, sort, scenario, voltageArea])
 
   const selectableVisible = useMemo(
     () => visible.filter(r => !activeDraftUnitIds.has(r.bmUnitId)).map(r => r.bmUnitId),
