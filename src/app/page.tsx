@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useModellingStore } from '@/store/useModellingStore'
 import type { ModellingAction, OperationType, UserId } from '@/models/types'
-import { fetchAllData } from '@/services/elexon'
+import { fetchAllData, fetchHistoricalData } from '@/services/elexon'
+import { dateToSp, dateToSettlementDate } from '@/utils/settlements'
 import { isUnitPnCommitted } from '@/utils/margin'
 import { EXCLUDED_FUEL_TYPES, PULLBACK_FUEL_TYPES } from '@/utils/fuelTypes'
 import { MarginChart } from '@/components/MarginChart'
@@ -50,6 +51,13 @@ export default function Home() {
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null)
   const [voltageArea, setVoltageArea] = useState('')
   const [scenario, setScenario] = useState('none')
+  const [dataMode, setDataMode] = useState<'real' | 'historical'>('real')
+  const [historicalDate, setHistoricalDate] = useState<string>(
+    () => dateToSettlementDate(new Date(Date.now() - 24 * 60 * 60 * 1000))
+  )
+  const [historicalStartSp, setHistoricalStartSp] = useState<number>(
+    () => dateToSp(new Date())
+  )
 
   // ── store ──
   const units             = useModellingStore(s => s.units)
@@ -103,6 +111,37 @@ export default function Home() {
       setLoading(false)
     }
   }, [setLoading, setError, setUnits, setSPs, clearAllDrafts])
+
+  const loadHistoricalData = useCallback(async (date: string, startSp: number) => {
+    const doLoad = async () => {
+      clearAllDrafts()
+      setLoading(true)
+      setError(null)
+      try {
+        const { units, settlementPeriods } = await fetchHistoricalData(date, startSp)
+        setUnits(units)
+        setSPs(settlementPeriods)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load historical data')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    if (drafts.length > 0) {
+      setConfirmState({
+        message: 'Loading new data will delete all current drafts. Continue?',
+        confirmLabel: 'Load data',
+        danger: true,
+        onConfirm: () => {
+          setConfirmState(null)
+          void doLoad()
+        },
+      })
+    } else {
+      await doLoad()
+    }
+  }, [clearAllDrafts, setLoading, setError, setUnits, setSPs, drafts, setConfirmState])
 
   useEffect(() => { loadData() }, [loadData])
 
@@ -485,6 +524,13 @@ export default function Home() {
           voltageArea={voltageArea}
           onVoltageAreaChange={setVoltageArea}
           onClose={() => setShowConfig(false)}
+          dataMode={dataMode}
+          onDataModeChange={setDataMode}
+          historicalDate={historicalDate}
+          onHistoricalDateChange={setHistoricalDate}
+          historicalStartSp={historicalStartSp}
+          onHistoricalStartSpChange={setHistoricalStartSp}
+          onLoadHistorical={loadHistoricalData}
         />
       )}
 
