@@ -119,8 +119,8 @@ export default function SelectedTable({
             <thead>
               <tr>
                 <th>BMU</th>
-                <th>Service</th>
                 <th>Type</th>
+                <th>Service</th>
                 <th className="num">NDZ</th>
                 <th className="num">MZT</th>
                 <th className="num">MNZT</th>
@@ -146,15 +146,17 @@ export default function SelectedTable({
                 const operationType = action?.operationType
                 return (
                   <tr key={bmUnitId}>
-                    <td className="mono bmu-cell">
-                      <span>{u.nationalGridBmUnit}</span>
-                      <span className="site-sub">{u.gspGroup}</span>
+                    <td className="mono">
+                      <div className="bmu-cell-inner">
+                        <span>{u.nationalGridBmUnit}</span>
+                        <span className="site-sub">{u.gspGroup}</span>
+                      </div>
                     </td>
-                    <td><ServiceChip service={unitServices[bmUnitId]} /></td>
                     <td><TypeChip fuelType={u.fuelType} /></td>
-                    <td className="mono num">{u.ndz  ? `${u.ndz}m`  : '—'}</td>
-                    <td className="mono num">{u.mzt  ? `${u.mzt}m`  : '—'}</td>
-                    <td className="mono num">{u.mnzt ? `${u.mnzt}m` : '—'}</td>
+                    <td><ServiceChip service={unitServices[bmUnitId]} /></td>
+                    <td className="mono num">{u.ndz  ? u.ndz  : '—'}</td>
+                    <td className="mono num">{u.mzt  ? u.mzt  : '—'}</td>
+                    <td className="mono num">{u.mnzt ? u.mnzt : '—'}</td>
                     <td className="mono num">{u.sel != null && u.sel > 0 ? u.sel.toFixed(0) : '—'}</td>
                     <td className="mono num">{u.registeredCapacity.toFixed(0)}</td>
                     <td className="mono num">{u.priceToSel ? `£${u.priceToSel}` : '—'}</td>

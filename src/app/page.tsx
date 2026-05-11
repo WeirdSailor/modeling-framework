@@ -240,11 +240,13 @@ export default function Home() {
   )
 
   const otherDraftUnitMap = useMemo(() => {
-    const map = new Map<string, string>()
+    const map = new Map<string, string[]>()
     for (const d of drafts) {
       if (d.id === activeDraftId || d.status !== 'draft') continue
       for (const a of d.actions) {
-        if (!map.has(a.bmUnitId)) map.set(a.bmUnitId, d.name)
+        const names = map.get(a.bmUnitId)
+        if (names) names.push(d.name)
+        else map.set(a.bmUnitId, [d.name])
       }
     }
     return map

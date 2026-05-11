@@ -323,8 +323,8 @@ export default function CommittedTab({
                 />
               </th>
               <th>BMU</th>
-              <th>Service</th>
               <th>Type</th>
+              <th>Service</th>
               <th className="num">NDZ</th>
               <th className="num">MZT</th>
               <th className="num">MNZT</th>
@@ -364,23 +364,25 @@ export default function CommittedTab({
                       onChange={() => toggleRow(row.key)}
                     />
                   </td>
-                  <td className="mono bmu-cell">
-                    <span>{row.nationalGridBmUnit}</span>
-                    <span className="site-sub">{row.gspGroup}</span>
+                  <td className="mono">
+                    <div className="bmu-cell-inner">
+                      <span>{row.nationalGridBmUnit}</span>
+                      <span className="site-sub">{row.gspGroup}</span>
+                    </div>
                   </td>
-                  <td><ServiceChip service={unitServices[row.bmUnitId]} /></td>
                   <td><TypeChip fuelType={row.fuelType} /></td>
+                  <td><ServiceChip service={unitServices[row.bmUnitId]} /></td>
                   <td className="mono num">
-                    {effNdz > 0 ? `${effNdz}m` : '—'}
-                    {snap && <ChangeArrow current={effNdz} snapshotVal={snap.ndz} unit="m" />}
+                    {effNdz > 0 ? effNdz : '—'}
+                    {snap && <ChangeArrow current={effNdz} snapshotVal={snap.ndz} />}
                   </td>
                   <td className="mono num">
-                    {effMzt > 0 ? `${effMzt}m` : '—'}
-                    {snap && <ChangeArrow current={effMzt} snapshotVal={snap.mzt} unit="m" />}
+                    {effMzt > 0 ? effMzt : '—'}
+                    {snap && <ChangeArrow current={effMzt} snapshotVal={snap.mzt} />}
                   </td>
                   <td className="mono num">
-                    {effMnzt > 0 ? `${effMnzt}m` : '—'}
-                    {snap && <ChangeArrow current={effMnzt} snapshotVal={snap.mnzt} unit="m" />}
+                    {effMnzt > 0 ? effMnzt : '—'}
+                    {snap && <ChangeArrow current={effMnzt} snapshotVal={snap.mnzt} />}
                   </td>
                   <td className="mono num">
                     {effSel > 0 ? effSel.toFixed(0) : '—'}

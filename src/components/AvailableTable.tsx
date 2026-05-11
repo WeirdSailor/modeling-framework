@@ -10,7 +10,7 @@ interface Props {
   unitPnByBmUnit: Record<string, number>
   unitServices: Record<string, ServiceType>
   activeDraftUnitIds: Set<string>
-  otherDraftUnitMap: Map<string, string>
+  otherDraftUnitMap: Map<string, string[]>
   selectionPattern: 'buttons' | 'click'
   readOnly: boolean
   voltageArea: string
@@ -87,14 +87,16 @@ function ServiceChip({ service }: { service: ServiceType | undefined }) {
   return <span className={`chip chip-${service.toLowerCase()}`}>{service}</span>
 }
 
-function SortTh({ col, sort, onSort, children, numeric }: {
+function SortTh({ col, sort, onSort, children, numeric, className, style }: {
   col: SortKey; sort: { key: SortKey; dir: 'asc' | 'desc' }
   onSort: (k: SortKey) => void; children: React.ReactNode; numeric?: boolean
+  className?: string; style?: React.CSSProperties
 }) {
   const active = sort.key === col
   return (
     <th
-      className={[numeric ? 'num' : '', 'sortable', active ? 'col-active' : ''].join(' ')}
+      className={[numeric ? 'num' : '', 'sortable', active ? 'col-active' : '', className ?? ''].filter(Boolean).join(' ')}
+      style={style}
       onClick={() => onSort(col)}
     >
       <span className="th-inner">
@@ -340,9 +342,11 @@ export default function AvailableTable({
 
   const showCheckbox = selectionPattern === 'buttons' && !readOnly
   const showAddBtn   = selectionPattern === 'buttons' && !readOnly
+
+  const addLeft = showCheckbox ? 32 : 0
   const showPn       = scenario === 'pullback'
   // checkbox, BMU, Service, Type, NDZ, MZT, MNZT, SEL, MEL, £ SEL, £ MEL, PN (opt), add (opt)
-  const colSpan = [showCheckbox, true, true, true, true, true, true, true, true, true, true, showPn, showAddBtn].filter(Boolean).length
+  const colSpan = [showCheckbox, true, true, true, true, true, true, true, true, true, true, showPn, showAddBtn, true].filter(Boolean).length
 
   return (
     <div className="panel available-panel">
@@ -429,7 +433,7 @@ export default function AvailableTable({
           <thead>
             <tr>
               {showCheckbox && (
-                <th className="check-col">
+                <th className="check-col col-frozen" style={{ left: 0 }}>
                   <input
                     type="checkbox"
                     checked={allChecked}
@@ -439,9 +443,10 @@ export default function AvailableTable({
                   />
                 </th>
               )}
+              {showAddBtn && <th className="action-col col-frozen" style={{ left: addLeft }} />}
               <SortTh col="nationalGridBmUnit" sort={sort} onSort={toggleSort}>BMU</SortTh>
-              <th>Service</th>
               <SortTh col="fuelType" sort={sort} onSort={toggleSort}>Type</SortTh>
+              <th>Service</th>
               <SortTh col="ndz"   sort={sort} onSort={toggleSort} numeric>NDZ</SortTh>
               <SortTh col="mzt"   sort={sort} onSort={toggleSort} numeric>MZT</SortTh>
               <SortTh col="mnzt"  sort={sort} onSort={toggleSort} numeric>MNZT</SortTh>
@@ -450,7 +455,7 @@ export default function AvailableTable({
               <SortTh col="priceToSel" sort={sort} onSort={toggleSort} numeric>£ SEL</SortTh>
               <SortTh col="priceToMel" sort={sort} onSort={toggleSort} numeric>£ MEL</SortTh>
               {showPn && <SortTh col="pn" sort={sort} onSort={toggleSort} numeric>PN</SortTh>}
-              {showAddBtn && <th className="action-col" />}
+              <th className="draft-ind-col" />
             </tr>
           </thead>
           <tbody>
@@ -458,9 +463,8 @@ export default function AvailableTable({
               <tr><td colSpan={colSpan} className="empty">No units match your filters.</td></tr>
             )}
             {visible.map(row => {
-              const inDraft  = activeDraftUnitIds.has(row.bmUnitId)
-              const inOther  = !inDraft && otherDraftUnitMap.has(row.bmUnitId)
-              const otherName = otherDraftUnitMap.get(row.bmUnitId)
+              const inDraft     = activeDraftUnitIds.has(row.bmUnitId)
+              const otherDrafts = otherDraftUnitMap.get(row.bmUnitId) ?? []
               const pending  = pendingIds.has(row.bmUnitId)
               return (
                 <tr
@@ -474,7 +478,7 @@ export default function AvailableTable({
                   title={inDraft ? 'Already in this draft' : ''}
                 >
                   {showCheckbox && (
-                    <td className="check-col" onClick={e => e.stopPropagation()}>
+                    <td className="check-col col-frozen" style={{ left: 0 }} onClick={e => e.stopPropagation()}>
                       <input
                         type="checkbox"
                         checked={pending}
@@ -483,24 +487,8 @@ export default function AvailableTable({
                       />
                     </td>
                   )}
-                  <td className="mono bmu-cell">
-                    <span>{row.nationalGridBmUnit}</span>
-                    <span className="site-sub">{row.gspGroup}</span>
-                    {inDraft && <span className="badge badge-in">In draft</span>}
-                    {inOther && <span className="badge badge-other" title={`Also in ${otherName}`}>Also in {otherName}</span>}
-                  </td>
-                  <td><ServiceChip service={unitServices[row.bmUnitId]} /></td>
-                  <td><TypeChip fuelType={row.fuelType} /></td>
-                  <td className="mono num">{row.ndz  > 0 ? `${row.ndz}m`  : '—'}</td>
-                  <td className="mono num">{row.mzt  > 0 ? `${row.mzt}m`  : '—'}</td>
-                  <td className="mono num">{row.mnzt > 0 ? `${row.mnzt}m` : '—'}</td>
-                  <td className="mono num">{row.sel  > 0 ? row.sel.toFixed(0)  : '—'}</td>
-                  <td className="mono num">{row.mel.toFixed(0)}</td>
-                  <td className="mono num">{row.priceToSel > 0 ? `£${row.priceToSel}` : '—'}</td>
-                  <td className="mono num">{row.priceToMel > 0 ? `£${row.priceToMel}` : '—'}</td>
-                  {showPn && <td className="mono num">{row.pn > 0 ? row.pn.toFixed(0) : '—'}</td>}
                   {showAddBtn && (
-                    <td className="action-col" onClick={e => e.stopPropagation()}>
+                    <td className="action-col col-frozen" style={{ left: addLeft }} onClick={e => e.stopPropagation()}>
                       <button
                         className="row-add-btn"
                         disabled={inDraft}
@@ -509,6 +497,28 @@ export default function AvailableTable({
                       >+</button>
                     </td>
                   )}
+                  <td className="mono">
+                    <div className="bmu-cell-inner">
+                      <span>{row.nationalGridBmUnit}</span>
+                      <span className="site-sub">{row.gspGroup}</span>
+                    </div>
+                  </td>
+                  <td><TypeChip fuelType={row.fuelType} /></td>
+                  <td><ServiceChip service={unitServices[row.bmUnitId]} /></td>
+                  <td className="mono num">{row.ndz  > 0 ? row.ndz  : '—'}</td>
+                  <td className="mono num">{row.mzt  > 0 ? row.mzt  : '—'}</td>
+                  <td className="mono num">{row.mnzt > 0 ? row.mnzt : '—'}</td>
+                  <td className="mono num">{row.sel  > 0 ? row.sel.toFixed(0)  : '—'}</td>
+                  <td className="mono num">{row.mel.toFixed(0)}</td>
+                  <td className="mono num">{row.priceToSel > 0 ? `£${row.priceToSel}` : '—'}</td>
+                  <td className="mono num">{row.priceToMel > 0 ? `£${row.priceToMel}` : '—'}</td>
+                  {showPn && <td className="mono num">{row.pn > 0 ? row.pn.toFixed(0) : '—'}</td>}
+                  <td className="draft-ind-col">
+                    {inDraft && <span className="draft-dot draft-dot-in" title="In this draft">●</span>}
+                    {otherDrafts.length > 0 && (
+                      <span className="draft-dot draft-dot-other" title={otherDrafts.join(', ')}>●{otherDrafts.length}</span>
+                    )}
+                  </td>
                 </tr>
               )
             })}

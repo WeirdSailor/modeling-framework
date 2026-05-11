@@ -194,18 +194,18 @@ A row of summary cards sits above the data table on the Committed tab:
 
 Cards with 0 units render at 40% opacity. Clicking a card sets `selectedReason` and filters the table to matching rows. Clicking the active card (or Total) resets the filter. All state is local to `CommittedTab` — no props needed.
 
-## Column Layout — All Three Tables
+## Column Layout — All Four Tables
 
-`AvailableTable`, `SelectedTable`, and `CommittedTab` share the same column set:
+`AvailableTable`, `SelectedTable`, `CommittedTab`, and `RedeclareTab` share the same column set (in order):
 
 | Column | Notes |
 |--------|-------|
-| BMU | `nationalGridBmUnit` + `gspGroup` sub-label |
+| BMU | `nationalGridBmUnit` + `gspGroup` sub-label (two-line cell via `.bmu-cell-inner` inner div — do **not** apply flex to the `<td>` itself or `vertical-align: middle` breaks) |
+| Type | Fuel type chip — **before** Service |
 | Service | SR or QR chip (blue/purple); `—` if unassigned. Set on Redeclare tab. |
-| Type | Fuel type chip |
-| NDZ | Notice to Deviate (minutes), `—` if zero |
-| MZT | Minimum Zero Time (minutes) |
-| MNZT | Minimum Non-Zero Time (minutes) |
+| NDZ | Notice to Deviate (minutes), `—` if zero — displayed as plain number, no "m" suffix |
+| MZT | Minimum Zero Time (minutes) — plain number, no "m" suffix |
+| MNZT | Minimum Non-Zero Time (minutes) — plain number, no "m" suffix |
 | SEL | Stable Export Limit (MW) |
 | MEL | `registeredCapacity` (MW) |
 | £ SEL | Price to SEL tier |
@@ -215,6 +215,21 @@ Cards with 0 units render at 40% opacity. Clicking a card sets `selectedReason` 
 | Reason | `reasonCode` (Margin / Inertia / Voltage / Reserve / Constraint) |
 
 CommittedTab also has: Draft (source draft name badge), Notes, a leading checkbox column for bulk remove, and change-indicator arrows (↑/↓) on data cells where the current value has drifted >10% from the commit-time snapshot.
+
+### AvailableTable-specific columns
+
+`AvailableTable` has two extra leading columns before BMU (only when `selectionPattern === 'buttons'` and not `readOnly`):
+
+| Position | Column | Notes |
+|----------|--------|-------|
+| 1 | Checkbox | `position: sticky; left: 0` — frozen during horizontal scroll |
+| 2 | + (add) | `position: sticky; left: 32px` — frozen during horizontal scroll |
+| 3 | BMU | Not sticky (attempts to freeze BMU were abandoned) |
+| last | Draft indicator | Narrow column showing `●` (blue, in active draft) and/or `●N` (amber, in N other drafts) with tooltip listing all draft names on hover |
+
+`otherDraftUnitMap` in `page.tsx` is `Map<string, string[]>` — maps each unit to **all** other-draft names it appears in (not just the first). The draft indicator renders a count badge with a tooltip from this array.
+
+The table has `min-width: 100%` (not `width: 100%`) so it can overflow and trigger horizontal scroll in `.table-scroll`.
 
 ## PN / SEL Fallback in `unitPnByBmUnit`
 
@@ -299,7 +314,7 @@ Zone list comes from `GSP_AREAS` in `src/config/scenarios.ts` (14 entries, same 
 `ServiceType = 'SR' | 'QR'` is defined in `src/models/types.ts`. Services are stored in `unitServices: Record<string, ServiceType>` in the Zustand store, separate from `dataOverrides`.
 
 - Assigned via the **Service** select on the Redeclare tab.
-- Displayed as a colour chip in the **Service** column (second column, after BMU) on Available, Selected, Committed, and Redeclare tabs.
+- Displayed as a colour chip in the **Service** column (third column, after Type) on Available, Selected, Committed, and Redeclare tabs.
 - SR = blue chip; QR = purple chip (light + dark mode variants in `globals.css`).
 - `setUnitService(bmUnitId, service | undefined)` — pass `undefined` to clear.
 

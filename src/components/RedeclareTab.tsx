@@ -178,11 +178,11 @@ export default function RedeclareTab({
           <thead>
             <tr>
               <th>BMU</th>
-              <th>Service</th>
               <th>Type</th>
-              <th className="num">NDZ (m)</th>
-              <th className="num">MZT (m)</th>
-              <th className="num">MNZT (m)</th>
+              <th>Service</th>
+              <th className="num">NDZ</th>
+              <th className="num">MZT</th>
+              <th className="num">MNZT</th>
               <th className="num">SEL (MW)</th>
               <th className="num">MEL (MW)</th>
               <th className="num">£ SEL</th>
@@ -203,10 +203,13 @@ export default function RedeclareTab({
                   key={row.key}
                   style={{ background: hasOverride ? 'var(--amber-soft)' : undefined }}
                 >
-                  <td className="mono bmu-cell">
-                    <span>{row.nationalGridBmUnit}</span>
-                    <span className="site-sub">{row.gspGroup}</span>
+                  <td className="mono">
+                    <div className="bmu-cell-inner">
+                      <span>{row.nationalGridBmUnit}</span>
+                      <span className="site-sub">{row.gspGroup}</span>
+                    </div>
                   </td>
+                  <td><TypeChip fuelType={row.fuelType} /></td>
                   <td>
                     <select
                       className="reason-select"
@@ -218,7 +221,6 @@ export default function RedeclareTab({
                       <option value="QR">QR</option>
                     </select>
                   </td>
-                  <td><TypeChip fuelType={row.fuelType} /></td>
                   <td className="num">
                     <NumInput
                       value={ov.ndz ?? row.ndz}
