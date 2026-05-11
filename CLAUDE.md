@@ -125,7 +125,7 @@ For slots beyond the gate-closure frontier (where real PN = 0), `fetchAllData` f
 **Cold unit caveat**: units that were also off yesterday simply don't appear in Elexon's PN data for any SP — they are absent from the response, not present with zero. The D-1 backfill therefore cannot help them.
 
 ### Dynamic parameters (SEL/NDZ/MNZT/MZT/SIL)
-Fetched across 5×7-day windows (35 days total) to capture units that haven't been active recently. NDZ is returned in seconds by the API — converted to minutes on ingest.
+Fetched across 12×7-day windows (84 days / ~3 months) to capture units with infrequently-updated standing data. NDZ `notice` field is returned in **minutes** by the API (not seconds) — used directly without conversion. MNZT and MZT `periodMin` fields are also in minutes.
 
 ---
 

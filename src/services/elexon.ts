@@ -64,11 +64,11 @@ function dayRange(settlementDate: string): { from: string; to: string } {
 }
 
 // API enforces a max 7-day window. Fetch multiple windows in parallel to cover
-// the last 35 days so we capture units that haven't been active recently.
+// the last 84 days (~12 weeks) so we capture units with infrequently-updated standing data.
 async function fetchDynParam(endpoint: string): Promise<RawDynParam[]> {
   const now = Date.now()
   const sevenDays = 7 * 24 * 60 * 60 * 1000
-  const windows = Array.from({ length: 5 }, (_, i) => ({
+  const windows = Array.from({ length: 12 }, (_, i) => ({
     from: new Date(now - (i + 1) * sevenDays).toISOString(),
     to: new Date(now - i * sevenDays).toISOString(),
   }))
@@ -317,8 +317,8 @@ export async function fetchBmUnits(): Promise<BMUnit[]> {
       gspGroup: raw.gspGroupId,
       sel: selEntry?.level !== undefined ? selEntry.level : undefined,
       sil: silEntry?.level !== undefined ? silEntry.level : undefined,
-      // NDZ: API returns seconds — convert to minutes
-      ndz: ndzEntry?.notice !== undefined ? Math.round(ndzEntry.notice / 60) : undefined,
+      // NDZ: API returns minutes directly
+      ndz: ndzEntry?.notice !== undefined ? ndzEntry.notice : undefined,
       mnzt: mnztEntry?.periodMin !== undefined ? mnztEntry.periodMin : undefined,
       mzt: mztEntry?.periodMin !== undefined ? mztEntry.periodMin : undefined,
       ...fakePriceTiers(selEntry?.level !== undefined),
