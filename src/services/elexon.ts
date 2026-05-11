@@ -622,3 +622,106 @@ export async function fetchAllData(): Promise<{
 
   return { units, settlementPeriods }
 }
+
+// ---------------------------------------------------------------------------
+// Public API: fetchHistoricalData — fixed 48-SP window anchored to a past date
+// ---------------------------------------------------------------------------
+
+export async function fetchHistoricalData(
+  startDate: string,  // YYYY-MM-DD
+  startSp: number,    // 1–48; first SP slot of the 24-hour window
+): Promise<{
+  units: BMUnit[]
+  settlementPeriods: SettlementPeriodData[]
+}> {
+  const nextDate = dateToSettlementDate(
+    new Date(new Date(`${startDate}T00:00:00Z`).getTime() + 24 * 60 * 60 * 1000)
+  )
+
+  // 48 slots: startSp..48 on startDate, then 1..(startSp-1) on nextDate
+  const slotPlan: Array<{ slot: number; date: string; sp: number }> = []
+  for (let sp = startSp; sp <= 48; sp++) {
+    slotPlan.push({ slot: slotPlan.length + 1, date: startDate, sp })
+  }
+  for (let sp = 1; sp < startSp; sp++) {
+    slotPlan.push({ slot: slotPlan.length + 1, date: nextDate, sp })
+  }
+
+  const [
+    [units, startDemand, nextDemand, startMels, nextMels, startMils, nextMils],
+    pnResults,
+  ] = await Promise.all([
+    Promise.all([
+      fetchBmUnits(),
+      fetchDemandForecast(startDate),
+      fetchDemandForecast(nextDate),
+      fetchMELS(startDate),
+      fetchMELS(nextDate),
+      fetchMILS(startDate),
+      fetchMILS(nextDate),
+    ]),
+    Promise.all(slotPlan.map(({ date, sp }) => fetchSinglePN(date, sp))),
+  ])
+
+  const isPnGloballyEmpty = pnResults.every(m => m.size === 0)
+  const mockPn = isPnGloballyEmpty ? buildMockPN(units) : null
+  if (mockPn) console.warn('[elexon] Historical PN entirely empty — using mock PN data')
+
+  const isMelsEmpty = startMels.size === 0 && nextMels.size === 0
+  const mockMels = isMelsEmpty ? buildMockMELS(units) : null
+
+  const isMilsEmpty = startMils.size === 0 && nextMils.size === 0
+  const mockMils = isMilsEmpty ? buildMockMILS(units) : null
+
+  const settlementPeriods: SettlementPeriodData[] = []
+
+  for (let i = 0; i < slotPlan.length; i++) {
+    const { slot, date, sp: actualSp } = slotPlan[i]
+
+    const demandMap = date === startDate ? startDemand : nextDemand
+    const demand = demandMap.get(actualSp) ?? 33000
+
+    const rawPn = mockPn
+      ? (mockPn.get(actualSp) ?? new Map<string, number>())
+      : pnResults[i]
+    const pn: Record<string, number> = {}
+    for (const [bmUnit, value] of rawPn) pn[bmUnit] = value
+
+    const melsMap = date === startDate ? startMels : nextMels
+    const rawMel = mockMels ? mockMels.get(actualSp) : melsMap.get(actualSp)
+    const mel: Record<string, number> = {}
+    if (rawMel) {
+      for (const [bmUnit, value] of rawMel) mel[bmUnit] = value
+    } else {
+      for (const unit of units) mel[unit.bmUnitId] = unit.registeredCapacity
+    }
+
+    const milsMap = date === startDate ? startMils : nextMils
+    const rawMil = mockMils ? mockMils.get(actualSp) : milsMap.get(actualSp)
+    const mil: Record<string, number> = {}
+    if (rawMil) {
+      for (const [bmUnit, value] of rawMil) mil[bmUnit] = value
+    }
+
+    const partial: SettlementPeriodData = {
+      settlementDate: date,
+      settlementPeriod: slot,
+      startTime: spToStartTime(actualSp, date),
+      pn,
+      mel,
+      mil,
+      demand,
+      emx: 0,
+      eol: 0,
+      emi: 0,
+      margin: 0,
+      hasConfirmedPn: true,
+      proxyEmx: 0,
+      proxyEol: 0,
+    }
+
+    settlementPeriods.push({ ...partial, ...computeAggregates(partial, [], units) })
+  }
+
+  return { units, settlementPeriods }
+}
