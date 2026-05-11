@@ -41,7 +41,38 @@ unitServices: Record<string, ServiceType>             // per-unit service assign
 
 ### Rolling 24-Hour Window
 
-`fetchAllData()` in `src/services/elexon.ts` builds 48 slots starting from the current UTC SP of today, wrapping into tomorrow. `settlementPeriod` in `SettlementPeriodData` is the **slot index 1–48 within the window** (not the real SP within the settlement day). The real SP is stored only in the `slotPlan` during fetch.
+Two fetch paths exist — both produce the same `{ units, settlementPeriods }` shape and use the same store:
+
+- **Real-time** — `fetchAllData()` anchors to `now`, builds 48 slots from the current UTC SP of today wrapping into tomorrow, uses D-1 PN proxy for unconfirmed slots.
+- **Historical** — `fetchHistoricalData(startDate, startSp)` anchors to a user-chosen past date + SP, builds 48 slots from `startSp` on `startDate` wrapping into `startDate + 1 day`. All slots are confirmed; no D-1 proxy. Dynamic params (NDZ/MZT/MNZT/SEL) are still fetched relative to today.
+
+`settlementPeriod` in `SettlementPeriodData` is the **slot index 1–48 within the window** (not the real SP within the settlement day). The real SP is stored only in the `slotPlan` during fetch. This is true for both fetch paths.
+
+### Historical Data Mode
+
+Accessible via **⚙ Config → data tab**. Three local state vars in `page.tsx` (not in Zustand):
+
+```ts
+dataMode: 'real' | 'historical'        // default 'real'
+historicalDate: string                  // YYYY-MM-DD, default yesterday
+historicalStartSp: number              // 1–48, default current SP at page load
+```
+
+The **Data tab** in `ConfigPanel` provides:
+- `Real-time | Historical` mode toggle (`SegControl`)
+- Date picker (`<input type="date">`, capped at `max=yesterday` — future dates return empty PN)
+- Start time select (`<select>` with all 48 SP start times in 30-min steps)
+- Live info line showing the exact window: `"48 SPs: 14:00 UTC 03/05/2026 → 14:00 UTC 04/05/2026"`
+- **Load historical data** button — calls `loadHistoricalData(date, startSp)` in `page.tsx`
+
+`loadHistoricalData` shows a `ConfirmModal` first if any drafts exist ("Loading new data will delete all current drafts"), then calls `clearAllDrafts()` and `fetchHistoricalData`.
+
+The sidebar **Refresh** button always calls `loadData` (real-time) regardless of mode. To re-fetch a historical window, use the Load button in the Data tab.
+
+**Key differences from `fetchAllData`:**
+- `hasConfirmedPn = true` for all 48 slots (all historical SPs have real data)
+- `proxyEmx = 0`, `proxyEol = 0` — D-1 proxy is not needed
+- No `yesterdayPN` fetch
 
 ### Draft Plans System
 
@@ -110,7 +141,7 @@ Fetched across 5×7-day windows (35 days total) to capture units that haven't be
 | `src/components/CommittedTab.tsx` | Committed-tab view: cost breakdown cards (Total + per-reason), click-to-filter table, change-indicator arrows (↑/↓), service chip, bulk remove |
 | `src/components/RedeclareTab.tsx` | Redeclare-tab view: editable data columns for committed units (simulates redeclarations); amber row highlight on override; Reset per-row and Reset all; Service (SR/QR) assign select |
 | `src/components/MarginChart.tsx` | Recharts chart: confirmed baseline + draft overlays + D-1 proxy + gate-closure frontier; dark-mode aware via MutationObserver |
-| `src/components/TweaksPanel.tsx` | Floating tweaks panel: theme, layout, sidebar toggle, selection mode |
+| `src/components/ConfigPanel.tsx` | Floating config panel (3 tabs): **tweaks** (theme/layout/sidebar/selection), **scenarios** (ranking criteria), **data** (Real-time/Historical mode switch, date picker, start-time select, Load button) |
 | `src/components/ConfirmModal.tsx` | Dark-mode-aware confirm dialog (replaces native browser confirm) |
 | `src/models/types.ts` | All interfaces; `USERS`, `UserId`, `ServiceType`, `UnitSnapshot` |
 | `src/services/elexon.ts` | All fetch logic + mock fallback |
@@ -123,6 +154,7 @@ Fetched across 5×7-day windows (35 days total) to capture units that haven't be
 
 ## What Not to Change Without Reading First
 
+- **Two separate fetch paths** — `fetchAllData()` (real-time, D-1 proxy) and `fetchHistoricalData()` (historical, all confirmed). Keep them independent. Do not merge them into a single function with a mode flag — that was an explicitly rejected design option.
 - **`computeAggregates` iterates `sp.pn` directly** — never change it to iterate `units` instead. That would miss all PN-holding units outside the dispatchable filter (wind, solar, etc.) and break the baseline.
 - **`refreshAggregates` in the store** — must be called whenever committed draft actions change. Currently called in `commitDraft`, `discardDraft`, `clearAllDrafts`, and `setSettlementPeriods`.
 - **`settlementPeriod` in `SettlementPeriodData`** is the slot index 1–48, not the real SP number. All `ModellingAction.fromPeriod`/`toPeriod` comparisons use this slot index.
