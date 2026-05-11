@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react'
 import { SCENARIOS, GSP_AREAS, type ScenarioId } from '@/config/scenarios'
+import { spToTime, dateToSettlementDate } from '@/utils/settlements'
 
 // ── TweakState (moved here from TweaksPanel) ──────────────────────────────────
 
@@ -253,6 +254,115 @@ function ScField({ label, children }: { label: string; children: React.ReactNode
   )
 }
 
+// ── Data tab ──────────────────────────────────────────────────────────────────
+
+function DataTab({
+  dataMode,
+  onDataModeChange,
+  historicalDate,
+  onHistoricalDateChange,
+  historicalStartSp,
+  onHistoricalStartSpChange,
+  onLoadHistorical,
+}: {
+  dataMode: 'real' | 'historical'
+  onDataModeChange: (mode: 'real' | 'historical') => void
+  historicalDate: string
+  onHistoricalDateChange: (date: string) => void
+  historicalStartSp: number
+  onHistoricalStartSpChange: (sp: number) => void
+  onLoadHistorical: (date: string, startSp: number) => void
+}) {
+  const yesterday = dateToSettlementDate(
+    new Date(Date.now() - 24 * 60 * 60 * 1000)
+  )
+  const startTime = spToTime(historicalStartSp)
+  const endDate = dateToSettlementDate(
+    new Date(new Date(`${historicalDate}T00:00:00Z`).getTime() + 24 * 60 * 60 * 1000)
+  )
+  function fmtDate(iso: string) {
+    const [y, m, d] = iso.split('-')
+    return `${d}/${m}/${y}`
+  }
+
+  return (
+    <div className="twk-body">
+      <div className="twk-sect">Data source</div>
+      <SegControl
+        value={dataMode}
+        options={[
+          { value: 'real', label: 'Real-time' },
+          { value: 'historical', label: 'Historical' },
+        ]}
+        onChange={onDataModeChange}
+      />
+
+      {dataMode === 'historical' && (
+        <>
+          <div className="twk-sect">Date</div>
+          <input
+            type="date"
+            value={historicalDate}
+            max={yesterday}
+            onChange={e => onHistoricalDateChange(e.target.value)}
+            style={{
+              width: '100%',
+              fontSize: 12,
+              padding: '4px 6px',
+              borderRadius: 'var(--radius)',
+              border: '1px solid var(--border)',
+              background: 'var(--bg-input)',
+              color: 'var(--text)',
+              boxSizing: 'border-box',
+            }}
+          />
+
+          <div className="twk-sect">Start time (UTC)</div>
+          <select
+            value={historicalStartSp}
+            onChange={e => onHistoricalStartSpChange(Number(e.target.value))}
+            style={{
+              width: '100%',
+              fontSize: 12,
+              padding: '4px 6px',
+              borderRadius: 'var(--radius)',
+              border: '1px solid var(--border)',
+              background: 'var(--bg-input)',
+              color: 'var(--text)',
+            }}
+          >
+            {Array.from({ length: 48 }, (_, i) => {
+              const sp = i + 1
+              return (
+                <option key={sp} value={sp}>
+                  {spToTime(sp)}
+                </option>
+              )
+            })}
+          </select>
+
+          <p style={{
+            fontSize: 10.5,
+            color: 'var(--text-soft)',
+            margin: '6px 0',
+            lineHeight: 1.4,
+          }}>
+            48 SPs: {startTime} UTC {fmtDate(historicalDate)} → {startTime} UTC {fmtDate(endDate)}
+          </p>
+
+          <button
+            className="btn btn-primary btn-block"
+            onClick={() => onLoadHistorical(historicalDate, historicalStartSp)}
+            style={{ marginTop: 4 }}
+          >
+            Load historical data
+          </button>
+        </>
+      )}
+    </div>
+  )
+}
+
 // ── ConfigPanel ───────────────────────────────────────────────────────────────
 
 interface Props {
@@ -261,12 +371,23 @@ interface Props {
   voltageArea: string
   onVoltageAreaChange: (area: string) => void
   onClose: () => void
+  dataMode: 'real' | 'historical'
+  onDataModeChange: (mode: 'real' | 'historical') => void
+  historicalDate: string
+  onHistoricalDateChange: (date: string) => void
+  historicalStartSp: number
+  onHistoricalStartSpChange: (sp: number) => void
+  onLoadHistorical: (date: string, startSp: number) => void
 }
 
-type ConfigTab = 'tweaks' | 'scenarios'
+type ConfigTab = 'tweaks' | 'scenarios' | 'data'
 
 export default function ConfigPanel({
   tweaks, onChangeTweak, voltageArea, onVoltageAreaChange, onClose,
+  dataMode, onDataModeChange,
+  historicalDate, onHistoricalDateChange,
+  historicalStartSp, onHistoricalStartSpChange,
+  onLoadHistorical,
 }: Props) {
   const panelRef = useRef<HTMLDivElement>(null)
   const offsetRef = useRef({ x: 16, y: 16 })
@@ -304,7 +425,7 @@ export default function ConfigPanel({
       {/* Drag handle / header */}
       <div className="twk-hd" onMouseDown={onDragStart}>
         <div style={{ display: 'flex', gap: 0 }}>
-          {(['tweaks', 'scenarios'] as ConfigTab[]).map(t => (
+          {(['tweaks', 'scenarios', 'data'] as ConfigTab[]).map(t => (
             <button
               key={t}
               type="button"
@@ -339,6 +460,17 @@ export default function ConfigPanel({
       )}
       {configTab === 'scenarios' && (
         <ScenariosTab voltageArea={voltageArea} onVoltageAreaChange={onVoltageAreaChange} />
+      )}
+      {configTab === 'data' && (
+        <DataTab
+          dataMode={dataMode}
+          onDataModeChange={onDataModeChange}
+          historicalDate={historicalDate}
+          onHistoricalDateChange={onHistoricalDateChange}
+          historicalStartSp={historicalStartSp}
+          onHistoricalStartSpChange={onHistoricalStartSpChange}
+          onLoadHistorical={onLoadHistorical}
+        />
       )}
     </div>
   )
