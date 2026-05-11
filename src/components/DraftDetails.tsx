@@ -1,15 +1,16 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import type { DraftPlan, SettlementPeriodData, UserId } from '@/models/types'
 import { USERS } from '@/models/types'
+import { SCENARIOS, GSP_AREAS } from '@/config/scenarios'
 
 interface Props {
   draft: DraftPlan
   settlementPeriods: SettlementPeriodData[]
-  cost: number
   currentUser: UserId
   onChangeName: (name: string) => void
+  onChangeDescription: (description: string) => void
   onChangeFrom: (period: number) => void
   onChangeTo: (period: number) => void
   onCommit: () => void
@@ -19,50 +20,161 @@ interface Props {
   onDuplicate: () => void
   onShare: (userId: UserId) => void
   onUnshare: (userId: UserId) => void
+  scenario: string
+  onScenarioChange: (s: string) => void
+  gspFilter: Record<string, 'include' | 'exclude'>
+  onGspFilterChange: (f: Record<string, 'include' | 'exclude'>) => void
 }
 
-function StateBadge({ status }: { status: DraftPlan['status'] }) {
-  const map = {
-    draft:     { label: 'Draft',     cls: 'badge-state-draft' },
-    committed: { label: 'Committed', cls: 'badge-state-committed' },
-    discarded: { label: 'Discarded', cls: 'badge-state-discarded' },
-  } as const
-  const m = map[status]
-  return <span className={`state-badge ${m.cls}`}>{m.label}</span>
-}
 
 function slotLabel(slot: number, periods: SettlementPeriodData[]): string {
   const sp = periods.find(s => s.settlementPeriod === slot)
   return sp ? sp.startTime.slice(11, 16) : `SP ${slot}`
 }
 
-function durationLabel(from: number, to: number): string {
-  const mins = (to - from) * 30
-  if (mins <= 0) return '—'
-  const h = Math.floor(mins / 60)
-  const m = mins % 60
-  return h > 0 ? `${h}h ${m > 0 ? m + 'm' : ''}`.trim() : `${m}m`
+
+function usePopoverDismiss(
+  popoverRef: React.RefObject<HTMLDivElement | null>,
+  wrapperRef: React.RefObject<HTMLDivElement | null>,
+  onClose: () => void,
+) {
+  useEffect(() => {
+    function handleMouseDown(e: MouseEvent) {
+      if (
+        popoverRef.current && !popoverRef.current.contains(e.target as Node) &&
+        wrapperRef.current && !wrapperRef.current.contains(e.target as Node)
+      ) onClose()
+    }
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose()
+    }
+    document.addEventListener('mousedown', handleMouseDown)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', handleMouseDown)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [onClose])
 }
 
-function formatCost(cost: number): string {
-  if (cost === 0) return '—'
-  return '£' + Math.round(cost).toLocaleString('en-GB')
+function ScenarioPopover({ scenario, onChange, onClose, wrapperRef }: {
+  scenario: string
+  onChange: (s: string) => void
+  onClose: () => void
+  wrapperRef: React.RefObject<HTMLDivElement | null>
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+  usePopoverDismiss(ref, wrapperRef, onClose)
+
+  return (
+    <div ref={ref} style={{
+      position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 50,
+      background: 'var(--bg-panel)', border: '1px solid var(--border-strong)',
+      borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,.35)', width: 200, overflow: 'hidden',
+    }}>
+      <div style={{ padding: '7px 12px', borderBottom: '1px solid var(--border)' }}>
+        <span style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--text-faint)' }}>Scenario</span>
+      </div>
+      {[{ id: 'none', name: 'No scenario' }, ...SCENARIOS].map(s => {
+        const active = scenario === s.id
+        return (
+          <button key={s.id} onClick={() => { onChange(active ? 'none' : s.id); onClose() }} style={{
+            display: 'block', width: '100%', textAlign: 'left',
+            padding: '7px 12px', fontSize: 12, border: 'none', cursor: 'pointer',
+            background: active ? 'rgba(79,70,229,.15)' : 'var(--bg-panel)',
+            color: active ? '#a5b4fc' : 'var(--text)', fontWeight: active ? 600 : 400,
+          }}>{s.name}</button>
+        )
+      })}
+    </div>
+  )
+}
+
+function GspFilterPopover({ gspFilter, onChange, onClose, wrapperRef }: {
+  gspFilter: Record<string, 'include' | 'exclude'>
+  onChange: (f: Record<string, 'include' | 'exclude'>) => void
+  onClose: () => void
+  wrapperRef: React.RefObject<HTMLDivElement | null>
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+  usePopoverDismiss(ref, wrapperRef, onClose)
+
+  function setZone(id: string, seg: 'include' | 'exclude' | null) {
+    const next = { ...gspFilter }
+    if (seg === null) delete next[id]; else next[id] = seg
+    onChange(next)
+  }
+
+  const includedIds = Object.entries(gspFilter).filter(([, v]) => v === 'include').map(([k]) => k)
+  const excludedIds = Object.entries(gspFilter).filter(([, v]) => v === 'exclude').map(([k]) => k)
+
+  return (
+    <div ref={ref} style={{
+      position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 50,
+      background: 'var(--bg-panel)', border: '1px solid var(--border-strong)',
+      borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,.35)', width: 268, overflow: 'hidden',
+    }}>
+      <div style={{ padding: '7px 12px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--text-faint)' }}>GSP Groups</span>
+        <button style={{ background: 'none', border: 0, color: '#6366f1', fontSize: 11, cursor: 'pointer', padding: '0 2px' }} onClick={() => onChange({})}>Clear all</button>
+      </div>
+      <div style={{ maxHeight: 280, overflowY: 'auto' }}>
+        {GSP_AREAS.map(area => {
+          const state = gspFilter[area.id] ?? null
+          return (
+            <div key={area.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '5px 12px', gap: 8 }}>
+              <span style={{ fontSize: 12, color: 'var(--text)' }}>{area.label}</span>
+              <div style={{ display: 'flex', border: '1px solid var(--border-strong)', borderRadius: 5, overflow: 'hidden', flexShrink: 0 }}>
+                {(['include', null, 'exclude'] as const).map((seg, i) => {
+                  const active = state === seg
+                  const lbl = seg === 'include' ? '+' : seg === 'exclude' ? '−' : '·'
+                  let bg = 'var(--bg-panel)', color = 'var(--text-faint)'
+                  if (active && seg === 'include') { bg = 'rgba(5,150,105,.15)'; color = '#6ee7b7' }
+                  if (active && seg === null)      { bg = 'var(--bg-subtle)';    color = 'var(--text)' }
+                  if (active && seg === 'exclude') { bg = 'rgba(220,38,38,.15)'; color = '#fca5a5' }
+                  return (
+                    <button key={i} style={{
+                      padding: '3px 8px', fontSize: 11, fontWeight: 600, background: bg, color,
+                      border: 'none', borderRight: i < 2 ? '1px solid var(--border-strong)' : 'none',
+                      cursor: 'pointer', lineHeight: 1.4,
+                    }} aria-pressed={active} onClick={() => setZone(area.id, seg)}>{lbl}</button>
+                  )
+                })}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+      {(includedIds.length > 0 || excludedIds.length > 0) && (
+        <div style={{ padding: '6px 12px', borderTop: '1px solid var(--border)', fontSize: 11, color: 'var(--text-faint)' }}>
+          {includedIds.length > 0 && <span>Showing: <span style={{ color: '#6ee7b7' }}>{includedIds.join(', ')}</span></span>}
+          {includedIds.length > 0 && excludedIds.length > 0 && <span style={{ margin: '0 6px' }}>·</span>}
+          {excludedIds.length > 0 && <span>Hiding: <span style={{ color: '#fca5a5' }}>{excludedIds.join(', ')}</span></span>}
+        </div>
+      )}
+    </div>
+  )
 }
 
 export default function DraftDetails({
-  draft, settlementPeriods, cost, currentUser,
+  draft, settlementPeriods, currentUser,
   onChangeName, onChangeFrom, onChangeTo,
+  onChangeDescription,
   onCommit, onDiscard, onReopen, onDelete, onDuplicate,
   onShare, onUnshare,
+  scenario, onScenarioChange, gspFilter, onGspFilterChange,
 }: Props) {
   const [shareOpen, setShareOpen] = useState(false)
+  const [scenarioOpen, setScenarioOpen] = useState(false)
+  const [gspOpen, setGspOpen] = useState(false)
+  const scenarioWrapperRef = useRef<HTMLDivElement>(null)
+  const gspWrapperRef = useRef<HTMLDivElement>(null)
+  const closeScenario = useCallback(() => setScenarioOpen(false), [])
+  const closeGsp = useCallback(() => setGspOpen(false), [])
 
   const isOwner = draft.ownerId === currentUser
   const readOnly = !isOwner || draft.status !== 'draft'
   const unitCount = new Set(draft.actions.map(a => a.bmUnitId)).size
-  const from = slotLabel(draft.fromPeriod, settlementPeriods)
-  const to   = slotLabel(draft.toPeriod,   settlementPeriods)
-  const duration = durationLabel(draft.fromPeriod, draft.toPeriod)
 
   const spOptions = settlementPeriods.map(sp => ({
     value: sp.settlementPeriod,
@@ -77,6 +189,79 @@ export default function DraftDetails({
     <div className="draft-details">
       <div className="dd-left">
         <div className="dd-name-row">
+          {/* Share icon — owner only */}
+          {isOwner && (
+            <div style={{ position: 'relative', flexShrink: 0 }}>
+              <button
+                onClick={() => setShareOpen(v => !v)}
+                title="Share"
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 4,
+                  background: shareOpen ? 'var(--bg-inset)' : 'none',
+                  border: '1px solid var(--border-strong)',
+                  borderRadius: 5, padding: '3px 7px', cursor: 'pointer',
+                  color: draft.sharedWith.length > 0 ? '#6366f1' : 'var(--text-soft)',
+                }}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+                  <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+                </svg>
+                {draft.sharedWith.length > 0 && (
+                  <span style={{ fontSize: 10, fontWeight: 600 }}>{draft.sharedWith.length}</span>
+                )}
+              </button>
+              {shareOpen && (
+                <div style={{
+                  position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 50,
+                  background: 'var(--bg-panel)', border: '1px solid var(--border-strong)',
+                  borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,.35)',
+                  minWidth: 160, overflow: 'hidden',
+                }}>
+                  <div style={{ padding: '7px 12px', borderBottom: '1px solid var(--border)' }}>
+                    <span style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--text-faint)' }}>
+                      Shared with
+                    </span>
+                  </div>
+                  {draft.sharedWith.length === 0 && (
+                    <div style={{ padding: '7px 12px', fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>Nobody yet</div>
+                  )}
+                  {draft.sharedWith.map(u => (
+                    <div key={u} style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      padding: '5px 12px', gap: 8, fontSize: 12, fontWeight: 600, color: 'var(--text)',
+                    }}>
+                      {u}
+                      <button
+                        onClick={() => onUnshare(u)}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-soft)', padding: 0, fontSize: 14, lineHeight: 1 }}
+                        title={`Unshare with ${u}`}
+                      >×</button>
+                    </div>
+                  ))}
+                  {availableToShare.length > 0 && (
+                    <div style={{ borderTop: '1px solid var(--border)' }}>
+                      {availableToShare.map(u => (
+                        <button
+                          key={u}
+                          onClick={() => { onShare(u); setShareOpen(false) }}
+                          style={{
+                            display: 'block', width: '100%', textAlign: 'left',
+                            background: 'none', border: 'none', cursor: 'pointer',
+                            padding: '6px 12px', fontSize: 12, color: 'var(--text-soft)',
+                          }}
+                          onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-inset)'; e.currentTarget.style.color = 'var(--text)' }}
+                          onMouseLeave={e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = 'var(--text-soft)' }}
+                        >
+                          + {u}
+                        </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
           {readOnly ? (
             <h1 className="dd-name">{draft.name}</h1>
           ) : (
@@ -87,7 +272,6 @@ export default function DraftDetails({
               placeholder="Untitled draft"
             />
           )}
-          <StateBadge status={draft.status} />
           {!isOwner && (
             <span style={{
               fontSize: 11, color: 'var(--text-soft)',
@@ -98,92 +282,21 @@ export default function DraftDetails({
             </span>
           )}
         </div>
-        <div className="dd-meta">
-          <span className="dd-meta-item">
-            <span className="dd-meta-label">Window</span>
-            <span className="dd-meta-value mono">{from} → {to}</span>
-          </span>
-          <span className="dd-meta-item">
-            <span className="dd-meta-label">Duration</span>
-            <span className="dd-meta-value mono">{duration}</span>
-          </span>
-          <span className="dd-meta-item">
-            <span className="dd-meta-label">Units</span>
-            <span className="dd-meta-value mono">{unitCount}</span>
-          </span>
-          <span className="dd-meta-item">
-            <span className="dd-meta-label">Cost</span>
-            <span className="dd-meta-value mono">{formatCost(cost)}</span>
-          </span>
+        <div className="dd-description-row">
+          {readOnly ? (
+            draft.description ? (
+              <p className="dd-description" title={draft.description}>{draft.description}</p>
+            ) : null
+          ) : (
+            <input
+              className="dd-description-input"
+              value={draft.description}
+              onChange={e => onChangeDescription(e.target.value)}
+              placeholder="Add a description…"
+              title={draft.description || undefined}
+            />
+          )}
         </div>
-
-        {/* Share controls — owner only */}
-        {isOwner && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
-            <span style={{ fontSize: 11, color: 'var(--text-soft)', flexShrink: 0 }}>Shared with:</span>
-            {draft.sharedWith.length === 0 && (
-              <span style={{ fontSize: 11, color: 'var(--text-muted)', fontStyle: 'italic' }}>nobody</span>
-            )}
-            {draft.sharedWith.map(u => (
-              <span key={u} style={{
-                display: 'inline-flex', alignItems: 'center', gap: 4,
-                fontSize: 11, fontWeight: 600,
-                background: 'var(--bg-inset)', border: '1px solid var(--border)',
-                borderRadius: 4, padding: '2px 6px',
-              }}>
-                {u}
-                <button
-                  onClick={() => onUnshare(u)}
-                  style={{
-                    background: 'none', border: 'none', cursor: 'pointer',
-                    color: 'var(--text-soft)', padding: 0, fontSize: 13, lineHeight: 1,
-                  }}
-                  title={`Unshare with ${u}`}
-                >×</button>
-              </span>
-            ))}
-            {availableToShare.length > 0 && (
-              <div style={{ position: 'relative' }}>
-                <button
-                  className="btn btn-ghost"
-                  style={{ fontSize: 11, padding: '2px 8px' }}
-                  onClick={() => setShareOpen(v => !v)}
-                >
-                  + Share
-                </button>
-                {shareOpen && (
-                  <div style={{
-                    position: 'absolute', top: '100%', left: 0, zIndex: 50,
-                    background: 'var(--bg-panel)', border: '1px solid var(--border)',
-                    borderRadius: 6, padding: 4, marginTop: 2,
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-                    minWidth: 100,
-                  }}>
-                    {availableToShare.map(u => (
-                      <button
-                        key={u}
-                        onClick={() => { onShare(u); setShareOpen(false) }}
-                        style={{
-                          display: 'block', width: '100%', textAlign: 'left',
-                          background: 'none', border: 'none', cursor: 'pointer',
-                          padding: '5px 10px', fontSize: 12, fontWeight: 600,
-                          color: 'var(--text)', borderRadius: 4,
-                        }}
-                        onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-inset)')}
-                        onMouseLeave={e => (e.currentTarget.style.background = 'none')}
-                      >
-                        {u}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      <div className="dd-right">
         <div className="time-pickers">
           <label className={`settle-select${readOnly ? ' disabled' : ''}`}>
             <span className="settle-label">From</span>
@@ -210,8 +323,53 @@ export default function DraftDetails({
               ))}
             </select>
           </label>
+          <span style={{ width: 1, background: 'var(--border)', alignSelf: 'stretch', margin: '0 4px' }} />
+          {/* Scenario */}
+          {(() => {
+            const active = scenario !== 'none'
+            const activeScenario = SCENARIOS.find(s => s.id === scenario)
+            return (
+              <div ref={scenarioWrapperRef} style={{ position: 'relative' }}>
+                <button style={{
+                  border: `1px solid ${active ? '#4f46e5' : 'var(--border-strong)'}`,
+                  borderRadius: 6, padding: '5px 10px', fontSize: 12, cursor: 'pointer',
+                  background: active ? 'rgba(79,70,229,.1)' : 'var(--bg-panel)',
+                  color: active ? '#a5b4fc' : 'var(--text-soft)',
+                  display: 'flex', alignItems: 'center', gap: 6,
+                }} onClick={() => setScenarioOpen(o => !o)}>
+                  {activeScenario ? activeScenario.name : 'Scenario'} ▾
+                </button>
+                {scenarioOpen && <ScenarioPopover scenario={scenario} onChange={onScenarioChange} onClose={closeScenario} wrapperRef={scenarioWrapperRef} />}
+              </div>
+            )
+          })()}
+          {/* GSP */}
+          {(() => {
+            const incCount = Object.values(gspFilter).filter(v => v === 'include').length
+            const excCount = Object.values(gspFilter).filter(v => v === 'exclude').length
+            const active = incCount > 0 || excCount > 0
+            const excOnly = excCount > 0 && incCount === 0
+            return (
+              <div ref={gspWrapperRef} style={{ position: 'relative' }}>
+                <button style={{
+                  border: `1px solid ${active ? (excOnly ? '#dc2626' : '#4f46e5') : 'var(--border-strong)'}`,
+                  borderRadius: 6, padding: '5px 10px', fontSize: 12, cursor: 'pointer',
+                  background: active ? (excOnly ? 'rgba(220,38,38,.1)' : 'rgba(79,70,229,.1)') : 'var(--bg-panel)',
+                  color: active ? (excOnly ? '#fca5a5' : '#a5b4fc') : 'var(--text-soft)',
+                  display: 'flex', alignItems: 'center', gap: 6,
+                }} onClick={() => setGspOpen(o => !o)}>
+                  GSP ▾
+                  {incCount > 0 && <span style={{ background: '#4f46e5', color: '#fff', fontSize: 10, borderRadius: 999, padding: '1px 5px', fontWeight: 600 }}>+{incCount}</span>}
+                  {excCount > 0 && <span style={{ background: '#dc2626', color: '#fff', fontSize: 10, borderRadius: 999, padding: '1px 5px', fontWeight: 600 }}>−{excCount}</span>}
+                </button>
+                {gspOpen && <GspFilterPopover gspFilter={gspFilter} onChange={onGspFilterChange} onClose={closeGsp} wrapperRef={gspWrapperRef} />}
+              </div>
+            )
+          })()}
         </div>
+      </div>
 
+      <div className="dd-right">
         <div className="dd-actions">
           {/* Owner actions */}
           {isOwner && draft.status === 'draft' && (
@@ -251,6 +409,7 @@ export default function DraftDetails({
             </>
           )}
         </div>
+
       </div>
     </div>
   )

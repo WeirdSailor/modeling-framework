@@ -1,8 +1,7 @@
 'use client'
 
-import { useState, useMemo, useCallback, useRef, useEffect, type RefObject } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import type { BMUnit, ServiceType } from '@/models/types'
-import { SCENARIOS, GSP_AREAS } from '@/config/scenarios'
 
 
 interface Props {
@@ -15,7 +14,7 @@ interface Props {
   readOnly: boolean
   voltageArea: string
   scenario: string
-  onScenarioChange: (s: string) => void
+  gspFilter: Record<string, 'include' | 'exclude'>
   onAddUnits: (ids: string[]) => void
 }
 
@@ -107,136 +106,13 @@ function SortTh({ col, sort, onSort, children, numeric, className, style }: {
   )
 }
 
-interface GspFilterPopoverProps {
-  gspFilter: Record<string, 'include' | 'exclude'>
-  onChange: (filter: Record<string, 'include' | 'exclude'>) => void
-  onClose: () => void
-  wrapperRef: RefObject<HTMLDivElement | null>
-}
-
-function GspFilterPopover({ gspFilter, onChange, onClose, wrapperRef }: GspFilterPopoverProps) {
-  const ref = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    function handleMouseDown(e: MouseEvent) {
-      if (
-        ref.current && !ref.current.contains(e.target as Node) &&
-        wrapperRef.current && !wrapperRef.current.contains(e.target as Node)
-      ) onClose()
-    }
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose()
-    }
-    document.addEventListener('mousedown', handleMouseDown)
-    document.addEventListener('keydown', handleKeyDown)
-    return () => {
-      document.removeEventListener('mousedown', handleMouseDown)
-      document.removeEventListener('keydown', handleKeyDown)
-    }
-  }, [onClose])
-
-  function setZone(id: string, seg: 'include' | 'exclude' | null) {
-    const current = gspFilter[id] ?? null
-    if (current === seg) return
-    const next = { ...gspFilter }
-    if (seg === null) delete next[id]
-    else next[id] = seg
-    onChange(next)
-  }
-
-  const includedIds = Object.entries(gspFilter).filter(([, v]) => v === 'include').map(([k]) => k)
-  const excludedIds = Object.entries(gspFilter).filter(([, v]) => v === 'exclude').map(([k]) => k)
-
-  return (
-    <div
-      ref={ref}
-      style={{
-        position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 50,
-        background: 'var(--bg-panel)', border: '1px solid var(--border-strong)',
-        borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,.35)', width: 268,
-        overflow: 'hidden',
-      }}
-    >
-      {/* Header */}
-      <div style={{ padding: '7px 12px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--text-faint)' }}>
-          GSP Groups
-        </span>
-        <button
-          style={{ background: 'none', border: 0, color: '#6366f1', fontSize: 11, cursor: 'pointer', padding: '0 2px' }}
-          onClick={() => onChange({})}
-        >
-          Clear all
-        </button>
-      </div>
-
-      {/* Zone rows */}
-      <div style={{ maxHeight: 280, overflowY: 'auto' }}>
-        {GSP_AREAS.map(area => {
-          const state = gspFilter[area.id] ?? null
-          return (
-            <div key={area.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '5px 12px', gap: 8 }}>
-              <span style={{ fontSize: 12, color: 'var(--text)' }}>{area.label}</span>
-              <div style={{ display: 'flex', border: '1px solid var(--border-strong)', borderRadius: 5, overflow: 'hidden', flexShrink: 0 }}>
-                {(['include', null, 'exclude'] as const).map((seg, i) => {
-                  const active = state === seg
-                  const label = seg === 'include' ? '+' : seg === 'exclude' ? '−' : '·'
-                  let bg = 'var(--bg-panel)'
-                  let color = 'var(--text-faint)'
-                  if (active && seg === 'include') { bg = 'rgba(5,150,105,.15)'; color = '#6ee7b7' }
-                  if (active && seg === null)      { bg = 'var(--bg-subtle)';    color = 'var(--text)' }
-                  if (active && seg === 'exclude') { bg = 'rgba(220,38,38,.15)'; color = '#fca5a5' }
-                  return (
-                    <button
-                      key={i}
-                      style={{
-                        padding: '3px 8px', fontSize: 11, fontWeight: 600,
-                        background: bg, color, border: 'none',
-                        borderRight: i < 2 ? '1px solid var(--border-strong)' : 'none',
-                        cursor: 'pointer', lineHeight: 1.4,
-                      }}
-                      aria-label={`${area.label}: ${seg === 'include' ? 'include' : seg === 'exclude' ? 'exclude' : 'neutral'}`}
-                      aria-pressed={active}
-                      onClick={() => setZone(area.id, seg)}
-                    >
-                      {label}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-          )
-        })}
-      </div>
-
-      {/* Footer summary — only shown when filter is active */}
-      {(includedIds.length > 0 || excludedIds.length > 0) && (
-        <div style={{ padding: '6px 12px', borderTop: '1px solid var(--border)', fontSize: 11, color: 'var(--text-faint)' }}>
-          {includedIds.length > 0 && (
-            <span>Showing: <span style={{ color: '#6ee7b7' }}>{includedIds.join(', ')}</span></span>
-          )}
-          {includedIds.length > 0 && excludedIds.length > 0 && (
-            <span style={{ margin: '0 6px' }}>·</span>
-          )}
-          {excludedIds.length > 0 && (
-            <span>Hiding: <span style={{ color: '#fca5a5' }}>{excludedIds.join(', ')}</span></span>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
 
 export default function AvailableTable({
   units, unitPnByBmUnit, unitServices, activeDraftUnitIds, otherDraftUnitMap,
-  selectionPattern, readOnly, voltageArea, scenario, onScenarioChange, onAddUnits,
+  selectionPattern, readOnly, voltageArea, scenario, gspFilter, onAddUnits,
 }: Props) {
-  const [search, setSearch] = useState('')
-  const [typeFilter, setTypeFilter] = useState('All')
   const [sort, setSort] = useState<{ key: SortKey; dir: 'asc' | 'desc' }>({ key: 'nationalGridBmUnit', dir: 'asc' })
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set())
-  const [gspFilter, setGspFilter] = useState<Record<string, 'include' | 'exclude'>>({})
-  const [gspPopoverOpen, setGspPopoverOpen] = useState(false)
 
   const rows = useMemo<UnitRow[]>(() => {
     return units.map(u => ({
@@ -255,25 +131,13 @@ export default function AvailableTable({
     }))
   }, [units, unitPnByBmUnit])
 
-  const types = useMemo(() => {
-    const t = new Set(rows.map(r => r.fuelType))
-    return ['All', ...Array.from(t).sort()]
-  }, [rows])
-
   const visible = useMemo(() => {
-    const q = search.trim().toLowerCase()
     const gspIncluded = Object.entries(gspFilter).filter(([, v]) => v === 'include').map(([k]) => k)
     const gspExcluded = Object.entries(gspFilter).filter(([, v]) => v === 'exclude').map(([k]) => k)
     let filtered = rows.filter(r => {
-      if (typeFilter !== 'All' && r.fuelType !== typeFilter) return false
       if (gspIncluded.length > 0 && !gspIncluded.includes(r.gspGroup)) return false
       if (gspExcluded.includes(r.gspGroup)) return false
-      if (!q) return true
-      return (
-        r.bmUnitId.toLowerCase().includes(q) ||
-        r.nationalGridBmUnit.toLowerCase().includes(q) ||
-        r.fuelType.toLowerCase().includes(q)
-      )
+      return true
     })
     if (scenario !== 'none') {
       filtered.sort((a, b) => scenarioScore(b, scenario, voltageArea) - scenarioScore(a, scenario, voltageArea))
@@ -287,7 +151,7 @@ export default function AvailableTable({
       })
     }
     return filtered
-  }, [rows, search, typeFilter, gspFilter, sort, scenario, voltageArea])
+  }, [rows, gspFilter, sort, scenario, voltageArea])
 
   const selectableVisible = useMemo(
     () => visible.filter(r => !activeDraftUnitIds.has(r.bmUnitId)).map(r => r.bmUnitId),
@@ -316,9 +180,6 @@ export default function AvailableTable({
       return next
     })
   }, [allChecked, selectableVisible])
-
-  const closeGspPopover = useCallback(() => setGspPopoverOpen(false), [])
-  const gspWrapperRef = useRef<HTMLDivElement>(null)
 
   function handleAddOne(id: string) {
     if (readOnly) return
@@ -352,80 +213,26 @@ export default function AvailableTable({
     <div className="panel available-panel">
       <header className="panel-head">
         <div className="panel-title">
-          <h2>Available units</h2>
-          <span className="count-pill">{visible.length} of {units.length}</span>
+          <h2>Available</h2>
         </div>
-        <div className="toolbar">
-          <div className="search-wrap">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" />
-            </svg>
-            <input
-              type="text" placeholder="Search BMU, type…"
-              value={search} onChange={e => setSearch(e.target.value)}
-            />
-            {search && (
-              <button className="clear-btn" onClick={() => setSearch('')} aria-label="Clear">×</button>
+        {selectionPattern === 'buttons' && !readOnly && pendingIds.size > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginLeft: 'auto' }}>
+            {pendingIds.size > 0 && (
+              <span className="foot-meta">{(() => {
+                const pending = rows.filter(r => pendingIds.has(r.bmUnitId))
+                const totalSel = pending.reduce((s, r) => s + r.sel, 0)
+                const totalMel = pending.reduce((s, r) => s + r.mel, 0)
+                return `${pendingIds.size} checked — ${Math.round(totalSel)} to SEL, ${Math.round(totalMel)} to MEL`
+              })()}</span>
             )}
+            <button
+              className="btn btn-primary"
+              onClick={handleAddMany}
+            >
+              Select →
+            </button>
           </div>
-          <select
-            value={typeFilter}
-            onChange={e => setTypeFilter(e.target.value)}
-          >
-            {types.map(t => <option key={t} value={t}>{t}</option>)}
-          </select>
-          <select
-            value={scenario}
-            onChange={e => onScenarioChange(e.target.value)}
-            title="Scenario — ranks units by operational priority"
-          >
-            <option value="none">Scenario…</option>
-            {SCENARIOS.map(s => (
-              <option key={s.id} value={s.id}>{s.name}</option>
-            ))}
-          </select>
-          {/* GSP filter */}
-          {(() => {
-            const incCount = Object.values(gspFilter).filter(v => v === 'include').length
-            const excCount = Object.values(gspFilter).filter(v => v === 'exclude').length
-            const active = incCount > 0 || excCount > 0
-            const excOnly = excCount > 0 && incCount === 0
-            return (
-              <div ref={gspWrapperRef} style={{ position: 'relative' }}>
-                <button
-                  style={{
-                    border: `1px solid ${active ? (excOnly ? '#dc2626' : '#4f46e5') : 'var(--border-strong)'}`,
-                    borderRadius: 6, padding: '5px 10px', fontSize: 12, cursor: 'pointer',
-                    background: active ? (excOnly ? 'rgba(220,38,38,.1)' : 'rgba(79,70,229,.1)') : 'var(--bg-panel)',
-                    color: active ? (excOnly ? '#fca5a5' : '#a5b4fc') : 'var(--text-soft)',
-                    display: 'flex', alignItems: 'center', gap: 6,
-                  }}
-                  onClick={() => setGspPopoverOpen(o => !o)}
-                >
-                  GSP ▾
-                  {incCount > 0 && (
-                    <span style={{ background: '#4f46e5', color: '#fff', fontSize: 10, borderRadius: 999, padding: '1px 5px', fontWeight: 600 }}>
-                      +{incCount}
-                    </span>
-                  )}
-                  {excCount > 0 && (
-                    <span style={{ background: '#dc2626', color: '#fff', fontSize: 10, borderRadius: 999, padding: '1px 5px', fontWeight: 600 }}>
-                      −{excCount}
-                    </span>
-                  )}
-                </button>
-                {gspPopoverOpen && (
-                  <GspFilterPopover
-                    gspFilter={gspFilter}
-                    onChange={setGspFilter}
-                    onClose={closeGspPopover}
-                    wrapperRef={gspWrapperRef}
-                  />
-                )}
-              </div>
-            )
-          })()}
-        </div>
+        )}
       </header>
 
       <div className="table-scroll">
@@ -526,35 +333,6 @@ export default function AvailableTable({
         </table>
       </div>
 
-      {selectionPattern === 'buttons' && !readOnly && (
-        <footer className="panel-foot">
-          <span className="foot-meta">
-            {pendingIds.size > 0 ? (() => {
-              const pending = rows.filter(r => pendingIds.has(r.bmUnitId))
-              const totalSel = pending.reduce((s, r) => s + r.sel, 0)
-              const totalMel = pending.reduce((s, r) => s + r.mel, 0)
-              return `${pendingIds.size} checked — ${Math.round(totalSel)} to SEL, ${Math.round(totalMel)} to MEL`
-            })() : 'Tick rows or use + to add'}
-          </span>
-          <button
-            className="btn btn-primary"
-            disabled={pendingIds.size === 0}
-            onClick={handleAddMany}
-          >
-            Select →
-          </button>
-        </footer>
-      )}
-      {selectionPattern === 'click' && !readOnly && (
-        <footer className="panel-foot">
-          <span className="foot-meta">Click any row to add it to the draft</span>
-        </footer>
-      )}
-      {readOnly && (
-        <footer className="panel-foot">
-          <span className="foot-meta" style={{ fontStyle: 'italic' }}>Read only — draft is not editable</span>
-        </footer>
-      )}
     </div>
   )
 }

@@ -74,6 +74,7 @@ export interface UnitSnapshot {
 export interface DraftPlan {
   id: string;
   name: string;
+  description: string;
   actions: ModellingAction[];
   status: 'draft' | 'committed' | 'discarded';
   color: string;

@@ -18,6 +18,8 @@ interface Props {
   onRefresh: () => void
   hiddenDraftIds: Set<string>
   onToggleChartVisibility: (id: string) => void
+  sidebarOpen: boolean
+  onToggleSidebar: () => void
 }
 
 function StateBadge({ status }: { status: DraftPlan['status'] }) {
@@ -44,7 +46,6 @@ function DraftListItem({ draft, active, onClick, periods, sharedBy, isHidden, on
   isHidden?: boolean
   onToggleVisibility?: () => void
 }) {
-  const unitCount = new Set(draft.actions.map(a => a.bmUnitId)).size
   const from = slotTime(draft.fromPeriod, periods)
   const to   = slotTime(draft.toPeriod,   periods)
   return (
@@ -72,11 +73,10 @@ function DraftListItem({ draft, active, onClick, periods, sharedBy, isHidden, on
           </button>
         )}
         <span className="draft-item-name">{draft.name}</span>
-        <StateBadge status={draft.status} />
       </div>
       <div className="draft-item-row">
         <span className="draft-item-meta mono">{from} → {to}</span>
-        <span className="draft-item-count">{unitCount} unit{unitCount !== 1 ? 's' : ''}</span>
+        <StateBadge status={draft.status} />
       </div>
       {sharedBy && (
         <div className="draft-item-row">
@@ -92,7 +92,7 @@ function DraftListItem({ draft, active, onClick, periods, sharedBy, isHidden, on
 export default function DraftSidebar({
   drafts, activeId, currentUser, onSelectUser, onSelect, onCreate,
   showArchive, setShowArchive, settlementPeriods, isLoading, onRefresh,
-  hiddenDraftIds, onToggleChartVisibility,
+  hiddenDraftIds, onToggleChartVisibility, sidebarOpen, onToggleSidebar,
 }: Props) {
   const [showCommitted, setShowCommitted] = useState(true)
   const [showShared, setShowShared] = useState(true)
@@ -114,6 +114,13 @@ export default function DraftSidebar({
 
   return (
     <aside className="draft-sidebar">
+      <button
+        className="sidebar-collapse-btn"
+        onClick={onToggleSidebar}
+        title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
+      >
+        {sidebarOpen ? '‹' : '›'}
+      </button>
       <div className="sidebar-head">
         <div className="brand">
           <div className="brand-mark" />
@@ -150,11 +157,9 @@ export default function DraftSidebar({
           </div>
         )}
 
-        <button className="btn btn-primary btn-block" onClick={onCreate}>
-          <span className="plus">+</span> New draft
-        </button>
       </div>
 
+      <div className="sidebar-scroll">
       <div className="sidebar-section">
         <div className="sidebar-label">
           <span>Editing</span>
@@ -248,6 +253,13 @@ export default function DraftSidebar({
             ))}
           </ul>
         )}
+      </div>
+      </div>
+
+      <div className="sidebar-footer">
+        <button className="btn btn-primary btn-block" onClick={onCreate}>
+          <span className="plus">+</span> New draft
+        </button>
       </div>
     </aside>
   )

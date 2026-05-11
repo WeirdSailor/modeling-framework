@@ -59,6 +59,7 @@ export default function Home() {
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null)
   const [voltageArea, setVoltageArea] = useState('')
   const [scenario, setScenario] = useState('none')
+  const [gspFilter, setGspFilter] = useState<Record<string, 'include' | 'exclude'>>({})
   const [dataMode, setDataMode] = useState<'real' | 'historical'>('real')
   const [historicalDate, setHistoricalDate] = useState<string>(
     () => dateToSettlementDate(new Date(Date.now() - 24 * 60 * 60 * 1000))
@@ -83,7 +84,8 @@ export default function Home() {
   const setActiveDraft    = useModellingStore(s => s.setActiveDraft)
   const addUnitsToDraft   = useModellingStore(s => s.addUnitsToDraft)
   const removeUnitFromDraft = useModellingStore(s => s.removeUnitFromDraft)
-  const renameDraft       = useModellingStore(s => s.renameDraft)
+  const renameDraft             = useModellingStore(s => s.renameDraft)
+  const updateDraftDescription  = useModellingStore(s => s.updateDraftDescription)
   const updateDraftWindow = useModellingStore(s => s.updateDraftWindow)
   const updateUnitNotes   = useModellingStore(s => s.updateUnitNotes)
   const updateUnitReason        = useModellingStore(s => s.updateUnitReason)
@@ -219,22 +221,7 @@ export default function Home() {
 
   const unitById = useMemo(() => new Map(units.map(u => [u.bmUnitId, u])), [units])
 
-  const activeDraftCost = useMemo(() => {
-    if (!activeDraft) return 0
-    const seen = new Set<string>()
-    let total = 0
-    for (const a of activeDraft.actions) {
-      if (seen.has(a.bmUnitId)) continue
-      seen.add(a.bmUnitId)
-      const u = unitById.get(a.bmUnitId)
-      const mel = u?.registeredCapacity ?? 0
-      const pn = unitPnByBmUnit[a.bmUnitId] ?? 0
-      total += Math.max(0, mel - pn) * 120
-    }
-    return total
-  }, [activeDraft, unitById, unitPnByBmUnit])
-
-  const activeDraftUnitIds = useMemo(
+const activeDraftUnitIds = useMemo(
     () => new Set(activeDraft?.actions.map(a => a.bmUnitId) ?? []),
     [activeDraft]
   )
@@ -347,11 +334,14 @@ export default function Home() {
   const isOwner = activeDraft?.ownerId === currentUser
   const readOnly = !activeDraft || activeDraft.status !== 'draft' || !isOwner
 
+  const [sidebarOpen, setSidebarOpen] = useState(true)
+
   const appClass = [
     'app',
     'layout-' + tweaks.layout,
     tweaks.showSidebar ? 'with-sidebar' : 'no-sidebar',
-  ].join(' ')
+    tweaks.showSidebar && !sidebarOpen ? 'sidebar-collapsed' : '',
+  ].filter(Boolean).join(' ')
 
   return (
     <div className={appClass}>
@@ -370,6 +360,8 @@ export default function Home() {
           onRefresh={loadData}
           hiddenDraftIds={hiddenDraftIds}
           onToggleChartVisibility={toggleDraftChartVisibility}
+          sidebarOpen={sidebarOpen}
+          onToggleSidebar={() => setSidebarOpen(v => !v)}
         />
       )}
 
@@ -436,9 +428,9 @@ export default function Home() {
                 <DraftDetails
                   draft={activeDraft}
                   settlementPeriods={settlementPeriods}
-                  cost={activeDraftCost}
                   currentUser={currentUser}
                   onChangeName={name => renameDraft(activeDraftId!, name)}
+                  onChangeDescription={desc => updateDraftDescription(activeDraftId!, desc)}
                   onChangeFrom={from => updateDraftWindow(activeDraftId!, from, activeDraft.toPeriod)}
                   onChangeTo={to => updateDraftWindow(activeDraftId!, activeDraft.fromPeriod, to)}
                   onCommit={handleCommit}
@@ -448,6 +440,10 @@ export default function Home() {
                   onDuplicate={handleDuplicate}
                   onShare={userId => shareDraft(activeDraftId!, userId)}
                   onUnshare={userId => unshareDraft(activeDraftId!, userId)}
+                  scenario={scenario}
+                  onScenarioChange={setScenario}
+                  gspFilter={gspFilter}
+                  onGspFilterChange={setGspFilter}
                 />
                 <div className={`workspace-grid grid-${tweaks.layout}`}>
                   <AvailableTable
@@ -460,7 +456,7 @@ export default function Home() {
                     readOnly={readOnly}
                     voltageArea={voltageArea}
                     scenario={scenario}
-                    onScenarioChange={setScenario}
+                    gspFilter={gspFilter}
                     onAddUnits={handleAddUnits}
                   />
                   <SelectedTable

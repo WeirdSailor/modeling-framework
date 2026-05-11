@@ -78,6 +78,8 @@ The sidebar **Refresh** button always calls `loadData` (real-time) regardless of
 
 Operators create independent draft plans. Each draft is a colour-coded group of `ModellingAction`s. Drafts can be overlaid simultaneously on the margin chart as dotted lines. Committing a draft absorbs it into the solid baseline and triggers `refreshAggregates`. The `DraftDetails` component manages draft lifecycle (create, commit, discard, duplicate, share).
 
+`DraftPlan` has a `description: string` field (empty string by default). Edited via a compact input in the `DraftDetails` panel between the name row and the From/To row — truncated with ellipsis when not focused, full text on hover (`title` attribute). `updateDraftDescription(id, description)` in the store handles updates.
+
 Every draft has an `ownerId` (the operator who created it) and a `sharedWith` list. Only the owner can edit, commit, discard, or share a draft. Other operators can view shared drafts read-only and duplicate them into their own workspace.
 
 ### Draft Duplication
@@ -134,9 +136,9 @@ Fetched across 12×7-day windows (84 days / ~3 months) to capture units with inf
 | File | Role |
 |------|------|
 | `src/app/page.tsx` | Top-level: data loading, layout, tab switching, derived data, confirm modals, sharing actions; owns `hiddenDraftIds` state for chart draft visibility |
-| `src/components/DraftSidebar.tsx` | Identity picker ("You are: [NSE ▼]"), window time + Refresh, draft list filtered to current user, "Shared with me" collapsible section; coloured circle visibility toggle per active draft |
-| `src/components/DraftDetails.tsx` | Draft header: name, state badge, meta row (window/duration/units/cost), share controls (owner) or "Shared by X" badge (recipient), From/To SP pickers, action buttons |
-| `src/components/AvailableTable.tsx` | Available units table: search/filter/sort, GSP group filter popover, checkbox or click selection, type + service chips |
+| `src/components/DraftSidebar.tsx` | Identity picker ("You are: [NSE ▼]"), window time + Refresh, draft list filtered to current user, "Shared with me" collapsible section; coloured circle visibility toggle per active draft; collapse button (‹/›) at top; New Draft button pinned to bottom footer |
+| `src/components/DraftDetails.tsx` | Draft header: share icon (left of name, opens sharing popover), name input, description field (truncated, hover tooltip), From/To SP pickers + Scenario/GSP filter buttons in same row, action buttons; no cost/meta row, no state badge |
+| `src/components/AvailableTable.tsx` | Available units table: sort, checkbox or click selection, type + service chips; no toolbar — Scenario/GSP filters live in DraftDetails and are passed as props; Select button appears in header only when rows are checked |
 | `src/components/SelectedTable.tsx` | Selected units in active draft: Σ PN / Σ MEL / Est. value totals, notes input, remove button, service chip |
 | `src/components/CommittedTab.tsx` | Committed-tab view: cost breakdown cards (Total + per-reason), click-to-filter table, change-indicator arrows (↑/↓), service chip, bulk remove |
 | `src/components/RedeclareTab.tsx` | Redeclare-tab view: editable data columns for committed units (simulates redeclarations); amber row highlight on override; Reset per-row and Reset all; Service (SR/QR) assign select |
@@ -163,15 +165,17 @@ Fetched across 12×7-day windows (84 days / ~3 months) to capture units with inf
 - **`ownerId` on every draft** — `createDraft` and `duplicateDraft` both set `ownerId: state.currentUser`. Any new draft-creation path must do the same. Drafts without `ownerId` will be invisible to all users in the sidebar.
 - **`dataSnapshot` is set at commit time** — `commitDraft` in the store reads `state.units` and `state.dataOverrides` to build the snapshot. If you add new tracked fields to `UnitSnapshot`, update both `commitDraft` and `ChangeArrow`'s render logic.
 - **`dataOverrides` is separate from `unitServices`** — overrides are numeric value redeclarations for change-tracking; services are categorical assignments. Do not merge them.
-- **`gspFilter` in `AvailableTable` is local component state** — intentionally not in Zustand. Do not lift it to the store or pass it as a prop. The `visible` memo depends on it; `gspFilter` must remain in its dependency array.
+- **`gspFilter` and `scenario` are props in `AvailableTable`** — lifted to `page.tsx` state so `DraftDetails` can also control them (Scenario and GSP buttons live in the DraftDetails time-pickers row). Do not move them back to local state in `AvailableTable`.
 - **`hiddenDraftIds` in `page.tsx` is local state** — intentionally not in Zustand. It is purely a chart UI concern. Passed as a prop to `MarginChart` and (with `onToggleChartVisibility`) to `DraftSidebar`. Do not lift to the store.
+- **`sidebarOpen` in `page.tsx` is local state** — controls the CSS `sidebar-collapsed` class on the app grid, which transitions `grid-template-columns` from `215px 1fr` to `36px 1fr`. Do not lift to the store.
+- **`AvailableTable` has no toolbar** — search, type filter, and the scenario/GSP buttons were removed. The only filtering controls are Scenario and GSP in `DraftDetails`. Do not re-add a toolbar to `AvailableTable`.
 - **Draft overlay partial rendering** — `MarginChart` only draws the dotted draft line for SPs where `draft.actions.some(a => a.fromPeriod <= slotIdx && a.toPeriod >= slotIdx)`. Adjacent SPs (one either side of the affected range) are included as bridge points at the baseline value so the line connects cleanly. Do not revert to rendering the full 48-SP dotted line.
 
 ---
 
 ## Draft Cost Calculation
 
-Displayed in the draft header alongside Window / Duration / Units.
+The cost formula is used only in `CommittedTab` for the cost breakdown cards (`STATIC_PRICE = 120`):
 
 ```
 Cost = Σ max(0, MEL − PN) × £120   (per unique unit in the draft)
@@ -181,9 +185,7 @@ Cost = Σ max(0, MEL − PN) × £120   (per unique unit in the draft)
 - **PN** = `unitPnByBmUnit[bmUnitId]` — see "PN / SEL fallback" below
 - **Price** = £120/MWh static placeholder (no real price data available)
 
-Formatted as `£1,234` (rounded, GB locale). Shows `—` when no units are in the draft. Computed in `page.tsx` as `activeDraftCost` and passed to `DraftDetails` as a prop.
-
-The same formula is used in `CommittedTab` for the cost breakdown cards (`STATIC_PRICE = 120`).
+The draft header no longer displays cost, window, duration, or unit count — those meta items were removed. `activeDraftCost` and its memo no longer exist in `page.tsx`.
 
 ## Committed Tab — Cost Breakdown Cards
 
@@ -266,39 +268,34 @@ A `ChangeArrow` component renders a coloured superscript arrow (↑ green, ↓ r
 - Overridden rows are highlighted amber. Per-row **Reset** button and top-level **Reset all** button.
 - PN, Event, Reason, Draft columns are read-only on this tab.
 
-## GSP Group Filter (AvailableTable)
+## GSP Group Filter & Scenario
 
-A "GSP ▾" button in the `AvailableTable` toolbar opens a floating popover listing all 14 GSP groups. Each zone has a 3-state segmented toggle: **+** (include), **·** (neutral), **−** (exclude). Multiple zones can be mixed — e.g. include `_F` + `_G`, exclude `_P`.
-
-### Filter state
-
-All state is **local to `AvailableTable`** — not in Zustand, not passed as props:
+Both filters live in **`DraftDetails`** (not `AvailableTable`). Their state is owned by `page.tsx` and passed down as props:
 
 ```ts
-gspFilter: Record<string, 'include' | 'exclude'>  // absence = neutral
-gspPopoverOpen: boolean
+// page.tsx state
+scenario: string                                      // active scenario id ('none' or SCENARIOS[n].id)
+gspFilter: Record<string, 'include' | 'exclude'>      // absence = neutral
 ```
 
-### Filter logic
+The Scenario and GSP buttons sit in the same row as the From/To SP pickers inside `.time-pickers` in `DraftDetails`. `ScenarioPopover` and `GspFilterPopover` are defined as subcomponents in `DraftDetails.tsx` (not in `AvailableTable.tsx`).
 
-Applied as an extra step in the `visible` useMemo, after the type-filter and search checks. `gspIncluded` and `gspExcluded` are hoisted outside the `.filter()` callback:
+`AvailableTable` receives `scenario` and `gspFilter` as **read-only props** and applies them in its `visible` useMemo — it does not own or mutate them.
+
+### GSP filter logic (in `AvailableTable.visible`)
 
 ```ts
 if (gspIncluded.length > 0 && !gspIncluded.includes(r.gspGroup)) return false
 if (gspExcluded.includes(r.gspGroup)) return false
 ```
 
-A unit passes if its `gspGroup` is in at least one included zone (when any inclusions are set) **and** not in any excluded zone. Both conditions apply simultaneously.
-
-### GspFilterPopover subcomponent
-
-Defined inline above `export default function AvailableTable`. Accepts `gspFilter`, `onChange`, `onClose`, and `wrapperRef` (a ref to the wrapper div containing both the button and the popover — used for click-outside detection to prevent the toggle button's `mousedown` from conflicting with the popover's `click`). Dismiss via click-outside (`document.mousedown`) or Escape.
+A unit passes if its `gspGroup` is in at least one included zone (when any inclusions are set) **and** not in any excluded zone.
 
 ### Data source
 
-Zone list comes from `GSP_AREAS` in `src/config/scenarios.ts` (14 entries, same data used by the Voltage scenario area picker). Zone membership uses `unit.gspGroup`. Mock data in `src/services/elexon.ts` (`MOCK_GSP_GROUPS`) covers all 14 zones.
+Zone list: `GSP_AREAS` in `src/config/scenarios.ts` (14 entries). Zone membership uses `unit.gspGroup`.
 
-### Button badge states
+### GSP button badge states
 
 | State | Appearance |
 |-------|-----------|

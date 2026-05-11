@@ -90,7 +90,6 @@ export default function SelectedTable({
       <header className="panel-head">
         <div className="panel-title">
           <h2>Selected</h2>
-          <span className="count-pill">{uniqueUnitIds.length}</span>
         </div>
         <div className="totals">
           <Stat label="Σ PN"  value={totals.pn.toFixed(0) + ' MW'} />

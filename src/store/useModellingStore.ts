@@ -57,6 +57,7 @@ interface ModellingState {
   updateUnitOperationType: (draftId: string, bmUnitId: string, operationType: OperationType | undefined) => void
   removeUnitFromDraft: (draftId: string, bmUnitId: string) => void
   renameDraft: (id: string, name: string) => void
+  updateDraftDescription: (id: string, description: string) => void
   updateDraftWindow: (id: string, fromPeriod: number, toPeriod: number) => void
   updateUnitNotes: (draftId: string, bmUnitId: string, notes: string) => void
   duplicateDraft: (id: string) => string
@@ -144,7 +145,7 @@ export const useModellingStore = create<ModellingState>((set, get) => ({
       const fromPeriod = state.settlementPeriods[0]?.settlementPeriod ?? 1
       const toPeriod = 48
       const newDraft: DraftPlan = {
-        id, name, actions: [], status: 'draft', color,
+        id, name, description: '', actions: [], status: 'draft', color,
         fromPeriod, toPeriod, unitNotes: {}, createdAt: Date.now(),
         ownerId: state.currentUser, sharedWith: [],
       }
@@ -203,6 +204,11 @@ export const useModellingStore = create<ModellingState>((set, get) => ({
   renameDraft: (id, name) =>
     set(state => ({
       drafts: state.drafts.map(d => d.id === id ? { ...d, name } : d),
+    })),
+
+  updateDraftDescription: (id, description) =>
+    set(state => ({
+      drafts: state.drafts.map(d => d.id === id ? { ...d, description } : d),
     })),
 
   updateDraftWindow: (id, fromPeriod, toPeriod) =>
