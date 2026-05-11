@@ -45,6 +45,14 @@ export default function Home() {
   }, [tweaks.theme])
 
   const [activeTab, setActiveTab] = useState<Tab>('workspace')
+  const [hiddenDraftIds, setHiddenDraftIds] = useState<Set<string>>(new Set())
+  const toggleDraftChartVisibility = useCallback((id: string) => {
+    setHiddenDraftIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }, [])
   const [showConfig, setShowConfig] = useState(false)
   const [showArchive, setShowArchive] = useState(true)
   const [toast, setToast] = useState<string | null>(null)
@@ -358,6 +366,8 @@ export default function Home() {
           settlementPeriods={settlementPeriods}
           isLoading={isLoading}
           onRefresh={loadData}
+          hiddenDraftIds={hiddenDraftIds}
+          onToggleChartVisibility={toggleDraftChartVisibility}
         />
       )}
 
@@ -484,7 +494,7 @@ export default function Home() {
             {isLoading && (
               <div className="loading-banner">Loading data…</div>
             )}
-            <MarginChart />
+            <MarginChart hiddenDraftIds={hiddenDraftIds} />
           </div>
         )}
 

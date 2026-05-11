@@ -16,6 +16,8 @@ interface Props {
   settlementPeriods: SettlementPeriodData[]
   isLoading: boolean
   onRefresh: () => void
+  hiddenDraftIds: Set<string>
+  onToggleChartVisibility: (id: string) => void
 }
 
 function StateBadge({ status }: { status: DraftPlan['status'] }) {
@@ -33,12 +35,14 @@ function slotTime(slot: number, periods: SettlementPeriodData[]): string {
   return sp ? sp.startTime.slice(11, 16) : `SP ${slot}`
 }
 
-function DraftListItem({ draft, active, onClick, periods, sharedBy }: {
+function DraftListItem({ draft, active, onClick, periods, sharedBy, isHidden, onToggleVisibility }: {
   draft: DraftPlan
   active: boolean
   onClick: () => void
   periods: SettlementPeriodData[]
   sharedBy?: string
+  isHidden?: boolean
+  onToggleVisibility?: () => void
 }) {
   const unitCount = new Set(draft.actions.map(a => a.bmUnitId)).size
   const from = slotTime(draft.fromPeriod, periods)
@@ -49,6 +53,24 @@ function DraftListItem({ draft, active, onClick, periods, sharedBy }: {
       onClick={onClick}
     >
       <div className="draft-item-row">
+        {draft.status === 'draft' && onToggleVisibility && (
+          <button
+            title={isHidden ? 'Show on chart' : 'Hide from chart'}
+            onClick={e => { e.stopPropagation(); onToggleVisibility(); }}
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              padding: 0, marginRight: 5, flexShrink: 0,
+              display: 'flex', alignItems: 'center',
+            }}
+          >
+            <span style={{
+              display: 'inline-block', width: 10, height: 10, borderRadius: '50%',
+              background: isHidden ? 'transparent' : draft.color,
+              border: `2px solid ${isHidden ? 'var(--text-soft)' : draft.color}`,
+              transition: 'background 0.15s, border-color 0.15s',
+            }} />
+          </button>
+        )}
         <span className="draft-item-name">{draft.name}</span>
         <StateBadge status={draft.status} />
       </div>
@@ -70,6 +92,7 @@ function DraftListItem({ draft, active, onClick, periods, sharedBy }: {
 export default function DraftSidebar({
   drafts, activeId, currentUser, onSelectUser, onSelect, onCreate,
   showArchive, setShowArchive, settlementPeriods, isLoading, onRefresh,
+  hiddenDraftIds, onToggleChartVisibility,
 }: Props) {
   const [showCommitted, setShowCommitted] = useState(true)
   const [showShared, setShowShared] = useState(true)
@@ -145,6 +168,8 @@ export default function DraftSidebar({
             <DraftListItem
               key={d.id} draft={d} active={d.id === activeId}
               onClick={() => onSelect(d.id)} periods={settlementPeriods}
+              isHidden={hiddenDraftIds.has(d.id)}
+              onToggleVisibility={() => onToggleChartVisibility(d.id)}
             />
           ))}
         </ul>
@@ -217,6 +242,8 @@ export default function DraftSidebar({
                 key={d.id} draft={d} active={d.id === activeId}
                 onClick={() => onSelect(d.id)} periods={settlementPeriods}
                 sharedBy={d.ownerId}
+                isHidden={hiddenDraftIds.has(d.id)}
+                onToggleVisibility={() => onToggleChartVisibility(d.id)}
               />
             ))}
           </ul>

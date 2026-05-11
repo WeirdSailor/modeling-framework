@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Fragment } from 'react'
 import {
   ComposedChart,
   Area,
@@ -131,25 +131,15 @@ function renderTooltip(activeDrafts: DraftPlan[], t: ChartTheme) {
           )}
         </p>
         <p style={{ color: t.tooltipMuted, margin: '2px 0' }}>Demand: {formatMW(raw.demand)} MW</p>
-        {isConfirmed ? (
-          <>
-            <p style={{ color: t.tooltipMuted, margin: '2px 0' }}>EMX:&nbsp;&nbsp;&nbsp;&nbsp;{formatMW(raw.emx)} MW</p>
-            <p style={{ color: t.tooltipMuted, margin: '2px 0' }}>EOL:&nbsp;&nbsp;&nbsp;&nbsp;{formatMW(raw.eol)} MW</p>
-            <p style={{ color: t.tooltipMuted, margin: '2px 0' }}>EMI:&nbsp;&nbsp;&nbsp;&nbsp;{formatMW(raw.emi)} MW</p>
-            <p style={{ color: marginColor, fontWeight: 600, margin: '4px 0 0' }}>
-              Margin: {marginSign}{formatMW(raw.margin)} MW
-            </p>
-          </>
-        ) : (
-          <>
-            <p style={{ color: t.gateClosure, fontStyle: 'italic', margin: '4px 0 2px', fontSize: 11 }}>D-1 proxy (estimated):</p>
-            <p style={{ color: t.tooltipMuted, margin: '2px 0' }}>EMX: {raw.proxyEmx ? formatMW(raw.proxyEmx as number) : '—'} MW</p>
-            <p style={{ color: t.tooltipMuted, margin: '2px 0' }}>EOL: {raw.proxyEol ? formatMW(raw.proxyEol as number) : '—'} MW</p>
-          </>
-        )}
+        <p style={{ color: t.tooltipMuted, margin: '2px 0' }}>EMX:&nbsp;&nbsp;&nbsp;&nbsp;{formatMW(raw.emx)} MW</p>
+        <p style={{ color: t.tooltipMuted, margin: '2px 0' }}>EOL:&nbsp;&nbsp;&nbsp;&nbsp;{formatMW(raw.eol)} MW</p>
+        <p style={{ color: t.tooltipMuted, margin: '2px 0' }}>EMI:&nbsp;&nbsp;&nbsp;&nbsp;{formatMW(raw.emi)} MW</p>
+        <p style={{ color: marginColor, fontWeight: 600, margin: '4px 0 0' }}>
+          Margin: {marginSign}{formatMW(raw.margin)} MW
+        </p>
         {activeDrafts.map(draft => {
           const draftEmx = raw[`draft_${draft.id}_emx`]
-          if (draftEmx === undefined) return null
+          if (draftEmx == null) return null
           const draftMargin     = draftEmx - raw.demand
           const draftMarginSign = draftMargin >= 0 ? '+' : ''
           return (
@@ -167,7 +157,7 @@ function renderTooltip(activeDrafts: DraftPlan[], t: ChartTheme) {
   }
 }
 
-export function MarginChart() {
+export function MarginChart({ hiddenDraftIds = new Set<string>() }: { hiddenDraftIds?: Set<string> }) {
   const settlementPeriods = useModellingStore(state => state.settlementPeriods)
   const drafts            = useModellingStore(state => state.drafts)
   const units             = useModellingStore(state => state.units)
@@ -192,7 +182,7 @@ export function MarginChart() {
     )
   }
 
-  const activeDrafts = drafts.filter(d => d.status === 'draft')
+  const activeDrafts = drafts.filter(d => d.status === 'draft' && !hiddenDraftIds.has(d.id))
   const committedActions = drafts
     .filter(d => d.status === 'committed')
     .flatMap(d => d.actions)
@@ -238,14 +228,12 @@ export function MarginChart() {
       label: slotLabel(sp, index),
       confirmed: sp.hasConfirmedPn ? 1 : 0,
       demand: sp.demand,
-      emx: sp.hasConfirmedPn ? sp.emx : null,
-      eol: sp.hasConfirmedPn ? sp.eol : null,
-      emi: sp.hasConfirmedPn ? sp.emi : null,
+      emx: sp.emx,
+      eol: sp.eol,
+      emi: sp.emi,
       margin: sp.margin,
-      marginPositive: sp.hasConfirmedPn ? Math.max(0, sp.margin) : null,
-      marginNegative: sp.hasConfirmedPn ? Math.min(0, sp.margin) : null,
-      proxyEmx: !sp.hasConfirmedPn && sp.proxyEmx > 0 ? sp.proxyEmx : null,
-      proxyEol: !sp.hasConfirmedPn && sp.proxyEol > 0 ? sp.proxyEol : null,
+      marginPositive: Math.max(0, sp.margin),
+      marginNegative: Math.min(0, sp.margin),
     }
 
     for (const draft of activeDrafts) {
@@ -253,9 +241,30 @@ export function MarginChart() {
         sp, sp.emx, sp.eol, sp.emi,
         draft.actions, alreadyModelled, units
       )
-      point[`draft_${draft.id}_emx`] = overlay.emx
-      point[`draft_${draft.id}_eol`] = overlay.eol
-      point[`draft_${draft.id}_emi`] = overlay.emi
+
+      const spCovered = (slotIdx: number) =>
+        draft.actions.some(a => a.fromPeriod <= slotIdx && a.toPeriod >= slotIdx)
+
+      const affects = spCovered(spNum)
+      const isBridge = !affects && (
+        (index > 0 && spCovered(settlementPeriods[index - 1].settlementPeriod)) ||
+        (index < settlementPeriods.length - 1 && spCovered(settlementPeriods[index + 1].settlementPeriod))
+      )
+
+      if (affects) {
+        point[`draft_${draft.id}_emx`] = overlay.emx
+        point[`draft_${draft.id}_eol`] = overlay.eol
+        point[`draft_${draft.id}_emi`] = overlay.emi
+      } else if (isBridge) {
+        // Anchor point at baseline so the dotted line branches off the solid cleanly
+        point[`draft_${draft.id}_emx`] = sp.emx
+        point[`draft_${draft.id}_eol`] = sp.eol
+        point[`draft_${draft.id}_emi`] = sp.emi
+      } else {
+        point[`draft_${draft.id}_emx`] = null
+        point[`draft_${draft.id}_eol`] = null
+        point[`draft_${draft.id}_emi`] = null
+      }
     }
 
     return point
@@ -342,7 +351,7 @@ export function MarginChart() {
               x={chartData[midnightLabel]?.label as string}
               stroke={t.midnight}
               strokeDasharray="3 3"
-              label={{ value: 'midnight', position: 'top', fontSize: 9, fill: t.midnight }}
+              label={{ value: '← midnight', position: 'insideTopLeft', fontSize: 9, fill: t.midnight }}
             />
           )}
 
@@ -351,25 +360,20 @@ export function MarginChart() {
           <Area dataKey="marginNegative" name="Deficit margin" baseValue={0}
             fill="#ef4444" fillOpacity={0.25} stroke="none" legendType="none" dot={false} activeDot={false} />
 
-          <Line dataKey="emi"    name="EMI"    stroke={t.emi}    strokeWidth={1.5} strokeDasharray="5 5" dot={false} activeDot={{ r: 3 }} />
+          <Line dataKey="emi"    name="EMI"    stroke={t.emi}    strokeWidth={1.5} dot={false} activeDot={{ r: 3 }} />
           <Line dataKey="eol"    name="EOL"    stroke={t.eol}    strokeWidth={2}   dot={false} activeDot={{ r: 3 }} />
           <Line dataKey="demand" name="Demand" stroke={t.demand} strokeWidth={2.5} dot={false} activeDot={{ r: 4 }} />
           <Line dataKey="emx"    name="EMX"    stroke={t.emx}    strokeWidth={2}   dot={false} activeDot={{ r: 3 }} />
 
-          <Line dataKey="proxyEmx" name="EMX (D-1 est.)" stroke={t.emx} strokeWidth={1.5}
-            strokeDasharray="3 5" strokeOpacity={0.45} dot={false} activeDot={{ r: 2 }} connectNulls={false} />
-          <Line dataKey="proxyEol" name="EOL (D-1 est.)" stroke={t.eol} strokeWidth={1.5}
-            strokeDasharray="3 5" strokeOpacity={0.45} dot={false} activeDot={{ r: 2 }} connectNulls={false} />
-
           {activeDrafts.map(draft => (
-            <>
-              <Line key={`${draft.id}_emi`} dataKey={`draft_${draft.id}_emi`} name={`${draft.name} EMI`}
+            <Fragment key={draft.id}>
+              <Line dataKey={`draft_${draft.id}_emi`} name={`${draft.name} EMI`}
                 stroke={draft.color} strokeWidth={1} strokeDasharray="4 4" strokeOpacity={0.55} dot={false} activeDot={{ r: 2 }} />
-              <Line key={`${draft.id}_eol`} dataKey={`draft_${draft.id}_eol`} name={`${draft.name} EOL`}
+              <Line dataKey={`draft_${draft.id}_eol`} name={`${draft.name} EOL`}
                 stroke={draft.color} strokeWidth={1.5} strokeDasharray="6 3" strokeOpacity={0.75} dot={false} activeDot={{ r: 3 }} />
-              <Line key={`${draft.id}_emx`} dataKey={`draft_${draft.id}_emx`} name={`${draft.name} EMX`}
+              <Line dataKey={`draft_${draft.id}_emx`} name={`${draft.name} EMX`}
                 stroke={draft.color} strokeWidth={2} strokeDasharray="6 3" dot={false} activeDot={{ r: 3 }} />
-            </>
+            </Fragment>
           ))}
         </ComposedChart>
       </ResponsiveContainer>

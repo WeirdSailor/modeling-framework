@@ -133,14 +133,14 @@ Fetched across 12×7-day windows (84 days / ~3 months) to capture units with inf
 
 | File | Role |
 |------|------|
-| `src/app/page.tsx` | Top-level: data loading, layout, tab switching, derived data, confirm modals, sharing actions |
-| `src/components/DraftSidebar.tsx` | Identity picker ("You are: [NSE ▼]"), window time + Refresh, draft list filtered to current user, "Shared with me" collapsible section |
+| `src/app/page.tsx` | Top-level: data loading, layout, tab switching, derived data, confirm modals, sharing actions; owns `hiddenDraftIds` state for chart draft visibility |
+| `src/components/DraftSidebar.tsx` | Identity picker ("You are: [NSE ▼]"), window time + Refresh, draft list filtered to current user, "Shared with me" collapsible section; coloured circle visibility toggle per active draft |
 | `src/components/DraftDetails.tsx` | Draft header: name, state badge, meta row (window/duration/units/cost), share controls (owner) or "Shared by X" badge (recipient), From/To SP pickers, action buttons |
 | `src/components/AvailableTable.tsx` | Available units table: search/filter/sort, GSP group filter popover, checkbox or click selection, type + service chips |
 | `src/components/SelectedTable.tsx` | Selected units in active draft: Σ PN / Σ MEL / Est. value totals, notes input, remove button, service chip |
 | `src/components/CommittedTab.tsx` | Committed-tab view: cost breakdown cards (Total + per-reason), click-to-filter table, change-indicator arrows (↑/↓), service chip, bulk remove |
 | `src/components/RedeclareTab.tsx` | Redeclare-tab view: editable data columns for committed units (simulates redeclarations); amber row highlight on override; Reset per-row and Reset all; Service (SR/QR) assign select |
-| `src/components/MarginChart.tsx` | Recharts chart: confirmed baseline + draft overlays + D-1 proxy + gate-closure frontier; dark-mode aware via MutationObserver |
+| `src/components/MarginChart.tsx` | Recharts chart: solid EMX/EOL/EMI baseline for all SPs + partial draft overlays (dotted only where draft has actions) + gate-closure frontier + midnight marker; draft visibility controlled via `hiddenDraftIds` prop; dark-mode aware via MutationObserver |
 | `src/components/ConfigPanel.tsx` | Floating config panel (3 tabs): **tweaks** (theme/layout/sidebar/selection), **scenarios** (ranking criteria), **data** (Real-time/Historical mode switch, date picker, start-time select, Load button) |
 | `src/components/ConfirmModal.tsx` | Dark-mode-aware confirm dialog (replaces native browser confirm) |
 | `src/models/types.ts` | All interfaces; `USERS`, `UserId`, `ServiceType`, `UnitSnapshot` |
@@ -164,6 +164,8 @@ Fetched across 12×7-day windows (84 days / ~3 months) to capture units with inf
 - **`dataSnapshot` is set at commit time** — `commitDraft` in the store reads `state.units` and `state.dataOverrides` to build the snapshot. If you add new tracked fields to `UnitSnapshot`, update both `commitDraft` and `ChangeArrow`'s render logic.
 - **`dataOverrides` is separate from `unitServices`** — overrides are numeric value redeclarations for change-tracking; services are categorical assignments. Do not merge them.
 - **`gspFilter` in `AvailableTable` is local component state** — intentionally not in Zustand. Do not lift it to the store or pass it as a prop. The `visible` memo depends on it; `gspFilter` must remain in its dependency array.
+- **`hiddenDraftIds` in `page.tsx` is local state** — intentionally not in Zustand. It is purely a chart UI concern. Passed as a prop to `MarginChart` and (with `onToggleChartVisibility`) to `DraftSidebar`. Do not lift to the store.
+- **Draft overlay partial rendering** — `MarginChart` only draws the dotted draft line for SPs where `draft.actions.some(a => a.fromPeriod <= slotIdx && a.toPeriod >= slotIdx)`. Adjacent SPs (one either side of the affected range) are included as bridge points at the baseline value so the line connects cleanly. Do not revert to rendering the full 48-SP dotted line.
 
 ---
 
@@ -300,6 +302,32 @@ Zone list comes from `GSP_AREAS` in `src/config/scenarios.ts` (14 entries, same 
 - Displayed as a colour chip in the **Service** column (second column, after BMU) on Available, Selected, Committed, and Redeclare tabs.
 - SR = blue chip; QR = purple chip (light + dark mode variants in `globals.css`).
 - `setUnitService(bmUnitId, service | undefined)` — pass `undefined` to clear.
+
+---
+
+## MarginChart — Line Rendering Rules
+
+### Baseline lines (EMX / EOL / EMI)
+All three are drawn as **solid** lines for every SP in the 48-slot window, regardless of `hasConfirmedPn`. In real-time mode, unconfirmed SPs carry D-1 proxy values in `sp.emx/eol/emi` (computed by `refreshAggregates` from the backfilled `sp.pn`). In historical mode all SPs are confirmed. The old behaviour of hiding EMX/EOL/EMI for unconfirmed SPs and showing separate dotted `proxyEmx`/`proxyEol` lines has been removed.
+
+### Draft overlay lines
+Dotted lines per active draft, but **only drawn for SPs covered by the draft's actions**. Logic in `chartData` construction:
+```ts
+const spCovered = (slotIdx) => draft.actions.some(a => a.fromPeriod <= slotIdx && a.toPeriod >= slotIdx)
+```
+- Covered SP → overlay value (dotted, diverges from baseline)
+- Adjacent SP (bridge point) → baseline value (so the line branches off/returns to the solid cleanly)
+- All other SPs → `null` (Recharts skips, solid baseline visible)
+
+### Draft chart visibility toggle
+`hiddenDraftIds: Set<string>` lives in `page.tsx` (local state, not Zustand). Toggled via the small coloured circle button on each `status === 'draft'` item in `DraftSidebar`. Passed as a prop to `MarginChart`, which filters `activeDrafts` with it:
+```ts
+const activeDrafts = drafts.filter(d => d.status === 'draft' && !hiddenDraftIds.has(d.id))
+```
+
+### Reference markers
+- **Gate closure** — amber `ReferenceLine` + shaded `ReferenceArea` for unconfirmed SPs; only shown in real-time mode (hidden when all SPs have `hasConfirmedPn`).
+- **Midnight** — grey `ReferenceLine` where the settlement date rolls over; label `← midnight` rendered `insideTopLeft` to avoid clipping.
 
 ---
 
