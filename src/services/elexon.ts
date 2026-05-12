@@ -2,6 +2,7 @@ import type { BMUnit, SettlementPeriodData } from '@/models/types'
 import { spToStartTime, dateToSp, dateToSettlementDate } from '@/utils/settlements'
 import { computeAggregates } from '@/utils/margin'
 import { FETCH_EXCLUDED_FUEL_TYPES } from '@/utils/fuelTypes'
+import { loadStandingDataCache } from '@/services/standingDataSync'
 
 // ---------------------------------------------------------------------------
 // Raw API response shapes
@@ -264,13 +265,14 @@ const MOCK_PN = buildMockPN(MOCK_BM_UNITS)
 
 export async function fetchBmUnits(): Promise<BMUnit[]> {
   // Parallel fetches — dynamic params fan out across 5 × 7-day windows each
-  const [refRaw, selEntries, silEntries, ndzEntries, mnztEntries, mztEntries] = await Promise.all([
+  const [refRaw, selEntries, silEntries, ndzEntries, mnztEntries, mztEntries, firestoreCache] = await Promise.all([
     safeFetch<RawBmUnitRef[] | null>('/api/elexon/reference/bmunits/all', null),
     fetchDynParam('datasets/SEL'),
     fetchDynParam('datasets/SIL'),
     fetchDynParam('datasets/NDZ'),
     fetchDynParam('datasets/MNZT'),
     fetchDynParam('datasets/MZT'),
+    loadStandingDataCache().catch(() => new Map()),
   ])
 
   // If reference data failed entirely, fall back to mock
@@ -309,19 +311,21 @@ export async function fetchBmUnits(): Promise<BMUnit[]> {
     const mnztEntry = mnztMap.get(bmUnitId) ?? mnztMap.get(raw.nationalGridBmUnit)
     const mztEntry = mztMap.get(bmUnitId) ?? mztMap.get(raw.nationalGridBmUnit)
 
+    const cached = firestoreCache.get(bmUnitId) ?? firestoreCache.get(raw.nationalGridBmUnit)
+
     units.push({
       bmUnitId,
       nationalGridBmUnit: raw.nationalGridBmUnit,
       fuelType: raw.fuelType,
       registeredCapacity: Math.round(cap),
       gspGroup: raw.gspGroupId,
-      sel: selEntry?.level !== undefined ? selEntry.level : undefined,
-      sil: silEntry?.level !== undefined ? silEntry.level : undefined,
-      // NDZ: API returns minutes directly
-      ndz: ndzEntry?.notice !== undefined ? ndzEntry.notice : undefined,
-      mnzt: mnztEntry?.periodMin !== undefined ? mnztEntry.periodMin : undefined,
-      mzt: mztEntry?.periodMin !== undefined ? mztEntry.periodMin : undefined,
-      ...fakePriceTiers(selEntry?.level !== undefined),
+      // Live fetch wins; Firestore fills gaps for units inactive in the last 84 days
+      sel:  selEntry?.level      !== undefined ? selEntry.level      : cached?.sel,
+      sil:  silEntry?.level      !== undefined ? silEntry.level      : undefined,
+      ndz:  ndzEntry?.notice     !== undefined ? ndzEntry.notice     : cached?.ndz,
+      mnzt: mnztEntry?.periodMin !== undefined ? mnztEntry.periodMin : cached?.mnzt,
+      mzt:  mztEntry?.periodMin  !== undefined ? mztEntry.periodMin  : cached?.mzt,
+      ...fakePriceTiers(selEntry?.level !== undefined || cached?.sel !== undefined),
     })
   }
 
