@@ -36,6 +36,9 @@ yarn-error.log*
 # Firebase service account key — never commit
 serviceAccountKey.json
 
+# Git worktrees
+.worktrees/
+
 # vercel
 .vercel
 
