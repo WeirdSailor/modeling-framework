@@ -23,7 +23,7 @@ interface RawBmUnitRef {
 interface RawDynParam {
   bmUnit: string
   level?: number    // SEL / SIL
-  notice?: number   // NDZ — seconds
+  notice?: number   // NDZ — minutes (API returns minutes directly)
   periodMin?: number // MNZT / MZT — minutes
   time?: string
   settlementDate?: string

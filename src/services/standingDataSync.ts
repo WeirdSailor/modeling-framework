@@ -104,7 +104,7 @@ function buildWeeklyWindows(start: Date, end: Date): Array<{ from: string; to: s
   const cursor = new Date(start)
   while (cursor < end) {
     const from = cursor.toISOString()
-    cursor.setDate(cursor.getDate() + 7)
+    cursor.setUTCDate(cursor.getUTCDate() + 7)
     const to = cursor < end ? cursor.toISOString() : end.toISOString()
     windows.push({ from, to })
   }
@@ -210,7 +210,6 @@ export async function runBackfill(
     }
 
     earliestDate = yearStart.toISOString().split('T')[0]
-    await updateSyncMetadata({ lastSyncedTo: now.toISOString().split('T')[0] })
 
     // Stop if no new data was found — nothing further back will help
     if (modified.size === 0) break
@@ -232,7 +231,7 @@ export async function runIncrementalSync(): Promise<void> {
   if (!metadata.lastSyncedTo) return
 
   const from = new Date(metadata.lastSyncedTo)
-  from.setDate(from.getDate() + 1)
+  from.setUTCDate(from.getUTCDate() + 1)
   const to = new Date()
   if (from >= to) return
 
