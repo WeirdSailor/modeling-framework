@@ -33,7 +33,7 @@ export function computeAggregates(
   // the reference units list)
   for (const [bmUnit, pn] of Object.entries(sp.pn)) {
     if (pn > 1) {
-      emx += sp.mel[bmUnit] ?? 0
+      emx += sp.mel[bmUnit] ?? pn
       eol += pn
       const sel = selMap.get(bmUnit)
       emi += sel !== undefined ? sel : (sp.mil[bmUnit] ?? 0)

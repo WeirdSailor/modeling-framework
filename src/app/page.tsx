@@ -16,8 +16,9 @@ import ConfigPanel, { type TweakState } from '@/components/ConfigPanel'
 import ConfirmModal from '@/components/ConfirmModal'
 import CommittedTab from '@/components/CommittedTab'
 import RedeclareTab from '@/components/RedeclareTab'
+import GraphTab from '@/components/GraphTab'
 
-type Tab = 'workspace' | 'chart' | 'committed' | 'redeclare'
+type Tab = 'workspace' | 'chart' | 'committed' | 'redeclare' | 'graph'
 
 interface ConfirmState {
   message: string
@@ -35,6 +36,7 @@ export default function Home() {
     layout: 'three-col',
     showSidebar: true,
     selectionPattern: 'buttons',
+    reservePct: 10,
   })
   const setTweak = useCallback(<K extends keyof TweakState>(key: K, value: TweakState[K]) => {
     setTweaksState(prev => ({ ...prev, [key]: value }))
@@ -381,6 +383,12 @@ const activeDraftUnitIds = useMemo(
             Chart
           </button>
           <button
+            className={`tab-btn${activeTab === 'graph' ? ' active' : ''}`}
+            onClick={() => setActiveTab('graph')}
+          >
+            BMU Summary
+          </button>
+          <button
             className={`tab-btn${activeTab === 'committed' ? ' active' : ''}`}
             onClick={() => setActiveTab('committed')}
           >
@@ -492,7 +500,7 @@ const activeDraftUnitIds = useMemo(
             {isLoading && (
               <div className="loading-banner">Loading data…</div>
             )}
-            <MarginChart hiddenDraftIds={hiddenDraftIds} />
+            <MarginChart hiddenDraftIds={hiddenDraftIds} reservePct={tweaks.reservePct} />
           </div>
         )}
 
@@ -520,6 +528,16 @@ const activeDraftUnitIds = useMemo(
             onClearOverride={clearDataOverride}
             onClearAll={clearAllDataOverrides}
             onSetService={setUnitService}
+          />
+        )}
+
+        {/* Graph tab */}
+        {activeTab === 'graph' && (
+          <GraphTab
+            settlementPeriods={settlementPeriods}
+            units={units}
+            drafts={drafts}
+            unitServices={unitServices}
           />
         )}
 

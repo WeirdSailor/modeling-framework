@@ -384,6 +384,36 @@ export async function fetchDemandForecast(settlementDate: string): Promise<Map<n
 }
 
 // ---------------------------------------------------------------------------
+// Public API: fetchDemandOutturn — actual metered demand (INDO), used for historical mode
+// ---------------------------------------------------------------------------
+
+export async function fetchDemandOutturn(settlementDate: string): Promise<Map<number, number>> {
+  const { from, to } = dayRange(settlementDate)
+  const url = `/api/elexon/datasets/INDO?from=${from}&to=${to}`
+
+  const raw = await safeFetch<{ data?: RawDemandEntry[] } | null>(url, null)
+
+  if (!raw?.data || raw.data.length === 0) {
+    console.warn('[elexon] Demand outturn unavailable — using mock data')
+    return MOCK_DEMAND
+  }
+
+  const map = new Map<number, number>()
+  for (const entry of raw.data) {
+    if (entry.settlementDate === settlementDate) {
+      map.set(entry.settlementPeriod, entry.quantity)
+    }
+  }
+
+  if (map.size === 0) {
+    console.warn('[elexon] Demand outturn had no entries for date — using mock data')
+    return MOCK_DEMAND
+  }
+
+  return map
+}
+
+// ---------------------------------------------------------------------------
 // Public API: fetchPN
 // ---------------------------------------------------------------------------
 
@@ -673,8 +703,8 @@ export async function fetchHistoricalData(
   ] = await Promise.all([
     Promise.all([
       fetchBmUnits(),
-      fetchDemandForecast(startDate),
-      fetchDemandForecast(nextDate),
+      fetchDemandOutturn(startDate),
+      fetchDemandOutturn(nextDate),
       fetchMELS(startDate),
       fetchMELS(nextDate),
       fetchMILS(startDate),

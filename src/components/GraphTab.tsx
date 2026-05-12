@@ -1,0 +1,244 @@
+'use client'
+
+import { useMemo, useState, useCallback } from 'react'
+import type { BMUnit, DraftPlan, ServiceType, SettlementPeriodData } from '@/models/types'
+
+interface Props {
+  settlementPeriods: SettlementPeriodData[]
+  units: BMUnit[]
+  drafts: DraftPlan[]
+  unitServices: Record<string, ServiceType>
+}
+
+type SortKey = 'bmu' | 'fuelType' | 'pn' | 'mel' | 'sel' | 'ndz' | 'mnzt' | 'mzt' | 'priceToSel' | 'priceToMel' | 'source'
+
+interface GraphRow {
+  bmUnitId: string
+  nationalGridBmUnit: string
+  gspGroup: string
+  fuelType: string | null   // null = unit outside the reference list
+  pn: number                // max PN across all SPs
+  mel: number | null
+  sel: number | null
+  ndz: number | null
+  mnzt: number | null
+  mzt: number | null
+  priceToSel: number | null
+  priceToMel: number | null
+  source: 'pn' | 'committed' | 'both'
+}
+
+const FUEL_CHIPS: Record<string, { label: string; chipClass: string }> = {
+  CCGT:    { label: 'CCGT',    chipClass: 'chip-ccgt' },
+  COAL:    { label: 'Coal',    chipClass: 'chip-coal' },
+  NUCLEAR: { label: 'Nuclear', chipClass: 'chip-nuclear' },
+  BIOMASS: { label: 'Biomass', chipClass: 'chip-biomass' },
+  PS:      { label: 'Pumped',  chipClass: 'chip-pumped' },
+  NPSHYD:  { label: 'Hydro',   chipClass: 'chip-hydro' },
+  OCGT:    { label: 'OCGT',    chipClass: 'chip-ocgt' },
+  GAS:     { label: 'Gas',     chipClass: 'chip-ccgt' },
+  OIL:     { label: 'Oil',     chipClass: 'chip-coal' },
+  WIND:    { label: 'Wind',    chipClass: 'chip-wind' },
+}
+
+function TypeChip({ fuelType }: { fuelType: string | null }) {
+  if (!fuelType) return <span style={{ color: 'var(--text-faint)', fontSize: 11 }}>—</span>
+  const { label, chipClass } = FUEL_CHIPS[fuelType] ?? { label: fuelType, chipClass: '' }
+  return <span className={`chip ${chipClass}`}>{label}</span>
+}
+
+function ServiceChip({ service }: { service: ServiceType | undefined }) {
+  if (!service) return <span style={{ color: 'var(--text-faint)', fontSize: 11 }}>—</span>
+  return <span className={`chip chip-${service.toLowerCase()}`}>{service}</span>
+}
+
+function SourceBadge({ source }: { source: GraphRow['source'] }) {
+  return (
+    <span style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+      {(source === 'pn' || source === 'both') && (
+        <span className="badge-state-committed" style={{ fontSize: 10, padding: '1px 5px', borderRadius: 4, fontWeight: 600, whiteSpace: 'nowrap' }}>PN</span>
+      )}
+      {(source === 'committed' || source === 'both') && (
+        <span className="chip chip-sr" style={{ fontSize: 10, padding: '1px 5px', whiteSpace: 'nowrap' }}>User</span>
+      )}
+    </span>
+  )
+}
+
+function SortTh({ col, sort, onSort, children, numeric }: {
+  col: SortKey
+  sort: { key: SortKey; dir: 'asc' | 'desc' }
+  onSort: (k: SortKey) => void
+  children: React.ReactNode
+  numeric?: boolean
+}) {
+  const active = sort.key === col
+  return (
+    <th
+      className={[numeric ? 'num' : '', 'sortable', active ? 'col-active' : ''].filter(Boolean).join(' ')}
+      onClick={() => onSort(col)}
+    >
+      <span className="th-inner">
+        {children}
+        <span className="sort-caret">{active ? (sort.dir === 'asc' ? '▲' : '▼') : '↕'}</span>
+      </span>
+    </th>
+  )
+}
+
+export default function GraphTab({ settlementPeriods, units, drafts, unitServices }: Props) {
+  const [sort, setSort] = useState<{ key: SortKey; dir: 'asc' | 'desc' }>({ key: 'pn', dir: 'desc' })
+
+  const toggleSort = useCallback((key: SortKey) => {
+    setSort(s => ({ key, dir: s.key === key && s.dir === 'asc' ? 'desc' : 'asc' }))
+  }, [])
+
+  const unitById = useMemo(() => new Map(units.map(u => [u.bmUnitId, u])), [units])
+
+  // Max PN across all SPs for every bmUnit in sp.pn — includes units outside the reference list
+  const allPnByBmUnit = useMemo<Record<string, number>>(() => {
+    const out: Record<string, number> = {}
+    for (const sp of settlementPeriods) {
+      for (const [bmUnit, pn] of Object.entries(sp.pn)) {
+        if (pn > (out[bmUnit] ?? 0)) out[bmUnit] = pn
+      }
+    }
+    return out
+  }, [settlementPeriods])
+
+  const rows = useMemo<GraphRow[]>(() => {
+    const map = new Map<string, GraphRow>()
+
+    // All units with PN > 1 in any SP
+    for (const [bmUnit, maxPn] of Object.entries(allPnByBmUnit)) {
+      if (maxPn <= 1) continue
+      const unit = unitById.get(bmUnit)
+      map.set(bmUnit, {
+        bmUnitId: bmUnit,
+        nationalGridBmUnit: unit?.nationalGridBmUnit ?? bmUnit,
+        gspGroup: unit?.gspGroup ?? '—',
+        fuelType: unit?.fuelType ?? null,
+        pn: maxPn,
+        mel: unit?.registeredCapacity ?? null,
+        sel: unit?.sel ?? null,
+        ndz: unit?.ndz ?? null,
+        mnzt: unit?.mnzt ?? null,
+        mzt: unit?.mzt ?? null,
+        priceToSel: unit?.priceToSel ?? null,
+        priceToMel: unit?.priceToMel ?? null,
+        source: 'pn',
+      })
+    }
+
+    // Overlay committed draft units — tag existing rows as 'both', add new rows as 'committed'
+    for (const draft of drafts) {
+      if (draft.status !== 'committed') continue
+      for (const action of draft.actions) {
+        const existing = map.get(action.bmUnitId)
+        if (existing) {
+          existing.source = 'both'
+        } else {
+          const unit = unitById.get(action.bmUnitId)
+          map.set(action.bmUnitId, {
+            bmUnitId: action.bmUnitId,
+            nationalGridBmUnit: unit?.nationalGridBmUnit ?? action.bmUnitId,
+            gspGroup: unit?.gspGroup ?? '—',
+            fuelType: unit?.fuelType ?? null,
+            pn: allPnByBmUnit[action.bmUnitId] ?? 0,
+            mel: unit?.registeredCapacity ?? null,
+            sel: unit?.sel ?? null,
+            ndz: unit?.ndz ?? null,
+            mnzt: unit?.mnzt ?? null,
+            mzt: unit?.mzt ?? null,
+            priceToSel: unit?.priceToSel ?? null,
+            priceToMel: unit?.priceToMel ?? null,
+            source: 'committed',
+          })
+        }
+      }
+    }
+
+    return Array.from(map.values())
+  }, [allPnByBmUnit, unitById, drafts])
+
+  const sorted = useMemo(() => {
+    return [...rows].sort((a, b) => {
+      let cmp = 0
+      switch (sort.key) {
+        case 'bmu':        cmp = a.nationalGridBmUnit.localeCompare(b.nationalGridBmUnit); break
+        case 'fuelType':   cmp = (a.fuelType ?? '').localeCompare(b.fuelType ?? ''); break
+        case 'pn':         cmp = a.pn - b.pn; break
+        case 'mel':        cmp = (a.mel ?? -1) - (b.mel ?? -1); break
+        case 'sel':        cmp = (a.sel ?? -1) - (b.sel ?? -1); break
+        case 'ndz':        cmp = (a.ndz ?? -1) - (b.ndz ?? -1); break
+        case 'mnzt':       cmp = (a.mnzt ?? -1) - (b.mnzt ?? -1); break
+        case 'mzt':        cmp = (a.mzt ?? -1) - (b.mzt ?? -1); break
+        case 'priceToSel': cmp = (a.priceToSel ?? -1) - (b.priceToSel ?? -1); break
+        case 'priceToMel': cmp = (a.priceToMel ?? -1) - (b.priceToMel ?? -1); break
+        case 'source':     cmp = a.source.localeCompare(b.source); break
+      }
+      return sort.dir === 'asc' ? cmp : -cmp
+    })
+  }, [rows, sort])
+
+  const pnCount = rows.filter(r => r.source !== 'committed').length
+  const userCount = rows.filter(r => r.source !== 'pn').length
+
+  return (
+    <div className="panel">
+      <header className="panel-head">
+        <div className="panel-title">
+          <h2>BMU Summary</h2>
+          <span className="panel-subtitle">{pnCount} dispatched · {userCount} committed by user</span>
+        </div>
+      </header>
+
+      <div className="table-scroll">
+        <table className="data-table">
+          <thead>
+            <tr>
+              <SortTh col="bmu"        sort={sort} onSort={toggleSort}>BMU</SortTh>
+              <SortTh col="fuelType"   sort={sort} onSort={toggleSort}>Type</SortTh>
+              <th>Service</th>
+              <SortTh col="ndz"        sort={sort} onSort={toggleSort} numeric>NDZ</SortTh>
+              <SortTh col="mzt"        sort={sort} onSort={toggleSort} numeric>MZT</SortTh>
+              <SortTh col="mnzt"       sort={sort} onSort={toggleSort} numeric>MNZT</SortTh>
+              <SortTh col="pn"         sort={sort} onSort={toggleSort} numeric>PN</SortTh>
+              <SortTh col="sel"        sort={sort} onSort={toggleSort} numeric>SEL</SortTh>
+              <SortTh col="mel"        sort={sort} onSort={toggleSort} numeric>MEL</SortTh>
+              <SortTh col="priceToSel" sort={sort} onSort={toggleSort} numeric>£ SEL</SortTh>
+              <SortTh col="priceToMel" sort={sort} onSort={toggleSort} numeric>£ MEL</SortTh>
+              <SortTh col="source"     sort={sort} onSort={toggleSort}>Source</SortTh>
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.length === 0 && (
+              <tr><td colSpan={12} className="empty">No units contributing to the graph.</td></tr>
+            )}
+            {sorted.map(row => (
+              <tr key={row.bmUnitId}>
+                <td className="mono">
+                  <div className="bmu-cell-inner">
+                    <span>{row.nationalGridBmUnit}</span>
+                    <span className="site-sub">{row.gspGroup}</span>
+                  </div>
+                </td>
+                <td><TypeChip fuelType={row.fuelType} /></td>
+                <td><ServiceChip service={unitServices[row.bmUnitId]} /></td>
+                <td className="mono num">{row.ndz  != null && row.ndz  > 0 ? row.ndz  : '—'}</td>
+                <td className="mono num">{row.mzt  != null && row.mzt  > 0 ? row.mzt  : '—'}</td>
+                <td className="mono num">{row.mnzt != null && row.mnzt > 0 ? row.mnzt : '—'}</td>
+                <td className="mono num">{row.pn > 0 ? row.pn.toFixed(0) : '—'}</td>
+                <td className="mono num">{row.sel  != null && row.sel  > 0 ? row.sel.toFixed(0)  : '—'}</td>
+                <td className="mono num">{row.mel  != null ? row.mel.toFixed(0) : '—'}</td>
+                <td className="mono num">{row.priceToSel != null && row.priceToSel > 0 ? `£${row.priceToSel}` : '—'}</td>
+                <td className="mono num">{row.priceToMel != null && row.priceToMel > 0 ? `£${row.priceToMel}` : '—'}</td>
+                <td><SourceBadge source={row.source} /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}

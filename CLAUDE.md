@@ -73,6 +73,7 @@ The sidebar **Refresh** button always calls `loadData` (real-time) regardless of
 - `hasConfirmedPn = true` for all 48 slots (all historical SPs have real data)
 - `proxyEmx = 0`, `proxyEol = 0` — D-1 proxy is not needed
 - No `yesterdayPN` fetch
+- Uses `fetchDemandOutturn` (INDO actual metered demand) instead of `fetchDemandForecast` — historical mode shows real demand outturn, not the day-ahead forecast
 
 ### Draft Plans System
 
@@ -100,6 +101,8 @@ Seven fixed operator identities: `ANSE | NSE | OSM | OEM | NBE | TSM | TSE` — 
 ### Margin Calculation (`src/utils/margin.ts`)
 
 `computeAggregates(sp, actions, units)` iterates **`sp.pn` directly** (not through the `units` array) for the baseline. This is critical — it means all PN-holding units contribute to EMX/EOL/EMI, including wind/solar/interconnectors that are not in the filtered unit reference list.
+
+For units that appear in `sp.pn` but have no entry in `sp.mel` (e.g., units dropped by the decommissioned filter that are still generating, or interconnectors), the MEL falls back to `pn` — i.e., `sp.mel[bmUnit] ?? pn`. This ensures EMX ≥ EOL always holds. Using `0` as fallback would cause EMX < EOL for any such unit.
 
 `applyDraftToBaseline(sp, baseEmx, baseEol, baseEmi, draftActions, alreadyModelled, units)` computes draft overlay efficiently without recomputing the baseline.
 
@@ -144,12 +147,13 @@ These values are also persisted in a **localStorage cache** (see Standing Data C
 | `src/components/SelectedTable.tsx` | Selected units in active draft: Σ PN / Σ MEL / Est. value totals, notes input, remove button, service chip |
 | `src/components/CommittedTab.tsx` | Committed-tab view: cost breakdown cards (Total + per-reason), click-to-filter table, change-indicator arrows (↑/↓), service chip, bulk remove |
 | `src/components/RedeclareTab.tsx` | Redeclare-tab view: editable data columns for committed units (simulates redeclarations); amber row highlight on override; Reset per-row and Reset all; Service (SR/QR) assign select |
-| `src/components/MarginChart.tsx` | Recharts chart: solid EMX/EOL/EMI baseline for all SPs + partial draft overlays (dotted only where draft has actions) + gate-closure frontier + midnight marker; draft visibility controlled via `hiddenDraftIds` prop; dark-mode aware via MutationObserver |
-| `src/components/ConfigPanel.tsx` | Floating config panel (4 tabs): **tweaks** (theme/layout/sidebar/selection), **scenarios** (ranking criteria), **data** (Real-time/Historical mode switch, date picker, start-time select, Load button), **standing data** (backfill + sync controls) |
+| `src/components/MarginChart.tsx` | Recharts chart: solid EMX/EOL/EMI baseline for all SPs + solid orange TR2 line (demand × reserve multiplier) + partial draft overlays (dotted only where draft has actions) + gate-closure frontier + midnight marker; draft visibility controlled via `hiddenDraftIds` prop; `reservePct` prop (default 10) controls TR2; dark-mode aware via MutationObserver |
+| `src/components/ConfigPanel.tsx` | Floating config panel (4 tabs): **tweaks** (theme/layout/sidebar/selection/TR2 reserve %), **scenarios** (ranking criteria), **data** (Real-time/Historical mode switch, date picker, start-time select, Load button), **standing data** (backfill + sync controls) |
+| `src/components/GraphTab.tsx` | BMU Summary tab: read-only table of all units contributing to the margin chart — units with PN > 1 in any SP (including those outside the reference list) plus committed-draft units; Source badge differentiates "PN" (green) vs "User" (blue) vs "Both"; columns match AvailableTable with PN inserted before SEL; sorted by PN descending |
 | `src/components/StandingDataTab.tsx` | Standing data tab UI: shows coverage (NDZ/MZT/MNZT/SEL per unit count), runs one-time backfill, shows per-batch progress, Sync Recent button after backfill completes |
 | `src/components/ConfirmModal.tsx` | Dark-mode-aware confirm dialog (replaces native browser confirm) |
 | `src/models/types.ts` | All interfaces; `USERS`, `UserId`, `ServiceType`, `UnitSnapshot` |
-| `src/services/elexon.ts` | All fetch logic + mock fallback; auto-runs incremental standing data sync at start of `fetchBmUnits` when cache is stale |
+| `src/services/elexon.ts` | All fetch logic + mock fallback; auto-runs incremental standing data sync at start of `fetchBmUnits` when cache is stale; `fetchDemandOutturn` fetches INDO actual demand (used by `fetchHistoricalData` in place of the day-ahead forecast) |
 | `src/services/standingDataSync.ts` | localStorage-based standing data cache: backfill, incremental sync, coverage computation; keys `so:standing_data` and `so:sync_metadata` |
 | `src/store/useModellingStore.ts` | Zustand store |
 | `src/utils/margin.ts` | `computeAggregates`, `applyDraftToBaseline`, `isUnitPnCommitted` |
@@ -172,11 +176,14 @@ These values are also persisted in a **localStorage cache** (see Standing Data C
 - **`ownerId` on every draft** — `createDraft` and `duplicateDraft` both set `ownerId: state.currentUser`. Any new draft-creation path must do the same. Drafts without `ownerId` will be invisible to all users in the sidebar.
 - **`dataSnapshot` is set at commit time** — `commitDraft` in the store reads `state.units` and `state.dataOverrides` to build the snapshot. If you add new tracked fields to `UnitSnapshot`, update both `commitDraft` and `ChangeArrow`'s render logic.
 - **`dataOverrides` is separate from `unitServices`** — overrides are numeric value redeclarations for change-tracking; services are categorical assignments. Do not merge them.
+- **`TweakState.reservePct`** — lives in local state in `page.tsx`, not in Zustand. Passed as a prop to `MarginChart`. Default 10. Clamped to 0–50 in the Config input. Do not lift to the store.
 - **`gspFilter` and `scenario` are props in `AvailableTable`** — lifted to `page.tsx` state so `DraftDetails` can also control them (Scenario and GSP buttons live in the DraftDetails time-pickers row). Do not move them back to local state in `AvailableTable`.
 - **`hiddenDraftIds` in `page.tsx` is local state** — intentionally not in Zustand. It is purely a chart UI concern. Passed as a prop to `MarginChart` and (with `onToggleChartVisibility`) to `DraftSidebar`. Do not lift to the store.
 - **`sidebarOpen` in `page.tsx` is local state** — controls the CSS `sidebar-collapsed` class on the app grid, which transitions `grid-template-columns` from `215px 1fr` to `36px 1fr`. Do not lift to the store.
 - **`AvailableTable` has no toolbar** — search, type filter, and the scenario/GSP buttons were removed. The only filtering controls are Scenario and GSP in `DraftDetails`. Do not re-add a toolbar to `AvailableTable`.
 - **Draft overlay partial rendering** — `MarginChart` only draws the dotted draft line for SPs where `draft.actions.some(a => a.fromPeriod <= slotIdx && a.toPeriod >= slotIdx)`. Adjacent SPs (one either side of the affected range) are included as bridge points at the baseline value so the line connects cleanly. Do not revert to rendering the full 48-SP dotted line.
+- **Margin = EMX − TR2, not EMX − demand** — the chart recomputes margin in `chartData` as `sp.emx − sp.demand × (1 + reservePct/100)`. The store's `sp.margin` field (which is `emx − demand`) is intentionally ignored by the chart. Draft overlay margins in the tooltip also use TR2 as the reference. Do not change the chart to use `sp.margin` or `raw.demand` as the margin baseline.
+- **`sp.mel[bmUnit] ?? pn` in `computeAggregates`** — the MEL fallback is `pn`, not `0`. Using `0` causes EMX < EOL for any unit in `sp.pn` that is absent from the `units` array (e.g., units dropped by the decommissioned filter). Do not revert to `?? 0`.
 
 ---
 
@@ -329,6 +336,9 @@ Zone list: `GSP_AREAS` in `src/config/scenarios.ts` (14 entries). Zone membershi
 ### Baseline lines (EMX / EOL / EMI)
 All three are drawn as **solid** lines for every SP in the 48-slot window, regardless of `hasConfirmedPn`. In real-time mode, unconfirmed SPs carry D-1 proxy values in `sp.emx/eol/emi` (computed by `refreshAggregates` from the backfilled `sp.pn`). In historical mode all SPs are confirmed. The old behaviour of hiding EMX/EOL/EMI for unconfirmed SPs and showing separate dotted `proxyEmx`/`proxyEol` lines has been removed.
 
+### TR2 line and margin definition
+A solid orange **TR2** line is drawn at `demand × (1 + reservePct / 100)` for every SP. `reservePct` is configurable in Config → Tweaks (default 10). **Margin is `EMX − TR2`**, not `EMX − demand`. The green/red surplus/deficit shaded areas and all draft overlay margin figures use the same TR2-based definition. The raw `sp.margin` from the store (which is `emx − demand`) is **not used** by the chart — margin is recomputed in `chartData` construction.
+
 ### Draft overlay lines
 Dotted lines per active draft, but **only drawn for SPs covered by the draft's actions**. Logic in `chartData` construction:
 ```ts
@@ -384,6 +394,7 @@ Units where all four of `sel`, `ndz`, `mnzt`, `mzt` are still `undefined` after 
 - **NDZ/MZT/MNZT blank — root cause found and fixed** — Two bugs: (1) `notice` field in the NDZ endpoint is in **minutes** not seconds; the code was dividing by 60 again, collapsing most values to 0. (2) Standing data is change-only — units only submit new entries when parameters change. CNQPS-2 last submitted NDZ 8–9 weeks ago, outside the old 35-day window. Both fixed: division removed, lookback extended to 84 days. The localStorage backfill now covers up to 6 years, so even infrequently-updated units are captured. Key format is confirmed consistent: `bmUnit: "T_CNQPS-2"` in dynamic param endpoints matches `elexonBmUnit: "T_CNQPS-2"` in reference data — key mismatch is **not** an issue.
 - **Units with partial standing data still show `—` for missing params** — A unit that has SEL but no NDZ/MZT/MNZT (e.g. a unit that never submitted dynamic params) will pass the decommissioned filter but still show dashes in those columns. This is a data reality; no fix planned.
 - **Standing data backfill is per-browser** — The localStorage cache is not shared between machines or browser profiles. Each new browser session needs its own backfill.
+- **`sp.margin` in the store is stale relative to the chart** — `sp.margin` stored in Zustand is `emx − demand` (no reserve). The chart uses `emx − TR2` instead. If any future feature reads `sp.margin` for a reserve-aware deficit check it must recompute locally.
 - **Rate limiting risk** — `fetchAllData` fires ~108 concurrent requests (48 current PN + 48 D-1 PN + 12 dynamic param windows). `fetchHistoricalData` fires ~108 (48 PN + 60 dynamic param windows). Failures are silently swallowed. If PN or dynamic params are unexpectedly blank, rate limiting is the likely cause.
 - **Sharing is UI-only** — no backend; switching identity is how you simulate another user seeing a shared draft. Shared state does not persist between browser sessions or machines.
 - **`Docs/overview.md` is stale** — describes the old single-date, single-action version. Should be rewritten if documentation is needed.

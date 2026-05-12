@@ -42,6 +42,7 @@ interface ChartTheme {
   zeroLine: string
   unconfirmedFill: string
   demand: string
+  tr2: string
   emx: string
   eol: string
   emi: string
@@ -61,6 +62,7 @@ const LIGHT: ChartTheme = {
   zeroLine:         '#9ca3af',
   unconfirmedFill:  '#f9fafb',
   demand:           '#1f2937',
+  tr2:              '#ea580c',
   emx:              '#16a34a',
   eol:              '#3b82f6',
   emi:              '#9ca3af',
@@ -80,6 +82,7 @@ const DARK: ChartTheme = {
   zeroLine:         '#2d3441',
   unconfirmedFill:  '#161a22',
   demand:           '#e2e8f0',
+  tr2:              '#fb923c',
   emx:              '#34d399',
   eol:              '#60a5fa',
   emi:              '#475569',
@@ -101,7 +104,7 @@ function formatMW(value: number): string {
   return value.toLocaleString('en-GB')
 }
 
-function renderTooltip(activeDrafts: DraftPlan[], t: ChartTheme) {
+function renderTooltip(activeDrafts: DraftPlan[], t: ChartTheme, reservePct: number) {
   return function TooltipContent(props: TooltipContentProps) {
     const { active, payload, label } = props
     if (!active || !payload || payload.length === 0) return null
@@ -131,6 +134,7 @@ function renderTooltip(activeDrafts: DraftPlan[], t: ChartTheme) {
           )}
         </p>
         <p style={{ color: t.tooltipMuted, margin: '2px 0' }}>Demand: {formatMW(raw.demand)} MW</p>
+        <p style={{ color: t.tr2, margin: '2px 0' }}>TR2:&nbsp;&nbsp;&nbsp;&nbsp;{formatMW(raw.tr2)} MW ({reservePct}% reserve)</p>
         <p style={{ color: t.tooltipMuted, margin: '2px 0' }}>EMX:&nbsp;&nbsp;&nbsp;&nbsp;{formatMW(raw.emx)} MW</p>
         <p style={{ color: t.tooltipMuted, margin: '2px 0' }}>EOL:&nbsp;&nbsp;&nbsp;&nbsp;{formatMW(raw.eol)} MW</p>
         <p style={{ color: t.tooltipMuted, margin: '2px 0' }}>EMI:&nbsp;&nbsp;&nbsp;&nbsp;{formatMW(raw.emi)} MW</p>
@@ -140,7 +144,7 @@ function renderTooltip(activeDrafts: DraftPlan[], t: ChartTheme) {
         {activeDrafts.map(draft => {
           const draftEmx = raw[`draft_${draft.id}_emx`]
           if (draftEmx == null) return null
-          const draftMargin     = draftEmx - raw.demand
+          const draftMargin     = draftEmx - raw.tr2
           const draftMarginSign = draftMargin >= 0 ? '+' : ''
           return (
             <div key={draft.id} style={{ marginTop: 8, paddingTop: 8, borderTop: `1px solid ${t.tooltipBorder}` }}>
@@ -157,7 +161,7 @@ function renderTooltip(activeDrafts: DraftPlan[], t: ChartTheme) {
   }
 }
 
-export function MarginChart({ hiddenDraftIds = new Set<string>() }: { hiddenDraftIds?: Set<string> }) {
+export function MarginChart({ hiddenDraftIds = new Set<string>(), reservePct = 10 }: { hiddenDraftIds?: Set<string>; reservePct?: number }) {
   const settlementPeriods = useModellingStore(state => state.settlementPeriods)
   const drafts            = useModellingStore(state => state.drafts)
   const units             = useModellingStore(state => state.units)
@@ -223,17 +227,21 @@ export function MarginChart({ hiddenDraftIds = new Set<string>() }: { hiddenDraf
       }
     }
 
+    const tr2 = sp.demand * (1 + reservePct / 100)
+    const margin = sp.emx - tr2
+
     const point: Record<string, number | string | null> = {
       sp: spNum,
       label: slotLabel(sp, index),
       confirmed: sp.hasConfirmedPn ? 1 : 0,
       demand: sp.demand,
+      tr2,
       emx: sp.emx,
       eol: sp.eol,
       emi: sp.emi,
-      margin: sp.margin,
-      marginPositive: Math.max(0, sp.margin),
-      marginNegative: Math.min(0, sp.margin),
+      margin,
+      marginPositive: Math.max(0, margin),
+      marginNegative: Math.min(0, margin),
     }
 
     for (const draft of activeDrafts) {
@@ -270,7 +278,7 @@ export function MarginChart({ hiddenDraftIds = new Set<string>() }: { hiddenDraf
     return point
   })
 
-  const tooltipRenderer = renderTooltip(activeDrafts, t)
+  const tooltipRenderer = renderTooltip(activeDrafts, t, reservePct)
   const frontierLabel   = frontierIndex >= 0 ? (chartData[frontierIndex]?.label as string ?? null) : null
   const lastLabel       = chartData[chartData.length - 1]?.label as string
 
@@ -363,6 +371,7 @@ export function MarginChart({ hiddenDraftIds = new Set<string>() }: { hiddenDraf
           <Line dataKey="emi"    name="EMI"    stroke={t.emi}    strokeWidth={1.5} dot={false} activeDot={{ r: 3 }} />
           <Line dataKey="eol"    name="EOL"    stroke={t.eol}    strokeWidth={2}   dot={false} activeDot={{ r: 3 }} />
           <Line dataKey="demand" name="Demand" stroke={t.demand} strokeWidth={2.5} dot={false} activeDot={{ r: 4 }} />
+          <Line dataKey="tr2"    name={`TR2 (${reservePct}% reserve)`} stroke={t.tr2} strokeWidth={2} dot={false} activeDot={{ r: 3 }} />
           <Line dataKey="emx"    name="EMX"    stroke={t.emx}    strokeWidth={2}   dot={false} activeDot={{ r: 3 }} />
 
           {activeDrafts.map(draft => (
