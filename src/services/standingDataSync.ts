@@ -1,8 +1,3 @@
-import {
-  collection, doc, getDocs, getDoc, setDoc, writeBatch,
-} from 'firebase/firestore'
-import { db } from '@/lib/firebase'
-
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -34,45 +29,52 @@ interface RawParamEntry {
   settlementDate?: string
 }
 
+const CACHE_KEY    = 'so:standing_data'
+const METADATA_KEY = 'so:sync_metadata'
+
 // ---------------------------------------------------------------------------
-// Firestore reads
+// localStorage reads
 // ---------------------------------------------------------------------------
 
 export async function loadStandingDataCache(): Promise<Map<string, CachedStandingData>> {
-  const snapshot = await getDocs(collection(db, 'standing_data'))
-  const cache = new Map<string, CachedStandingData>()
-  for (const docSnap of snapshot.docs) {
-    if (docSnap.id === '_placeholder') continue
-    cache.set(docSnap.id, docSnap.data() as CachedStandingData)
+  if (typeof window === 'undefined') return new Map()
+  try {
+    const raw = localStorage.getItem(CACHE_KEY)
+    if (!raw) return new Map()
+    return new Map(JSON.parse(raw) as Array<[string, CachedStandingData]>)
+  } catch {
+    return new Map()
   }
-  return cache
 }
 
 export async function getSyncMetadata(): Promise<SyncMetadata> {
-  const snap = await getDoc(doc(db, 'sync_metadata', 'config'))
-  if (!snap.exists()) return { backfillComplete: false, backfillFrom: '', lastSyncedTo: '' }
-  return snap.data() as SyncMetadata
+  if (typeof window === 'undefined') return { backfillComplete: false, backfillFrom: '', lastSyncedTo: '' }
+  try {
+    const raw = localStorage.getItem(METADATA_KEY)
+    if (!raw) return { backfillComplete: false, backfillFrom: '', lastSyncedTo: '' }
+    return JSON.parse(raw) as SyncMetadata
+  } catch {
+    return { backfillComplete: false, backfillFrom: '', lastSyncedTo: '' }
+  }
 }
 
 // ---------------------------------------------------------------------------
-// Firestore writes
+// localStorage writes
 // ---------------------------------------------------------------------------
 
 export async function updateSyncMetadata(partial: Partial<SyncMetadata>): Promise<void> {
-  await setDoc(doc(db, 'sync_metadata', 'config'), partial, { merge: true })
+  if (typeof window === 'undefined') return
+  const current = await getSyncMetadata()
+  localStorage.setItem(METADATA_KEY, JSON.stringify({ ...current, ...partial }))
 }
 
-// Writes a subset of the cache to Firestore. Firestore caps batches at 500 ops — chunk at 400.
 export async function writeStandingDataBatch(updates: Map<string, CachedStandingData>): Promise<void> {
-  const entries = [...updates.entries()].filter(([id]) => id !== '_placeholder')
-  const CHUNK = 400
-  for (let i = 0; i < entries.length; i += CHUNK) {
-    const batch = writeBatch(db)
-    for (const [bmUnitId, data] of entries.slice(i, i + CHUNK)) {
-      batch.set(doc(db, 'standing_data', bmUnitId), data, { merge: true })
-    }
-    await batch.commit()
+  if (typeof window === 'undefined') return
+  const current = await loadStandingDataCache()
+  for (const [id, data] of updates) {
+    if (id !== '_placeholder') current.set(id, data)
   }
+  localStorage.setItem(CACHE_KEY, JSON.stringify([...current.entries()]))
 }
 
 // ---------------------------------------------------------------------------
@@ -136,6 +138,7 @@ function mergeEntries(
   modified: Set<string>,
 ): void {
   for (const entry of entries) {
+    if (!entry.bmUnit) continue
     const value = entry[valueField]
     if (value === undefined) continue
     const effectiveDate = entry.time?.split('T')[0] ?? entry.settlementDate ?? ''
@@ -154,6 +157,7 @@ async function fetchAndMergeWindows(
   cache: Map<string, CachedStandingData>,
   modified: Set<string>,
   signal: AbortSignal,
+  onBatch?: (done: number, total: number) => void,
 ): Promise<void> {
   const PARAMS = [
     { key: 'NDZ'  as const, valueField: 'notice'    as const, cacheKey: 'ndz'  as const, dateKey: 'ndzAt'  as const },
@@ -162,6 +166,7 @@ async function fetchAndMergeWindows(
     { key: 'SEL'  as const, valueField: 'level'     as const, cacheKey: 'sel'  as const, dateKey: 'selAt'  as const },
   ]
   const tasks = PARAMS.flatMap(p => windows.map(w => ({ ...p, ...w })))
+  const totalBatches = Math.ceil(tasks.length / 20)
   const BATCH = 20
   for (let i = 0; i < tasks.length; i += BATCH) {
     if (signal.aborted) return
@@ -171,6 +176,7 @@ async function fetchAndMergeWindows(
       const { cacheKey, dateKey, valueField } = slice[j]
       mergeEntries(cacheKey, dateKey, valueField, results[j], cache, modified)
     }
+    onBatch?.(Math.floor(i / BATCH) + 1, totalBatches)
   }
 }
 
@@ -184,7 +190,6 @@ export async function runBackfill(
   signal: AbortSignal,
 ): Promise<void> {
   const cache = await loadStandingDataCache()
-  const total = knownUnitIds.length
   const now = new Date()
   const MAX_YEARS = 6
   let earliestDate = now.toISOString().split('T')[0]
@@ -198,16 +203,22 @@ export async function runBackfill(
     yearStart.setFullYear(yearStart.getFullYear() - yearOffset - 1)
 
     const { ndz: covered } = computeCoverage(cache, knownUnitIds)
-    onProgress(`Searching ${yearEnd.getFullYear()}...`, covered, total)
+    onProgress(`Searching ${yearEnd.getFullYear()}...`, covered, knownUnitIds.length)
 
     const windows = buildWeeklyWindows(yearStart, yearEnd)
     const modified = new Set<string>()
-    await fetchAndMergeWindows(windows, cache, modified, signal)
+    await fetchAndMergeWindows(windows, cache, modified, signal, (done, total) => {
+      const { ndz: c } = computeCoverage(cache, knownUnitIds)
+      onProgress(`Searching ${yearEnd.getFullYear()}… batch ${done}/${total}`, c, knownUnitIds.length)
+    })
 
     if (modified.size > 0) {
       const updates = new Map([...modified].map(id => [id, cache.get(id)!]))
       await writeStandingDataBatch(updates)
     }
+
+    const { ndz: coveredAfter } = computeCoverage(cache, knownUnitIds)
+    onProgress(`Searched ${yearEnd.getFullYear()} — found ${modified.size} new entries`, coveredAfter, knownUnitIds.length)
 
     earliestDate = yearStart.toISOString().split('T')[0]
 

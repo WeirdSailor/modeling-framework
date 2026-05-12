@@ -1,5 +1,5 @@
 import { initializeApp, getApps } from 'firebase/app'
-import { getFirestore } from 'firebase/firestore'
+import { initializeFirestore, getFirestore, memoryLocalCache } from 'firebase/firestore'
 
 const firebaseConfig = {
   apiKey:            process.env.NEXT_PUBLIC_FIREBASE_API_KEY!,
@@ -10,5 +10,18 @@ const firebaseConfig = {
   appId:             process.env.NEXT_PUBLIC_FIREBASE_APP_ID!,
 }
 
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0]
-export const db = getFirestore(app)
+function createDb() {
+  const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0]
+  try {
+    return initializeFirestore(app, {
+      localCache: memoryLocalCache(),
+      // Force HTTP long-polling instead of WebSocket — fixes "client is offline"
+      // in environments where WebSocket connections to firestore.googleapis.com are blocked.
+      experimentalForceLongPolling: true,
+    })
+  } catch {
+    return getFirestore(app)
+  }
+}
+
+export const db = typeof window !== 'undefined' ? createDb() : null!

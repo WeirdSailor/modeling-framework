@@ -20,18 +20,24 @@ export default function StandingDataTab() {
   const [coverage, setCoverage] = useState<{ ndz: number; mzt: number; mnzt: number; sel: number } | null>(null)
   const [running, setRunning] = useState<'backfill' | 'sync' | null>(null)
   const [progress, setProgress] = useState<{ message: string; covered: number; total: number } | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const abortRef = useRef<AbortController | null>(null)
 
   async function refresh() {
-    const [meta, cache] = await Promise.all([getSyncMetadata(), loadStandingDataCache()])
-    setMetadata(meta)
-    if (knownIds.length > 0) setCoverage(computeCoverage(cache, knownIds))
+    try {
+      const [meta, cache] = await Promise.all([getSyncMetadata(), loadStandingDataCache()])
+      setMetadata(meta)
+      if (knownIds.length > 0) setCoverage(computeCoverage(cache, knownIds))
+    } catch (err) {
+      console.error('[standing-data] refresh failed:', err)
+    }
   }
 
   useEffect(() => { refresh() }, [total])
 
   async function handleBackfill() {
     setRunning('backfill')
+    setError(null)
     abortRef.current = new AbortController()
     try {
       await runBackfill(
@@ -39,21 +45,28 @@ export default function StandingDataTab() {
         (message, covered, t) => setProgress({ message, covered, total: t }),
         abortRef.current.signal,
       )
+    } catch (err) {
+      console.error('[backfill]', err)
+      setError(err instanceof Error ? err.message : 'Backfill failed — check browser console for details.')
     } finally {
-      setRunning(null)
       abortRef.current = null
       setProgress(null)
-      refresh()
+      await refresh()
+      setRunning(null)
     }
   }
 
   async function handleSyncRecent() {
     setRunning('sync')
+    setError(null)
     try {
       await runIncrementalSync()
+    } catch (err) {
+      console.error('[sync]', err)
+      setError(err instanceof Error ? err.message : 'Sync failed — check browser console for details.')
     } finally {
+      await refresh()
       setRunning(null)
-      refresh()
     }
   }
 
@@ -127,6 +140,13 @@ export default function StandingDataTab() {
           </>
         ) : null}
       </div>
+
+      {/* Error banner */}
+      {error && (
+        <p style={{ fontSize: 12, color: 'var(--danger, #e53e3e)', margin: '8px 0 4px', lineHeight: 1.5 }}>
+          {error}
+        </p>
+      )}
 
       {/* Coverage summary */}
       {coverage && total > 0 && (

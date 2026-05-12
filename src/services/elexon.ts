@@ -2,7 +2,7 @@ import type { BMUnit, SettlementPeriodData } from '@/models/types'
 import { spToStartTime, dateToSp, dateToSettlementDate } from '@/utils/settlements'
 import { computeAggregates } from '@/utils/margin'
 import { FETCH_EXCLUDED_FUEL_TYPES } from '@/utils/fuelTypes'
-import { loadStandingDataCache } from '@/services/standingDataSync'
+import { loadStandingDataCache, getSyncMetadata, runIncrementalSync } from '@/services/standingDataSync'
 
 // ---------------------------------------------------------------------------
 // Raw API response shapes
@@ -264,6 +264,15 @@ const MOCK_PN = buildMockPN(MOCK_BM_UNITS)
 // ---------------------------------------------------------------------------
 
 export async function fetchBmUnits(): Promise<BMUnit[]> {
+  // Auto-sync: if backfill is complete and cache is stale (> 23h), sync before loading
+  try {
+    const meta = await getSyncMetadata()
+    if (meta.backfillComplete && meta.lastSyncedTo) {
+      const stale = Date.now() - new Date(meta.lastSyncedTo).getTime() > 23 * 60 * 60 * 1000
+      if (stale) await runIncrementalSync()
+    }
+  } catch { /* silent — stale cache is acceptable */ }
+
   // Parallel fetches — dynamic params fan out across 5 × 7-day windows each
   const [refRaw, selEntries, silEntries, ndzEntries, mnztEntries, mztEntries, firestoreCache] = await Promise.all([
     safeFetch<RawBmUnitRef[] | null>('/api/elexon/reference/bmunits/all', null),
@@ -313,19 +322,26 @@ export async function fetchBmUnits(): Promise<BMUnit[]> {
 
     const cached = firestoreCache.get(bmUnitId) ?? firestoreCache.get(raw.nationalGridBmUnit)
 
+    const sel  = selEntry?.level      !== undefined ? selEntry.level      : cached?.sel
+    const ndz  = ndzEntry?.notice     !== undefined ? ndzEntry.notice     : cached?.ndz
+    const mnzt = mnztEntry?.periodMin !== undefined ? mnztEntry.periodMin : cached?.mnzt
+    const mzt  = mztEntry?.periodMin  !== undefined ? mztEntry.periodMin  : cached?.mzt
+
+    // Skip units with no standing data across all 4 params — decommissioned / never registered
+    if (sel === undefined && ndz === undefined && mnzt === undefined && mzt === undefined) continue
+
     units.push({
       bmUnitId,
       nationalGridBmUnit: raw.nationalGridBmUnit,
       fuelType: raw.fuelType,
       registeredCapacity: Math.round(cap),
       gspGroup: raw.gspGroupId,
-      // Live fetch wins; Firestore fills gaps for units inactive in the last 84 days
-      sel:  selEntry?.level      !== undefined ? selEntry.level      : cached?.sel,
-      sil:  silEntry?.level      !== undefined ? silEntry.level      : undefined,
-      ndz:  ndzEntry?.notice     !== undefined ? ndzEntry.notice     : cached?.ndz,
-      mnzt: mnztEntry?.periodMin !== undefined ? mnztEntry.periodMin : cached?.mnzt,
-      mzt:  mztEntry?.periodMin  !== undefined ? mztEntry.periodMin  : cached?.mzt,
-      ...fakePriceTiers(selEntry?.level !== undefined || cached?.sel !== undefined),
+      sel,
+      sil: silEntry?.level !== undefined ? silEntry.level : undefined,
+      ndz,
+      mnzt,
+      mzt,
+      ...fakePriceTiers(sel !== undefined),
     })
   }
 
