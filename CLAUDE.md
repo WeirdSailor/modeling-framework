@@ -129,6 +129,8 @@ For slots beyond the gate-closure frontier (where real PN = 0), `fetchAllData` f
 ### Dynamic parameters (SEL/NDZ/MNZT/MZT/SIL)
 Fetched across 12×7-day windows (84 days / ~3 months) to capture units with infrequently-updated standing data. NDZ `notice` field is returned in **minutes** by the API (not seconds) — used directly without conversion. MNZT and MZT `periodMin` fields are also in minutes.
 
+These values are also persisted in a **localStorage cache** (see Standing Data Cache section below). On each Refresh, `fetchBmUnits` merges live API results with cached values so units that haven't submitted new standing data recently still carry their last known parameters.
+
 ---
 
 ## Component Map
@@ -143,14 +145,16 @@ Fetched across 12×7-day windows (84 days / ~3 months) to capture units with inf
 | `src/components/CommittedTab.tsx` | Committed-tab view: cost breakdown cards (Total + per-reason), click-to-filter table, change-indicator arrows (↑/↓), service chip, bulk remove |
 | `src/components/RedeclareTab.tsx` | Redeclare-tab view: editable data columns for committed units (simulates redeclarations); amber row highlight on override; Reset per-row and Reset all; Service (SR/QR) assign select |
 | `src/components/MarginChart.tsx` | Recharts chart: solid EMX/EOL/EMI baseline for all SPs + partial draft overlays (dotted only where draft has actions) + gate-closure frontier + midnight marker; draft visibility controlled via `hiddenDraftIds` prop; dark-mode aware via MutationObserver |
-| `src/components/ConfigPanel.tsx` | Floating config panel (3 tabs): **tweaks** (theme/layout/sidebar/selection), **scenarios** (ranking criteria), **data** (Real-time/Historical mode switch, date picker, start-time select, Load button) |
+| `src/components/ConfigPanel.tsx` | Floating config panel (4 tabs): **tweaks** (theme/layout/sidebar/selection), **scenarios** (ranking criteria), **data** (Real-time/Historical mode switch, date picker, start-time select, Load button), **standing data** (backfill + sync controls) |
+| `src/components/StandingDataTab.tsx` | Standing data tab UI: shows coverage (NDZ/MZT/MNZT/SEL per unit count), runs one-time backfill, shows per-batch progress, Sync Recent button after backfill completes |
 | `src/components/ConfirmModal.tsx` | Dark-mode-aware confirm dialog (replaces native browser confirm) |
 | `src/models/types.ts` | All interfaces; `USERS`, `UserId`, `ServiceType`, `UnitSnapshot` |
-| `src/services/elexon.ts` | All fetch logic + mock fallback |
+| `src/services/elexon.ts` | All fetch logic + mock fallback; auto-runs incremental standing data sync at start of `fetchBmUnits` when cache is stale |
+| `src/services/standingDataSync.ts` | localStorage-based standing data cache: backfill, incremental sync, coverage computation; keys `so:standing_data` and `so:sync_metadata` |
 | `src/store/useModellingStore.ts` | Zustand store |
 | `src/utils/margin.ts` | `computeAggregates`, `applyDraftToBaseline`, `isUnitPnCommitted` |
 | `src/utils/settlements.ts` | SP ↔ time helpers (UTC-based, see BST note above) |
-| `src/utils/fuelTypes.ts` | `EXCLUDED_FUEL_TYPES` — shared by `elexon.ts` and `AvailableTable.tsx` |
+| `src/utils/fuelTypes.ts` | `EXCLUDED_FUEL_TYPES` (display filter) and `FETCH_EXCLUDED_FUEL_TYPES` (fetch filter) — shared by `elexon.ts` and `AvailableTable.tsx` |
 
 ---
 
@@ -160,7 +164,10 @@ Fetched across 12×7-day windows (84 days / ~3 months) to capture units with inf
 - **`computeAggregates` iterates `sp.pn` directly** — never change it to iterate `units` instead. That would miss all PN-holding units outside the dispatchable filter (wind, solar, etc.) and break the baseline.
 - **`refreshAggregates` in the store** — must be called whenever committed draft actions change. Currently called in `commitDraft`, `discardDraft`, `clearAllDrafts`, and `setSettlementPeriods`.
 - **`settlementPeriod` in `SettlementPeriodData`** is the slot index 1–48, not the real SP number. All `ModellingAction.fromPeriod`/`toPeriod` comparisons use this slot index.
-- **`src/utils/fuelTypes.ts`** — shared exclusion list. Keep in sync if adding/removing fuel types from the grid.
+- **`src/utils/fuelTypes.ts`** — two separate exclusion sets. `FETCH_EXCLUDED_FUEL_TYPES` prevents units from being fetched at all (solar, interconnectors, COAL, COALB). `EXCLUDED_FUEL_TYPES` is the display-only filter applied in `AvailableTable` (adds WIND, NUCLEAR on top). Keep both in sync when adding fuel types. COAL and COALB are in both sets — they are fetched but never displayed, and never committed to the unit list.
+- **Standing data cache** — uses `localStorage` (keys `so:standing_data`, `so:sync_metadata`). Do not move back to Firestore without discussion — WebSocket connections to `firestore.googleapis.com` are blocked in some network environments. The cache persists across sessions; a one-time backfill is sufficient for a given browser profile.
+- **Auto-sync in `fetchBmUnits`** — silently calls `runIncrementalSync()` before the `Promise.all` if `backfillComplete` is true and `lastSyncedTo` is more than 23 hours ago. It is intentionally silent (no UI feedback, error swallowed). Do not add loading state or toast for this — it runs in the background of a normal Refresh.
+- **Decommissioned unit filter in `fetchBmUnits`** — units where all four of `sel`, `ndz`, `mnzt`, `mzt` are `undefined` after merging live API + localStorage cache are skipped entirely (`continue`). This removes units that have never submitted standing data (mothballed / decommissioned). Do not remove this filter — the raw reference API returns ~1000+ units including long-decommissioned plant.
 - **`fetchSinglePN` + 48 parallel calls** — do not collapse into a single date-range call; the Elexon PN endpoint requires per-SP queries. The `/datasets/PN` endpoint with only a date-range returns 404 — `settlementDate` + `settlementPeriod` are both mandatory.
 - **`ownerId` on every draft** — `createDraft` and `duplicateDraft` both set `ownerId: state.currentUser`. Any new draft-creation path must do the same. Drafts without `ownerId` will be invisible to all users in the sidebar.
 - **`dataSnapshot` is set at commit time** — `commitDraft` in the store reads `state.units` and `state.dataOverrides` to build the snapshot. If you add new tracked fields to `UnitSnapshot`, update both `commitDraft` and `ChangeArrow`'s render logic.
@@ -343,14 +350,40 @@ const activeDrafts = drafts.filter(d => d.status === 'draft' && !hiddenDraftIds.
 
 ---
 
+## Standing Data Cache
+
+NDZ, MZT, MNZT, and SEL are change-only datasets — Elexon only publishes a new entry when the value changes. A unit that last changed its NDZ 6 months ago won't appear in a 3-month rolling fetch. To handle this, the app maintains a localStorage cache built by a one-time backfill.
+
+### Storage
+- `so:standing_data` — `Array<[bmUnitId, CachedStandingData]>` (JSON-serialised Map). Each entry holds up to four values plus the ISO date each was effective from.
+- `so:sync_metadata` — `{ backfillComplete: boolean, backfillFrom: string, lastSyncedTo: string }`.
+
+### Lifecycle
+1. **Backfill** (one-time, manual) — triggered from the **Standing Data** tab in ConfigPanel. Searches up to 6 years back in yearly chunks, batching 20 requests at a time. Stops early if a year yields no new data. Writes to localStorage incrementally. Sets `backfillComplete: true` when done.
+2. **Incremental sync** (automatic) — `fetchBmUnits` checks on every Refresh whether `backfillComplete && lastSyncedTo` is more than 23 hours old. If so, `runIncrementalSync()` fetches from `lastSyncedTo` to today and merges new entries. Silent — no UI indicator.
+3. **Manual sync** — "Sync Recent" button in the Standing Data tab for on-demand refresh after backfill.
+
+### Merge logic
+`mergeEntries` keeps the entry with the **most recent effective date** — if the cached date is already newer than what the API just returned, the cache wins. This prevents older API windows from overwriting fresher cached values.
+
+### `fetchBmUnits` integration
+After the auto-sync check, `loadStandingDataCache()` is included in the `Promise.all`. For each unit, live API values take priority; cache fills in any gaps:
+```ts
+const ndz = ndzEntry?.notice !== undefined ? ndzEntry.notice : cached?.ndz
+```
+Units where all four of `sel`, `ndz`, `mnzt`, `mzt` are still `undefined` after merging are dropped (decommissioned filter).
+
+---
+
 ## Known Issues / Future Work
 
 - **BST/UTC offset** — window starts ~1 hour early in summer. Low priority for prototype.
 - **£120 static price** — real BM offer prices not yet integrated; cost figures are indicative only.
 - **No test suite** — margin calculation logic is a good candidate for unit tests.
 - **D-1 proxy + tomorrow slots** — tomorrow's SPs always have zero confirmed PN; they use yesterday's same-SP data as proxy. This is a reasonable heuristic but not operationally precise.
-- **NDZ/MZT/MNZT blank — root cause found and fixed** — Two bugs: (1) `notice` field in the NDZ endpoint is in **minutes** not seconds; the code was dividing by 60 again, collapsing most values to 0. (2) Standing data is change-only — units only submit new entries when parameters change. CNQPS-2 last submitted NDZ 8–9 weeks ago, outside the old 35-day window. Both fixed: division removed, lookback extended to 84 days. Key format is confirmed consistent: `bmUnit: "T_CNQPS-2"` in dynamic param endpoints matches `elexonBmUnit: "T_CNQPS-2"` in reference data — key mismatch is **not** an issue.
-- **Units silent >84 days still show `—`** — Units that haven't submitted standing data in over 3 months (e.g. mothballed plant) will still have no NDZ/MZT/MNZT. This is a data reality, not a code bug. No fix planned for prototype.
+- **NDZ/MZT/MNZT blank — root cause found and fixed** — Two bugs: (1) `notice` field in the NDZ endpoint is in **minutes** not seconds; the code was dividing by 60 again, collapsing most values to 0. (2) Standing data is change-only — units only submit new entries when parameters change. CNQPS-2 last submitted NDZ 8–9 weeks ago, outside the old 35-day window. Both fixed: division removed, lookback extended to 84 days. The localStorage backfill now covers up to 6 years, so even infrequently-updated units are captured. Key format is confirmed consistent: `bmUnit: "T_CNQPS-2"` in dynamic param endpoints matches `elexonBmUnit: "T_CNQPS-2"` in reference data — key mismatch is **not** an issue.
+- **Units with partial standing data still show `—` for missing params** — A unit that has SEL but no NDZ/MZT/MNZT (e.g. a unit that never submitted dynamic params) will pass the decommissioned filter but still show dashes in those columns. This is a data reality; no fix planned.
+- **Standing data backfill is per-browser** — The localStorage cache is not shared between machines or browser profiles. Each new browser session needs its own backfill.
 - **Rate limiting risk** — `fetchAllData` fires ~108 concurrent requests (48 current PN + 48 D-1 PN + 12 dynamic param windows). `fetchHistoricalData` fires ~108 (48 PN + 60 dynamic param windows). Failures are silently swallowed. If PN or dynamic params are unexpectedly blank, rate limiting is the likely cause.
 - **Sharing is UI-only** — no backend; switching identity is how you simulate another user seeing a shared draft. Shared state does not persist between browser sessions or machines.
 - **`Docs/overview.md` is stale** — describes the old single-date, single-action version. Should be rewritten if documentation is needed.
