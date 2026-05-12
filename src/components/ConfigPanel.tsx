@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react'
 import { SCENARIOS, GSP_AREAS, type ScenarioId } from '@/config/scenarios'
 import { spToTime, dateToSettlementDate } from '@/utils/settlements'
+import StandingDataTab from '@/components/StandingDataTab'
 
 // ── TweakState (moved here from TweaksPanel) ──────────────────────────────────
 
@@ -380,7 +381,7 @@ interface Props {
   onLoadHistorical: (date: string, startSp: number) => void
 }
 
-type ConfigTab = 'tweaks' | 'scenarios' | 'data'
+type ConfigTab = 'tweaks' | 'scenarios' | 'data' | 'standing'
 
 export default function ConfigPanel({
   tweaks, onChangeTweak, voltageArea, onVoltageAreaChange, onClose,
@@ -425,7 +426,7 @@ export default function ConfigPanel({
       {/* Drag handle / header */}
       <div className="twk-hd" onMouseDown={onDragStart}>
         <div style={{ display: 'flex', gap: 0 }}>
-          {(['tweaks', 'scenarios', 'data'] as ConfigTab[]).map(t => (
+          {(['tweaks', 'scenarios', 'data', 'standing'] as ConfigTab[]).map(t => (
             <button
               key={t}
               type="button"
@@ -472,6 +473,7 @@ export default function ConfigPanel({
           onLoadHistorical={onLoadHistorical}
         />
       )}
+      {configTab === 'standing' && <StandingDataTab />}
     </div>
   )
 }
