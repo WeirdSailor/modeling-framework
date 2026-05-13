@@ -50,9 +50,9 @@ export const OPERATION_TYPE_LABELS: Record<OperationType, string> = {
 
 export interface ModellingAction {
   bmUnitId: string;
-  fromPeriod: number;    // Settlement period start (1-48)
-  toPeriod: number;      // Settlement period end (1-48)
-  outputLevel: number;   // MW
+  fromPeriod: number;              // Settlement period start (1-48)
+  toPeriod: number | undefined;    // Settlement period end (1-48); undefined = open-ended (covers all remaining SPs)
+  outputLevel: number;             // MW
   reasonCode: 'MARGIN' | 'INERTIA' | 'VOLTAGE' | 'CONSTRAINT' | 'RESERVE';
   operationType?: OperationType;
   timestamp: Date;

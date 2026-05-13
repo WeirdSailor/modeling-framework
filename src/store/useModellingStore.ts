@@ -55,6 +55,7 @@ interface ModellingState {
   addUnitsToDraft: (draftId: string, bmUnitIds: string[], reasonCode?: ModellingAction['reasonCode']) => void
   updateUnitReason: (draftId: string, bmUnitId: string, reasonCode: ModellingAction['reasonCode']) => void
   updateUnitOperationType: (draftId: string, bmUnitId: string, operationType: OperationType | undefined) => void
+  updateUnitWindow: (draftId: string, bmUnitId: string, fromPeriod: number, toPeriod: number | undefined) => void
   removeUnitFromDraft: (draftId: string, bmUnitId: string) => void
   renameDraft: (id: string, name: string) => void
   updateDraftDescription: (id: string, description: string) => void
@@ -259,6 +260,23 @@ export const useModellingStore = create<ModellingState>((set, get) => ({
           : d
       ),
     })),
+
+  updateUnitWindow: (draftId, bmUnitId, fromPeriod, toPeriod) =>
+    set(state => {
+      const draft = state.drafts.find(d => d.id === draftId)
+      if (!draft) return {}
+      const drafts = state.drafts.map(d =>
+        d.id === draftId
+          ? { ...d, actions: d.actions.map(a => a.bmUnitId === bmUnitId ? { ...a, fromPeriod, toPeriod } : a) }
+          : d
+      )
+      return {
+        drafts,
+        settlementPeriods: draft.status === 'committed'
+          ? refreshAggregates(state.settlementPeriods, drafts, state.units)
+          : state.settlementPeriods,
+      }
+    }),
 
   duplicateDraft: (id) => {
     const newId = crypto.randomUUID()

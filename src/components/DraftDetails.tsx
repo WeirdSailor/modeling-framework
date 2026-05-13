@@ -29,7 +29,7 @@ interface Props {
 
 function slotLabel(slot: number, periods: SettlementPeriodData[]): string {
   const sp = periods.find(s => s.settlementPeriod === slot)
-  return sp ? sp.startTime.slice(11, 16) : `SP ${slot}`
+  return sp ? `${sp.startTime.slice(8, 10)}|${sp.startTime.slice(11, 16)}` : `SP ${slot}`
 }
 
 
@@ -178,7 +178,7 @@ export default function DraftDetails({
 
   const spOptions = settlementPeriods.map(sp => ({
     value: sp.settlementPeriod,
-    label: `SP ${sp.settlementPeriod} · ${sp.startTime.slice(11, 16)}`,
+    label: `${sp.startTime.slice(8, 10)}|${sp.startTime.slice(11, 16)}`,
   }))
 
   const availableToShare = USERS.filter(

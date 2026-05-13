@@ -43,7 +43,7 @@ export function computeAggregates(
   // Modelled units — deduplicated per unit, skipped if already PN-committed
   const seen = new Set<string>()
   for (const action of actions) {
-    if (action.fromPeriod <= spNum && action.toPeriod >= spNum && !seen.has(action.bmUnitId)) {
+    if (action.fromPeriod <= spNum && (action.toPeriod === undefined || action.toPeriod >= spNum) && !seen.has(action.bmUnitId)) {
       seen.add(action.bmUnitId)
       if ((sp.pn[action.bmUnitId] ?? 0) <= 1) {
         emx += sp.mel[action.bmUnitId] ?? 0
@@ -82,7 +82,7 @@ export function applyDraftToBaseline(
   for (const action of draftActions) {
     if (
       action.fromPeriod <= spNum &&
-      action.toPeriod >= spNum &&
+      (action.toPeriod === undefined || action.toPeriod >= spNum) &&
       !seen.has(action.bmUnitId) &&
       !alreadyModelled.has(action.bmUnitId)
     ) {

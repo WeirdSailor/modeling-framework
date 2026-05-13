@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import type { DraftPlan, BMUnit, ModellingAction, OperationType, UnitSnapshot, ServiceType } from '@/models/types'
+import type { DraftPlan, BMUnit, ModellingAction, OperationType, UnitSnapshot, ServiceType, SettlementPeriodData } from '@/models/types'
 
 const CHANGE_THRESHOLD = 10 // percent
 
@@ -38,6 +38,7 @@ interface Props {
   unitPnByBmUnit: Record<string, number>
   dataOverrides: Record<string, Partial<UnitSnapshot>>
   unitServices: Record<string, ServiceType>
+  settlementPeriods: SettlementPeriodData[]
   onRemoveUnits: (removals: { draftId: string; bmUnitId: string }[]) => void
 }
 
@@ -57,10 +58,17 @@ interface CommittedRow {
   mnzt: number
   priceToSel: number
   priceToMel: number
+  fromPeriod: number
+  toPeriod: number | undefined
   reasonCode: ModellingAction['reasonCode']
   operationType?: OperationType
   notes: string
   snapshot?: UnitSnapshot
+}
+
+function slotLabel(slot: number, periods: SettlementPeriodData[]): string {
+  const sp = periods.find(s => s.settlementPeriod === slot)
+  return sp ? `${sp.startTime.slice(8, 10)}|${sp.startTime.slice(11, 16)}` : `SP ${slot}`
 }
 
 function ServiceChip({ service }: { service: ServiceType | undefined }) {
@@ -109,7 +117,7 @@ function TypeChip({ fuelType }: { fuelType: string }) {
 }
 
 export default function CommittedTab({
-  drafts, unitById, unitPnByBmUnit, dataOverrides, unitServices, onRemoveUnits,
+  drafts, unitById, unitPnByBmUnit, dataOverrides, unitServices, settlementPeriods, onRemoveUnits,
 }: Props) {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [selectedReason, setSelectedReason] = useState<ModellingAction['reasonCode'] | null>(null)
@@ -143,6 +151,8 @@ export default function CommittedTab({
           mnzt: u?.mnzt ?? 0,
           priceToSel: u?.priceToSel ?? 0,
           priceToMel: u?.priceToMel ?? 0,
+          fromPeriod: action.fromPeriod,
+          toPeriod: action.toPeriod,
           reasonCode: action.reasonCode,
           operationType: action.operationType,
           notes: draft.unitNotes[action.bmUnitId] ?? '',
@@ -333,6 +343,8 @@ export default function CommittedTab({
               <th className="num">£ SEL</th>
               <th className="num">£ MEL</th>
               <th className="num">PN</th>
+              <th className="time-col">From</th>
+              <th className="time-col">To</th>
               <th className="reason-col">Event</th>
               <th className="reason-col">Reason</th>
               <th>Draft</th>
@@ -401,6 +413,12 @@ export default function CommittedTab({
                     {snap && <ChangeArrow current={effPriceToMel} snapshotVal={snap.priceToMel} unit="£" />}
                   </td>
                   <td className="mono num">{row.pn > 0 ? row.pn.toFixed(0) : '—'}</td>
+                  <td className="time-col">
+                    <span className="notes-readonly mono">{slotLabel(row.fromPeriod, settlementPeriods)}</span>
+                  </td>
+                  <td className="time-col">
+                    <span className="notes-readonly mono">{row.toPeriod !== undefined ? slotLabel(row.toPeriod, settlementPeriods) : '—'}</span>
+                  </td>
                   <td className="reason-col">
                     <span className="notes-readonly">{row.operationType ?? '—'}</span>
                   </td>

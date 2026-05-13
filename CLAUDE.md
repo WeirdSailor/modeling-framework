@@ -37,6 +37,8 @@ dataOverrides: Record<string, Partial<UnitSnapshot>>  // per-unit data redeclara
 unitServices: Record<string, ServiceType>             // per-unit service assignment (SR | QR)
 ```
 
+`updateUnitWindow(draftId, bmUnitId, fromPeriod, toPeriod)` updates a single action's from/to independently of the draft-level window. If the draft is committed, it triggers `refreshAggregates`. Note: calling `updateDraftWindow` afterwards overwrites per-unit customisations (it bulk-sets all actions to the draft's from/to).
+
 `refreshAggregates` is called inside the store on every draft commit/discard/clear. It recomputes EMX/EOL/EMI/Margin for each SP using committed draft actions. It does `{ ...sp, ...computeAggregates(...) }` — the spread preserves `hasConfirmedPn`, `proxyEmx`, `proxyEol` without any special handling.
 
 ### Rolling 24-Hour Window
@@ -142,10 +144,10 @@ These values are also persisted in a **localStorage cache** (see Standing Data C
 |------|------|
 | `src/app/page.tsx` | Top-level: data loading, layout, tab switching, derived data, confirm modals, sharing actions; owns `hiddenDraftIds` state for chart draft visibility |
 | `src/components/DraftSidebar.tsx` | Identity picker ("You are: [NSE ▼]"), window time + Refresh, draft list filtered to current user, "Shared with me" collapsible section; coloured circle visibility toggle per active draft; collapse button (‹/›) at top; New Draft button pinned to bottom footer |
-| `src/components/DraftDetails.tsx` | Draft header: share icon (left of name, opens sharing popover), name input, description field (truncated, hover tooltip), From/To SP pickers + Scenario/GSP filter buttons in same row, action buttons; no cost/meta row, no state badge |
+| `src/components/DraftDetails.tsx` | Draft header: share icon (left of name, opens sharing popover), name input, description field (truncated, hover tooltip), From/To SP pickers + Scenario/GSP filter buttons in same row, action buttons; no cost/meta row, no state badge; From/To options display as `DD\|HH:MM` |
 | `src/components/AvailableTable.tsx` | Available units table: sort, checkbox or click selection, type + service chips; no toolbar — Scenario/GSP filters live in DraftDetails and are passed as props; Select button appears in header only when rows are checked |
-| `src/components/SelectedTable.tsx` | Selected units in active draft: Σ PN / Σ MEL / Est. value totals, notes input, remove button, service chip |
-| `src/components/CommittedTab.tsx` | Committed-tab view: cost breakdown cards (Total + per-reason), click-to-filter table, change-indicator arrows (↑/↓), service chip, bulk remove |
+| `src/components/SelectedTable.tsx` | Selected units in active draft: Σ PN / Σ MEL / Est. value totals, notes input, remove button, service chip; **From/To columns** (before Event) with inline selects for per-unit window editing; To can be cleared to undefined (open-ended) |
+| `src/components/CommittedTab.tsx` | Committed-tab view: cost breakdown cards (Total + per-reason), click-to-filter table, change-indicator arrows (↑/↓), service chip, bulk remove; **From/To columns** (read-only, before Event) |
 | `src/components/RedeclareTab.tsx` | Redeclare-tab view: editable data columns for committed units (simulates redeclarations); amber row highlight on override; Reset per-row and Reset all; Service (SR/QR) assign select |
 | `src/components/MarginChart.tsx` | Recharts chart: solid EMX/EOL/EMI baseline for all SPs + solid orange TR2 line (demand × reserve multiplier) + partial draft overlays (dotted only where draft has actions) + gate-closure frontier + midnight marker; draft visibility controlled via `hiddenDraftIds` prop; `reservePct` prop (default 10) controls TR2; dark-mode aware via MutationObserver |
 | `src/components/ConfigPanel.tsx` | Floating config panel (4 tabs): **tweaks** (theme/layout/sidebar/selection/TR2 reserve %), **scenarios** (ranking criteria), **data** (Real-time/Historical mode switch, date picker, start-time select, Load button), **standing data** (backfill + sync controls) |
@@ -168,6 +170,7 @@ These values are also persisted in a **localStorage cache** (see Standing Data C
 - **`computeAggregates` iterates `sp.pn` directly** — never change it to iterate `units` instead. That would miss all PN-holding units outside the dispatchable filter (wind, solar, etc.) and break the baseline.
 - **`refreshAggregates` in the store** — must be called whenever committed draft actions change. Currently called in `commitDraft`, `discardDraft`, `clearAllDrafts`, and `setSettlementPeriods`.
 - **`settlementPeriod` in `SettlementPeriodData`** is the slot index 1–48, not the real SP number. All `ModellingAction.fromPeriod`/`toPeriod` comparisons use this slot index.
+- **`ModellingAction.toPeriod` is `number | undefined`** — `undefined` means open-ended (the action covers all SPs from `fromPeriod` to the end of the window). Every check against `toPeriod` must handle the undefined case: `(action.toPeriod === undefined || action.toPeriod >= spNum)`. Do not revert to `number` — the SelectedTable UI exposes a "clear To" option that sets it to undefined.
 - **`src/utils/fuelTypes.ts`** — two separate exclusion sets. `FETCH_EXCLUDED_FUEL_TYPES` prevents units from being fetched at all (solar, interconnectors, COAL, COALB). `EXCLUDED_FUEL_TYPES` is the display-only filter applied in `AvailableTable` (adds WIND, NUCLEAR on top). Keep both in sync when adding fuel types. COAL and COALB are in both sets — they are fetched but never displayed, and never committed to the unit list.
 - **Standing data cache** — uses `localStorage` (keys `so:standing_data`, `so:sync_metadata`). Do not move back to Firestore without discussion — WebSocket connections to `firestore.googleapis.com` are blocked in some network environments. The cache persists across sessions; a one-time backfill is sufficient for a given browser profile.
 - **Auto-sync in `fetchBmUnits`** — silently calls `runIncrementalSync()` before the `Promise.all` if `backfillComplete` is true and `lastSyncedTo` is more than 23 hours ago. It is intentionally silent (no UI feedback, error swallowed). Do not add loading state or toast for this — it runs in the background of a normal Refresh.
@@ -227,6 +230,8 @@ Cards with 0 units render at 40% opacity. Clicking a card sets `selectedReason` 
 | £ SEL | Price to SEL tier |
 | £ MEL | Price to MEL tier |
 | PN | Current physical notification (MW) — conditional on pullback scenario in Available/Selected; always shown in Committed |
+| From | Per-unit window start — editable select in SelectedTable, read-only in CommittedTab; displayed as `DD\|HH:MM` |
+| To | Per-unit window end — editable select with a `—` (clear) option in SelectedTable, read-only in CommittedTab; `undefined` = open-ended; displayed as `DD\|HH:MM` |
 | Event | `operationType` (AS / DS / AD etc.) |
 | Reason | `reasonCode` (Margin / Inertia / Voltage / Reserve / Constraint) |
 

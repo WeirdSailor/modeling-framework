@@ -222,7 +222,7 @@ export function MarginChart({ hiddenDraftIds = new Set<string>(), reservePct = 1
       if (pn > 1) alreadyModelled.add(bmUnit)
     }
     for (const action of committedActions) {
-      if (action.fromPeriod <= spNum && action.toPeriod >= spNum) {
+      if (action.fromPeriod <= spNum && (action.toPeriod === undefined || action.toPeriod >= spNum)) {
         alreadyModelled.add(action.bmUnitId)
       }
     }
@@ -251,7 +251,7 @@ export function MarginChart({ hiddenDraftIds = new Set<string>(), reservePct = 1
       )
 
       const spCovered = (slotIdx: number) =>
-        draft.actions.some(a => a.fromPeriod <= slotIdx && a.toPeriod >= slotIdx)
+        draft.actions.some(a => a.fromPeriod <= slotIdx && (a.toPeriod === undefined || a.toPeriod >= slotIdx))
 
       const affects = spCovered(spNum)
       const isBridge = !affects && (

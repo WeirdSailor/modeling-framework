@@ -1,6 +1,6 @@
 'use client'
 
-import type { DraftPlan, BMUnit, ModellingAction, OperationType, ServiceType } from '@/models/types'
+import type { DraftPlan, BMUnit, ModellingAction, OperationType, ServiceType, SettlementPeriodData } from '@/models/types'
 import { OPERATION_TYPE_LABELS } from '@/models/types'
 
 const REASON_CODES: ModellingAction['reasonCode'][] = ['MARGIN', 'INERTIA', 'VOLTAGE', 'CONSTRAINT', 'RESERVE']
@@ -21,12 +21,14 @@ interface Props {
   unitById: Map<string, BMUnit>
   unitPnByBmUnit: Record<string, number>
   unitServices: Record<string, ServiceType>
+  settlementPeriods: SettlementPeriodData[]
   readOnly: boolean
   scenario: string
   onRemoveUnit: (bmUnitId: string) => void
   onUpdateNotes: (bmUnitId: string, notes: string) => void
   onUpdateReason: (bmUnitId: string, reasonCode: ModellingAction['reasonCode']) => void
   onUpdateOperationType: (bmUnitId: string, operationType: OperationType | undefined) => void
+  onUpdateUnitWindow: (bmUnitId: string, fromPeriod: number, toPeriod: number | undefined) => void
 }
 
 function getFuelDisplay(fuelType: string): { label: string; chipClass: string } {
@@ -66,9 +68,14 @@ function Stat({ label, value }: { label: string; value: string }) {
   )
 }
 
+function slotLabel(slot: number, periods: SettlementPeriodData[]): string {
+  const sp = periods.find(s => s.settlementPeriod === slot)
+  return sp ? `${sp.startTime.slice(8, 10)}|${sp.startTime.slice(11, 16)}` : `SP ${slot}`
+}
+
 export default function SelectedTable({
-  draft, unitById, unitPnByBmUnit, unitServices, readOnly, scenario,
-  onRemoveUnit, onUpdateNotes, onUpdateReason, onUpdateOperationType,
+  draft, unitById, unitPnByBmUnit, unitServices, settlementPeriods, readOnly, scenario,
+  onRemoveUnit, onUpdateNotes, onUpdateReason, onUpdateOperationType, onUpdateUnitWindow,
 }: Props) {
   const showPn = scenario === 'pullback'
   const uniqueUnitIds = Array.from(new Set(draft.actions.map(a => a.bmUnitId)))
@@ -128,6 +135,8 @@ export default function SelectedTable({
                 <th className="num">£ SEL</th>
                 <th className="num">£ MEL</th>
                 {showPn && <th className="num">PN</th>}
+                <th className="time-col">From</th>
+                <th className="time-col">To</th>
                 <th className="reason-col">Event</th>
                 <th className="reason-col">Reason</th>
                 <th className="notes-col">Notes</th>
@@ -161,6 +170,48 @@ export default function SelectedTable({
                     <td className="mono num">{u.priceToSel ? `£${u.priceToSel}` : '—'}</td>
                     <td className="mono num">{u.priceToMel ? `£${u.priceToMel}` : '—'}</td>
                     {showPn && <td className="mono num">{pn > 0 ? pn.toFixed(0) : '—'}</td>}
+                    <td className="time-col">
+                      {readOnly ? (
+                        <span className="notes-readonly mono">{action ? slotLabel(action.fromPeriod, settlementPeriods) : '—'}</span>
+                      ) : (
+                        <select
+                          className="reason-select mono"
+                          value={action?.fromPeriod ?? 1}
+                          onChange={e => {
+                            if (!action) return
+                            onUpdateUnitWindow(bmUnitId, Number(e.target.value), action.toPeriod)
+                          }}
+                        >
+                          {settlementPeriods.map(sp => (
+                            <option key={sp.settlementPeriod} value={sp.settlementPeriod}>
+                              {sp.startTime.slice(8, 10)}|{sp.startTime.slice(11, 16)}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </td>
+                    <td className="time-col">
+                      {readOnly ? (
+                        <span className="notes-readonly mono">{action?.toPeriod !== undefined ? slotLabel(action.toPeriod, settlementPeriods) : '—'}</span>
+                      ) : (
+                        <select
+                          className="reason-select mono"
+                          value={action?.toPeriod ?? ''}
+                          onChange={e => {
+                            if (!action) return
+                            const val = e.target.value
+                            onUpdateUnitWindow(bmUnitId, action.fromPeriod, val === '' ? undefined : Number(val))
+                          }}
+                        >
+                          <option value="">—</option>
+                          {settlementPeriods.map(sp => (
+                            <option key={sp.settlementPeriod} value={sp.settlementPeriod}>
+                              {sp.startTime.slice(8, 10)}|{sp.startTime.slice(11, 16)}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </td>
                     <td className="reason-col">
                       {readOnly ? (
                         <span className="notes-readonly">{operationType ?? '—'}</span>

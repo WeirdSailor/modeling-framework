@@ -92,6 +92,7 @@ export default function Home() {
   const updateUnitNotes   = useModellingStore(s => s.updateUnitNotes)
   const updateUnitReason        = useModellingStore(s => s.updateUnitReason)
   const updateUnitOperationType = useModellingStore(s => s.updateUnitOperationType)
+  const updateUnitWindow        = useModellingStore(s => s.updateUnitWindow)
   const currentUser       = useModellingStore(s => s.currentUser)
   const setCurrentUser    = useModellingStore(s => s.setCurrentUser)
   const duplicateDraft    = useModellingStore(s => s.duplicateDraft)
@@ -472,6 +473,7 @@ const activeDraftUnitIds = useMemo(
                     unitById={unitById}
                     unitPnByBmUnit={unitPnByBmUnit}
                     unitServices={unitServices}
+                    settlementPeriods={settlementPeriods}
                     readOnly={readOnly}
                     scenario={scenario}
                     onRemoveUnit={handleRemoveUnit}
@@ -483,6 +485,9 @@ const activeDraftUnitIds = useMemo(
                     }
                     onUpdateOperationType={(bmUnitId, operationType) =>
                       updateUnitOperationType(activeDraftId!, bmUnitId, operationType)
+                    }
+                    onUpdateUnitWindow={(bmUnitId, fromPeriod, toPeriod) =>
+                      updateUnitWindow(activeDraftId!, bmUnitId, fromPeriod, toPeriod)
                     }
                   />
                 </div>
@@ -512,6 +517,7 @@ const activeDraftUnitIds = useMemo(
             unitPnByBmUnit={unitPnByBmUnit}
             dataOverrides={dataOverrides}
             unitServices={unitServices}
+            settlementPeriods={settlementPeriods}
             onRemoveUnits={handleRemoveCommittedUnits}
           />
         )}
