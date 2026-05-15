@@ -3,13 +3,20 @@
 import type { DraftPlan, BMUnit, ModellingAction, OperationType, ServiceType, SettlementPeriodData } from '@/models/types'
 import { OPERATION_TYPE_LABELS } from '@/models/types'
 
-const REASON_CODES: ModellingAction['reasonCode'][] = ['MARGIN', 'INERTIA', 'VOLTAGE', 'CONSTRAINT', 'RESERVE']
+const REASON_CODES: ModellingAction['reasonCode'][] = [
+  'MARGIN', 'INERTIA', 'VOLTAGE',
+  'RECOVERY_RESERVE', 'FREQ_CONTROL_RESERVE', 'GENERAL_RESERVE',
+  'CONTINGENCY_RESERVE', 'RESPONSE',
+]
 const REASON_LABEL: Record<ModellingAction['reasonCode'], string> = {
-  MARGIN:     'Margin',
-  INERTIA:    'Inertia',
-  VOLTAGE:    'Voltage',
-  CONSTRAINT: 'Constraint',
-  RESERVE:    'Reserve',
+  MARGIN:               'Margin',
+  INERTIA:              'Inertia',
+  VOLTAGE:              'Voltage',
+  RECOVERY_RESERVE:     'Recovery Reserve',
+  FREQ_CONTROL_RESERVE: 'Freq. Control',
+  GENERAL_RESERVE:      'General Reserve',
+  CONTINGENCY_RESERVE:  'Contingency',
+  RESPONSE:             'Response',
 }
 
 const OPERATION_TYPES = Object.keys(OPERATION_TYPE_LABELS) as OperationType[]

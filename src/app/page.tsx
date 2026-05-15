@@ -366,9 +366,9 @@ export default function Home() {
     margin:   'MARGIN',
     inertia:  'INERTIA',
     voltage:  'VOLTAGE',
-    reserve:  'RESERVE',
-    response: 'RESERVE',
-    pullback: 'CONSTRAINT',
+    reserve:  'RECOVERY_RESERVE',
+    response: 'RESPONSE',
+    pullback: 'MARGIN',
   }
 
   function handleAddUnits(ids: string[]) {

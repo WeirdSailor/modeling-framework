@@ -17,7 +17,9 @@ interface Props {
 
 const REASON_LABEL: Record<ModellingAction['reasonCode'], string> = {
   MARGIN: 'Margin', INERTIA: 'Inertia', VOLTAGE: 'Voltage',
-  CONSTRAINT: 'Constraint', RESERVE: 'Reserve',
+  RECOVERY_RESERVE: 'Recovery Reserve', FREQ_CONTROL_RESERVE: 'Freq. Control',
+  GENERAL_RESERVE: 'General Reserve', CONTINGENCY_RESERVE: 'Contingency',
+  RESPONSE: 'Response',
 }
 
 function getFuelDisplay(fuelType: string): { label: string; chipClass: string } {

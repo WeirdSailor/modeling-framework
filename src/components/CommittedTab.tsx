@@ -6,24 +6,33 @@ import type { DraftPlan, BMUnit, ModellingAction, OperationType, UnitSnapshot, S
 const CHANGE_THRESHOLD = 10 // percent
 
 const REASON_LABEL: Record<ModellingAction['reasonCode'], string> = {
-  MARGIN:     'Margin',
-  INERTIA:    'Inertia',
-  VOLTAGE:    'Voltage',
-  CONSTRAINT: 'Constraint',
-  RESERVE:    'Reserve',
+  MARGIN:                 'Margin',
+  RECOVERY_RESERVE:       'Recovery Reserve',
+  FREQ_CONTROL_RESERVE:   'Freq. Control',
+  GENERAL_RESERVE:        'General Reserve',
+  CONTINGENCY_RESERVE:    'Contingency',
+  RESPONSE:               'Response',
+  INERTIA:                'Inertia',
+  VOLTAGE:                'Voltage',
 }
 
 const STATIC_PRICE = 120
 
 const REASON_COLORS: Record<ModellingAction['reasonCode'], string> = {
-  MARGIN:     '#f59e0b',
-  INERTIA:    '#8b5cf6',
-  VOLTAGE:    '#06b6d4',
-  RESERVE:    '#f97316',
-  CONSTRAINT: '#ec4899',
+  MARGIN:               '#f59e0b',
+  RECOVERY_RESERVE:     '#6366f1',
+  FREQ_CONTROL_RESERVE: '#8b5cf6',
+  GENERAL_RESERVE:      '#06b6d4',
+  CONTINGENCY_RESERVE:  '#0ea5e9',
+  RESPONSE:             '#f97316',
+  INERTIA:              '#22c55e',
+  VOLTAGE:              '#f59e0b',
 }
 
-const REASON_ORDER: ModellingAction['reasonCode'][] = ['MARGIN', 'INERTIA', 'VOLTAGE', 'RESERVE', 'CONSTRAINT']
+const REASON_ORDER: ModellingAction['reasonCode'][] = [
+  'MARGIN', 'RECOVERY_RESERVE', 'FREQ_CONTROL_RESERVE', 'GENERAL_RESERVE',
+  'CONTINGENCY_RESERVE', 'RESPONSE', 'INERTIA', 'VOLTAGE',
+]
 
 function formatCost(cost: number): string {
   if (cost === 0) return '—'
