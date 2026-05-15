@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
 import type { BMUnit, ServiceType } from '@/models/types'
 
 
@@ -16,6 +16,8 @@ interface Props {
   scenario: string
   gspFilter: Record<string, 'include' | 'exclude'>
   onAddUnits: (ids: string[]) => void
+  solveMode?: boolean
+  solveMw?: number | null
 }
 
 type SortKey = 'bmUnitId' | 'nationalGridBmUnit' | 'fuelType' | 'pn' | 'mel' | 'sel' | 'ndz' | 'mnzt' | 'mzt' | 'priceToSel' | 'priceToMel'
@@ -110,6 +112,7 @@ function SortTh({ col, sort, onSort, children, numeric, className, style }: {
 export default function AvailableTable({
   units, unitPnByBmUnit, unitServices, activeDraftUnitIds, otherDraftUnitMap,
   selectionPattern, readOnly, voltageArea, scenario, gspFilter, onAddUnits,
+  solveMode = false, solveMw = null,
 }: Props) {
   const [sort, setSort] = useState<{ key: SortKey; dir: 'asc' | 'desc' }>({ key: 'nationalGridBmUnit', dir: 'asc' })
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set())
@@ -152,6 +155,27 @@ export default function AvailableTable({
     }
     return filtered
   }, [rows, gspFilter, sort, scenario, voltageArea])
+
+  const coveringSet = useMemo<Set<string>>(() => {
+    if (!solveMode || !solveMw || solveMw <= 0) return new Set()
+    let running = 0
+    const ids = new Set<string>()
+    for (const row of visible) {
+      if (activeDraftUnitIds.has(row.bmUnitId)) continue
+      const available = Math.max(0, row.mel - row.pn)
+      if (available <= 0) continue
+      ids.add(row.bmUnitId)
+      running += available
+      if (running >= solveMw) break
+    }
+    return ids
+  }, [solveMode, solveMw, visible, activeDraftUnitIds])
+
+  useEffect(() => {
+    if (solveMode && coveringSet.size > 0) {
+      setPendingIds(new Set(coveringSet))
+    }
+  }, [solveMode, coveringSet])
 
   const selectableVisible = useMemo(
     () => visible.filter(r => !activeDraftUnitIds.has(r.bmUnitId)).map(r => r.bmUnitId),
@@ -273,6 +297,7 @@ export default function AvailableTable({
               const inDraft     = activeDraftUnitIds.has(row.bmUnitId)
               const otherDrafts = otherDraftUnitMap.get(row.bmUnitId) ?? []
               const pending  = pendingIds.has(row.bmUnitId)
+              const inCoveringSet = solveMode && coveringSet.has(row.bmUnitId)
               return (
                 <tr
                   key={row.bmUnitId}
@@ -281,6 +306,7 @@ export default function AvailableTable({
                     pending ? 'row-pending' : '',
                     selectionPattern === 'click' && !inDraft && !readOnly ? 'row-clickable' : '',
                   ].join(' ')}
+                  style={inCoveringSet ? { background: 'rgba(99,102,241,0.12)', outline: '1px solid rgba(99,102,241,0.3)' } : undefined}
                   onClick={() => handleRowClick(row)}
                   title={inDraft ? 'Already in this draft' : ''}
                 >
