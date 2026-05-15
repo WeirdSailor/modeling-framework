@@ -18,8 +18,10 @@ import CommittedTab from '@/components/CommittedTab'
 import RedeclareTab from '@/components/RedeclareTab'
 import GraphTab from '@/components/GraphTab'
 import RequirementsTab from '@/components/RequirementsTab'
+import Dashboard from '@/components/Dashboard'
+import type { AreaId } from '@/config/areas'
 
-type Tab = 'workspace' | 'chart' | 'committed' | 'redeclare' | 'graph' | 'requirements'
+type Tab = 'dashboard' | 'workspace' | 'chart' | 'committed' | 'redeclare' | 'graph' | 'requirements'
 
 interface ConfirmState {
   message: string
@@ -48,7 +50,8 @@ export default function Home() {
     document.documentElement.setAttribute('data-theme', tweaks.theme)
   }, [tweaks.theme])
 
-  const [activeTab, setActiveTab] = useState<Tab>('workspace')
+  const [activeTab, setActiveTab] = useState<Tab>('dashboard')
+  const [activeAreaTab, setActiveAreaTab] = useState<AreaId>('margin')
   const [hiddenDraftIds, setHiddenDraftIds] = useState<Set<string>>(new Set())
   const toggleDraftChartVisibility = useCallback((id: string) => {
     setHiddenDraftIds(prev => {
@@ -118,6 +121,7 @@ export default function Home() {
   const clearAllDataOverrides = useModellingStore(s => s.clearAllDataOverrides)
   const unitServices      = useModellingStore(s => s.unitServices)
   const setUnitService    = useModellingStore(s => s.setUnitService)
+  const areaRequirements  = useModellingStore(s => s.areaRequirements)
 
   // ── data fetch ──
   const loadData = useCallback(async () => {
@@ -204,6 +208,11 @@ export default function Home() {
     setScenario('margin')
     setActiveTab('workspace')
   }, [solveTarget, createDraft, updateDraftWindow, setScenario])
+
+  const handleDashboardTileClick = useCallback((area: AreaId) => {
+    setActiveAreaTab(area)
+    setActiveTab('chart')
+  }, [])
 
   // ── derived data ──
   const activeDraft = drafts.find(d => d.id === activeDraftId) ?? null
@@ -410,6 +419,12 @@ export default function Home() {
         {/* Tab bar */}
         <div className="tab-bar">
           <button
+            className={`tab-btn${activeTab === 'dashboard' ? ' active' : ''}`}
+            onClick={() => setActiveTab('dashboard')}
+          >
+            Dashboard
+          </button>
+          <button
             className={`tab-btn${activeTab === 'workspace' ? ' active' : ''}`}
             onClick={() => setActiveTab('workspace')}
           >
@@ -464,6 +479,16 @@ export default function Home() {
             ⚙ Config
           </button>
         </div>
+
+        {/* Dashboard tab */}
+        {activeTab === 'dashboard' && (
+          <Dashboard
+            settlementPeriods={settlementPeriods}
+            areaRequirements={areaRequirements}
+            reservePct={tweaks.reservePct}
+            onTileClick={handleDashboardTileClick}
+          />
+        )}
 
         {/* Workspace tab */}
         {activeTab === 'workspace' && (
