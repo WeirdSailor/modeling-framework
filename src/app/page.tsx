@@ -63,6 +63,11 @@ export default function Home() {
   const [voltageArea, setVoltageArea] = useState('')
   const [scenario, setScenario] = useState('none')
   const [gspFilter, setGspFilter] = useState<Record<string, 'include' | 'exclude'>>({})
+  const [solveTarget, setSolveTarget] = useState<{
+    fromSp: number
+    toSp: number
+    worstDeficitMw: number
+  } | null>(null)
   const [dataMode, setDataMode] = useState<'real' | 'historical'>('real')
   const [historicalDate, setHistoricalDate] = useState<string>(
     () => dateToSettlementDate(new Date(Date.now() - 24 * 60 * 60 * 1000))
@@ -119,6 +124,7 @@ export default function Home() {
       const { units, settlementPeriods } = await fetchAllData()
       setUnits(units)
       setSPs(settlementPeriods)
+      setSolveTarget(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load data')
     } finally {
@@ -135,6 +141,7 @@ export default function Home() {
         const { units, settlementPeriods } = await fetchHistoricalData(date, startSp)
         setUnits(units)
         setSPs(settlementPeriods)
+        setSolveTarget(null)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load historical data')
       } finally {
@@ -174,6 +181,14 @@ export default function Home() {
     clearTimeout(toastTimer)
     toastTimer = setTimeout(() => setToast(null), 1800)
   }, [])
+
+  const handleSolveSelect = useCallback((fromSp: number, toSp: number, worstDeficitMw: number) => {
+    setSolveTarget({ fromSp, toSp, worstDeficitMw })
+    setActiveTab('workspace')
+    if (activeDraftId) {
+      updateDraftWindow(activeDraftId, fromSp, toSp)
+    }
+  }, [activeDraftId, updateDraftWindow])
 
   // ── derived data ──
   const activeDraft = drafts.find(d => d.id === activeDraftId) ?? null
@@ -242,6 +257,13 @@ const activeDraftUnitIds = useMemo(
     }
     return map
   }, [drafts, activeDraftId])
+
+  // ── helpers ──
+  function fmtSlot(sp: number | undefined): string {
+    if (!sp) return '—'
+    const found = settlementPeriods.find(s => s.settlementPeriod === sp)
+    return found ? found.startTime.slice(11, 16) : `SP ${sp}`
+  }
 
   // ── handlers ──
   function handleCreateDraft() {
@@ -441,8 +463,15 @@ const activeDraftUnitIds = useMemo(
                   currentUser={currentUser}
                   onChangeName={name => renameDraft(activeDraftId!, name)}
                   onChangeDescription={desc => updateDraftDescription(activeDraftId!, desc)}
-                  onChangeFrom={from => updateDraftWindow(activeDraftId!, from, activeDraft.toPeriod)}
-                  onChangeTo={to => updateDraftWindow(activeDraftId!, activeDraft.fromPeriod, to)}
+                  solveMw={solveTarget?.worstDeficitMw ?? null}
+                  onChangeFrom={from => {
+                    setSolveTarget(null)
+                    updateDraftWindow(activeDraftId!, from, activeDraft.toPeriod)
+                  }}
+                  onChangeTo={to => {
+                    setSolveTarget(null)
+                    updateDraftWindow(activeDraftId!, activeDraft.fromPeriod, to)
+                  }}
                   onCommit={handleCommit}
                   onDiscard={handleDiscard}
                   onReopen={handleReopen}
@@ -468,6 +497,8 @@ const activeDraftUnitIds = useMemo(
                     scenario={scenario}
                     gspFilter={gspFilter}
                     onAddUnits={handleAddUnits}
+                    solveMode={solveTarget !== null}
+                    solveMw={solveTarget ? Math.abs(solveTarget.worstDeficitMw) : null}
                   />
                   <SelectedTable
                     draft={activeDraft}
@@ -499,14 +530,68 @@ const activeDraftUnitIds = useMemo(
 
         {/* Chart tab */}
         {activeTab === 'chart' && (
-          <div className="chart-tab">
+          <div className="chart-tab" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {error && (
               <div className="error-banner">Error: {error}</div>
             )}
             {isLoading && (
               <div className="loading-banner">Loading data…</div>
             )}
-            <MarginChart hiddenDraftIds={hiddenDraftIds} reservePct={tweaks.reservePct} />
+            <MarginChart
+              hiddenDraftIds={hiddenDraftIds}
+              reservePct={tweaks.reservePct}
+              chartInteractionMode={tweaks.chartInteractionMode}
+              onSolveSelect={handleSolveSelect}
+            />
+
+            {/* Solve bar */}
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 20,
+              padding: '10px 16px',
+              background: 'var(--bg-panel)',
+              border: `1px solid ${solveTarget ? '#6366f1' : 'var(--border)'}`,
+              borderRadius: 8,
+              flexShrink: 0,
+            }}>
+              {(['From', 'To', 'Duration', 'Worst Deficit'] as const).map(lbl => {
+                let val = '—'
+                let color: string | undefined
+                if (solveTarget) {
+                  const dur = (solveTarget.toSp - solveTarget.fromSp + 1) * 30
+                  if (lbl === 'From')          val = fmtSlot(solveTarget.fromSp)
+                  if (lbl === 'To')            val = fmtSlot(solveTarget.toSp)
+                  if (lbl === 'Duration')      val = dur < 60 ? `${dur} min` : `${(dur / 60).toFixed(1)} h`
+                  if (lbl === 'Worst Deficit') {
+                    val = `${Math.round(solveTarget.worstDeficitMw).toLocaleString('en-GB')} MW`
+                    color = '#ef4444'
+                  }
+                }
+                return (
+                  <div key={lbl} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <span style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-faint)' }}>{lbl}</span>
+                    <span style={{ fontSize: 12, fontFamily: 'monospace', color: color ?? (solveTarget ? 'var(--text)' : 'var(--text-faint)'), fontWeight: color ? 700 : 400 }}>{val}</span>
+                  </div>
+                )
+              })}
+              <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
+                {solveTarget && (
+                  <button
+                    style={{ fontSize: 11, color: 'var(--text-faint)', background: 'none', border: 'none', cursor: 'pointer' }}
+                    onClick={() => setSolveTarget(null)}
+                  >
+                    ✕ Clear
+                  </button>
+                )}
+                <button
+                  className="btn btn-primary"
+                  disabled={!solveTarget}
+                  onClick={() => solveTarget && setActiveTab('workspace')}
+                  style={{ fontSize: 12, opacity: solveTarget ? 1 : 0.35, padding: '6px 16px' }}
+                >
+                  Solve ↗
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
