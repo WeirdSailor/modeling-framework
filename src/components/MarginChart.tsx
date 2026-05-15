@@ -223,7 +223,6 @@ export function MarginChart({
   }, [chartInteractionMode])
 
   function fireSolveSelect(idxA: number, idxB: number) {
-    console.log('[chart] fireSolveSelect idxA=', idxA, 'idxB=', idxB, 'onSolveSelect=', !!onSolveSelect)
     if (!onSolveSelect) return
     const lo = Math.min(idxA, idxB)
     const hi = Math.max(idxA, idxB)
@@ -235,9 +234,7 @@ export function MarginChart({
         return sp.emx - tr2
       })
     )
-    console.log('[chart] worst deficit in range=', worst)
     if (worst < 0) onSolveSelect(fromSp, toSp, worst)
-    else console.log('[chart] no deficit in selected range — onSolveSelect NOT called')
   }
 
   // Must be before early return so hook count is stable across renders
@@ -399,11 +396,10 @@ export function MarginChart({
           data={chartData}
           margin={{ top: 8, right: 16, left: 8, bottom: 8 }}
           onMouseDown={e => {
-            console.log('[chart] mousedown fired, activeTooltipIndex=', e?.activeTooltipIndex, 'mode=', chartInteractionMode)
             if (chartInteractionMode !== 'drag') return
-            const idx = typeof e?.activeTooltipIndex === 'number' ? e.activeTooltipIndex : null
-            console.log('[chart] drag idx=', idx)
-            if (idx == null) return
+            const raw = e?.activeTooltipIndex
+            const idx = raw != null ? parseInt(String(raw), 10) : null
+            if (idx == null || isNaN(idx)) return
             isDraggingRef.current = true
             dragStartRef.current  = idx
             setDragStart(idx)
@@ -412,19 +408,19 @@ export function MarginChart({
           }}
           onMouseMove={e => {
             if (chartInteractionMode === 'drag' && isDraggingRef.current) {
-              const idx = typeof e?.activeTooltipIndex === 'number' ? e.activeTooltipIndex : null
-              console.log('[chart] mousemove while dragging, idx=', idx)
-              if (idx != null) setDragEnd(idx)
+              const raw = e?.activeTooltipIndex
+              const idx = raw != null ? parseInt(String(raw), 10) : null
+              if (idx != null && !isNaN(idx)) setDragEnd(idx)
             }
           }}
           onMouseUp={e => {
-            console.log('[chart] mouseup fired, activeTooltipIndex=', e?.activeTooltipIndex)
             if (chartInteractionMode !== 'drag') return
             dragFiredRef.current  = true
             isDraggingRef.current = false
             setIsDragging(false)
-            const rawIdx = typeof e?.activeTooltipIndex === 'number' ? e.activeTooltipIndex : null
-            const idx   = rawIdx ?? dragEnd
+            const raw    = e?.activeTooltipIndex
+            const rawIdx = raw != null ? parseInt(String(raw), 10) : null
+            const idx    = (rawIdx != null && !isNaN(rawIdx)) ? rawIdx : dragEnd
             const start = dragStartRef.current
             dragStartRef.current  = null
             if (start !== null && idx !== null && start !== idx) {
@@ -436,10 +432,10 @@ export function MarginChart({
             }
           }}
           onClick={e => {
-            console.log('[chart] click fired, activeTooltipIndex=', e?.activeTooltipIndex, 'mode=', chartInteractionMode)
             if (chartInteractionMode === 'twoClick') {
-              const idx = typeof e?.activeTooltipIndex === 'number' ? e.activeTooltipIndex : null
-              if (idx == null) return
+              const raw = e?.activeTooltipIndex
+              const idx = raw != null ? parseInt(String(raw), 10) : null
+              if (idx == null || isNaN(idx)) return
               if (clickPhase === 0) {
                 setClickStart(idx)
                 setDragStart(idx)
@@ -459,8 +455,9 @@ export function MarginChart({
                 }
               }
             } else if (chartInteractionMode === 'deficit') {
-              const idx = typeof e?.activeTooltipIndex === 'number' ? e.activeTooltipIndex : null
-              if (idx == null) return
+              const raw = e?.activeTooltipIndex
+              const idx = raw != null ? parseInt(String(raw), 10) : null
+              if (idx == null || isNaN(idx)) return
               const range = deficitRanges.find(r => idx >= r.lo && idx <= r.hi)
               if (!range) { setDragStart(null); setDragEnd(null); return }
               setDragStart(range.lo)
