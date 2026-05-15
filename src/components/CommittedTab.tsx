@@ -83,11 +83,11 @@ function ChangeArrow({ current, snapshotVal, unit = '', invertColors = false }: 
   const up = pct > 0
   const sign = up ? '+' : ''
   const tooltip = `Was: ${snapshotVal.toFixed(0)}${unit} → Now: ${current.toFixed(0)}${unit} (${sign}${pct.toFixed(0)}%)`
+  const color = up
+    ? (invertColors ? '#ef4444' : '#22c55e')
+    : (invertColors ? '#22c55e' : '#ef4444')
   return (
-    <span
-      className={`change-arrow ${up ? 'change-up' : 'change-down'}${invertColors ? ' invert' : ''}`}
-      title={tooltip}
-    >
+    <span className="change-arrow" style={{ color }} title={tooltip}>
       {up ? '↑' : '↓'}
     </span>
   )
