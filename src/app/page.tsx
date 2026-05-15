@@ -19,7 +19,10 @@ import RedeclareTab from '@/components/RedeclareTab'
 import GraphTab from '@/components/GraphTab'
 import RequirementsTab from '@/components/RequirementsTab'
 import Dashboard from '@/components/Dashboard'
+import AreaChart from '@/components/AreaChart'
 import type { AreaId } from '@/config/areas'
+import { AREAS, getArea } from '@/config/areas'
+import { computeAreaStatus } from '@/utils/areaAggregates'
 
 type Tab = 'dashboard' | 'workspace' | 'chart' | 'committed' | 'redeclare' | 'graph' | 'requirements'
 
@@ -31,6 +34,12 @@ interface ConfirmState {
 }
 
 let toastTimer: ReturnType<typeof setTimeout> | undefined
+
+const STATUS_DOT_COLOR: Record<string, string> = {
+  shortfall: '#ef4444',
+  tight:     '#f59e0b',
+  ok:        '#22c55e',
+}
 
 export default function Home() {
   // ── tweaks ──
@@ -195,6 +204,11 @@ export default function Home() {
     setSolvePanelVisible(true)
   }, [])
 
+  const handleAreaSolveSelect = useCallback((fromSp: number, toSp: number, worstDeficitMw: number) => {
+    setSolveTarget({ fromSp, toSp, worstDeficitMw, adjustedMw: Math.abs(worstDeficitMw) })
+    setSolvePanelVisible(true)
+  }, [])
+
   const handleSolveMwChange = useCallback((mw: number) => {
     setSolveTarget(t => t ? { ...t, adjustedMw: Math.max(1, mw) } : t)
   }, [])
@@ -205,9 +219,9 @@ export default function Home() {
     updateDraftWindow(draftId, solveTarget.fromSp, solveTarget.toSp)
     setSolvePanelVisible(false)
     setClearSelectionKey(k => k + 1)
-    setScenario('margin')
+    setScenario(getArea(activeAreaTab).defaultScenario)
     setActiveTab('workspace')
-  }, [solveTarget, createDraft, updateDraftWindow, setScenario])
+  }, [solveTarget, createDraft, updateDraftWindow, setScenario, activeAreaTab])
 
   const handleDashboardTileClick = useCallback((area: AreaId) => {
     setActiveAreaTab(area)
@@ -380,6 +394,15 @@ export default function Home() {
         : `Removed ${removals.length} units from committed drafts`
     )
   }
+
+  const areaStatusMap = useMemo(() =>
+    Object.fromEntries(
+      AREAS.map(a => [
+        a.id,
+        computeAreaStatus(a.id, settlementPeriods, areaRequirements, 48, tweaks.reservePct),
+      ])
+    )
+  , [settlementPeriods, areaRequirements, tweaks.reservePct])
 
   const isOwner = activeDraft?.ownerId === currentUser
   const readOnly = !activeDraft || activeDraft.status !== 'draft' || !isOwner
@@ -584,13 +607,66 @@ export default function Home() {
             {isLoading && (
               <div className="loading-banner">Loading data…</div>
             )}
-            <MarginChart
-              hiddenDraftIds={hiddenDraftIds}
-              reservePct={tweaks.reservePct}
-              chartInteractionMode={tweaks.chartInteractionMode}
-              clearSelectionKey={clearSelectionKey}
-              onSolveSelect={handleSolveSelect}
-            />
+
+            <div>
+              {/* Area subtab row */}
+              <div style={{
+                display: 'flex', gap: 0, borderBottom: '1px solid var(--border)',
+                background: 'var(--surface)', overflowX: 'auto', padding: '0 12px',
+              }}>
+                {AREAS.map(a => {
+                  const st = areaStatusMap[a.id]
+                  const dotColor = STATUS_DOT_COLOR[st?.status ?? 'ok']
+                  const isActive = activeAreaTab === a.id
+                  return (
+                    <button
+                      key={a.id}
+                      onClick={() => setActiveAreaTab(a.id)}
+                      style={{
+                        padding: '6px 12px', fontSize: 10, whiteSpace: 'nowrap',
+                        background: 'transparent', border: 'none', cursor: 'pointer',
+                        borderBottom: isActive ? `2px solid ${dotColor}` : '2px solid transparent',
+                        color: isActive ? dotColor : 'var(--text-muted)',
+                        display: 'flex', alignItems: 'center', gap: 4,
+                      }}
+                    >
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: dotColor, display: 'inline-block' }} />
+                      {a.shortName}
+                    </button>
+                  )
+                })}
+              </div>
+
+              {/* Margin chart */}
+              {activeAreaTab === 'margin' && (
+                <MarginChart
+                  hiddenDraftIds={hiddenDraftIds}
+                  reservePct={tweaks.reservePct}
+                  chartInteractionMode={tweaks.chartInteractionMode}
+                  clearSelectionKey={clearSelectionKey}
+                  onSolveSelect={handleSolveSelect}
+                />
+              )}
+
+              {/* Non-Margin area charts */}
+              {activeAreaTab !== 'margin' && (() => {
+                const areaConfig = getArea(activeAreaTab)
+                const reqs = areaRequirements[activeAreaTab] ?? []
+                return (
+                  <AreaChart
+                    area={areaConfig}
+                    settlementPeriods={settlementPeriods}
+                    areaRequirements={reqs}
+                    drafts={drafts}
+                    units={units}
+                    hiddenDraftIds={hiddenDraftIds}
+                    chartInteractionMode={tweaks.chartInteractionMode}
+                    onSolveSelect={handleAreaSolveSelect}
+                    isLoading={isLoading}
+                  />
+                )
+              })()}
+            </div>
 
             {/* Solve bar */}
             <div style={{
