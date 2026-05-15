@@ -32,6 +32,7 @@ export interface SettlementPeriodData {
   hasConfirmedPn: boolean; // true if this slot has post-gate-closure PN data from Elexon
   proxyEmx: number;        // D-1 EMX estimate for unconfirmed slots (0 if confirmed or unavailable)
   proxyEol: number;        // D-1 EOL estimate for unconfirmed slots (0 if confirmed or unavailable)
+  areaAvailability?: Record<string, number>  // effective availability per non-Margin AreaId, after committed actions
 }
 
 export type ServiceType = 'SR' | 'QR'
@@ -53,7 +54,7 @@ export interface ModellingAction {
   fromPeriod: number;              // Settlement period start (1-48)
   toPeriod: number | undefined;    // Settlement period end (1-48); undefined = open-ended (covers all remaining SPs)
   outputLevel: number;             // MW
-  reasonCode: 'MARGIN' | 'INERTIA' | 'VOLTAGE' | 'CONSTRAINT' | 'RESERVE';
+  reasonCode: 'MARGIN' | 'RECOVERY_RESERVE' | 'FREQ_CONTROL_RESERVE' | 'GENERAL_RESERVE' | 'CONTINGENCY_RESERVE' | 'RESPONSE' | 'INERTIA' | 'VOLTAGE';
   operationType?: OperationType;
   timestamp: Date;
 }
@@ -69,6 +70,13 @@ export interface UnitSnapshot {
   mnzt: number;
   priceToSel: number;
   priceToMel: number;
+}
+
+export interface AreaRequirementRow {
+  sp: number           // 1–48 slot index within the rolling window
+  requirement: number  // MW / GVAs / MVAr
+  contracted: number   // base contracted availability before modelling actions
+  constrained: number  // portion unusable (e.g. constrained off)
 }
 
 export interface DraftPlan {
