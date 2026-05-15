@@ -17,8 +17,9 @@ import ConfirmModal from '@/components/ConfirmModal'
 import CommittedTab from '@/components/CommittedTab'
 import RedeclareTab from '@/components/RedeclareTab'
 import GraphTab from '@/components/GraphTab'
+import RequirementsTab from '@/components/RequirementsTab'
 
-type Tab = 'workspace' | 'chart' | 'committed' | 'redeclare' | 'graph'
+type Tab = 'workspace' | 'chart' | 'committed' | 'redeclare' | 'graph' | 'requirements'
 
 interface ConfirmState {
   message: string
@@ -438,6 +439,12 @@ export default function Home() {
           >
             Redeclare
           </button>
+          <button
+            className={`tab-btn${activeTab === 'requirements' ? ' active' : ''}`}
+            onClick={() => setActiveTab('requirements')}
+          >
+            Requirements
+          </button>
           <div className="tab-spacer" />
           {!tweaks.showSidebar && (
             <button
@@ -637,6 +644,11 @@ export default function Home() {
             onClearAll={clearAllDataOverrides}
             onSetService={setUnitService}
           />
+        )}
+
+        {/* Requirements tab */}
+        {activeTab === 'requirements' && (
+          <RequirementsTab />
         )}
 
         {/* Graph tab */}
