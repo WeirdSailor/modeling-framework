@@ -1,7 +1,8 @@
 import { create } from 'zustand'
-import type { BMUnit, SettlementPeriodData, ModellingAction, DraftPlan, OperationType, UserId, UnitSnapshot, ServiceType } from '@/models/types'
+import type { BMUnit, SettlementPeriodData, ModellingAction, DraftPlan, OperationType, UserId, UnitSnapshot, ServiceType, AreaRequirementRow } from '@/models/types'
 import { USERS } from '@/models/types'
 import { computeAggregates } from '@/utils/margin'
+import { computeAreaAvailabilities } from '@/utils/areaAggregates'
 
 const DRAFT_COLORS = ['#f59e0b', '#8b5cf6', '#06b6d4', '#f97316', '#ec4899']
 
@@ -22,6 +23,33 @@ function refreshAggregates(
   return periods.map(sp => ({ ...sp, ...computeAggregates(sp, committedActions, units) }))
 }
 
+const NON_MARGIN_AREA_IDS = [
+  'recovery_reserve', 'freq_control_reserve', 'general_reserve',
+  'contingency_reserve', 'response', 'inertia', 'voltage',
+] as const
+
+function initialAreaRequirements(): Record<string, AreaRequirementRow[]> {
+  const result: Record<string, AreaRequirementRow[]> = {}
+  for (const area of NON_MARGIN_AREA_IDS) {
+    result[area] = Array.from({ length: 48 }, (_, i) => ({
+      sp: i + 1, requirement: 0, contracted: 0, constrained: 0,
+    }))
+  }
+  return result
+}
+
+// Runs both refreshAggregates (margin) and computeAreaAvailabilities (all other areas).
+function refreshAllAggregates(
+  periods: SettlementPeriodData[],
+  drafts: DraftPlan[],
+  units: BMUnit[],
+  areaRequirements: Record<string, AreaRequirementRow[]>
+): SettlementPeriodData[] {
+  const committedActions = drafts.filter(d => d.status === 'committed').flatMap(d => d.actions)
+  const withMargin = refreshAggregates(periods, drafts, units)
+  return computeAreaAvailabilities(withMargin, committedActions, units, areaRequirements)
+}
+
 interface ModellingState {
   units: BMUnit[]
   settlementPeriods: SettlementPeriodData[]
@@ -33,6 +61,9 @@ interface ModellingState {
   currentUser: UserId
   dataOverrides: Record<string, Partial<UnitSnapshot>>
   unitServices: Record<string, ServiceType>
+  areaRequirements: Record<string, AreaRequirementRow[]>
+  setAreaRequirement: (area: string, sp: number, field: 'requirement' | 'contracted' | 'constrained', value: number) => void
+  fillAreaRequirements: (area: string, requirement?: number, contracted?: number) => void
 
   setUnits: (units: BMUnit[]) => void
   setSettlementPeriods: (periods: SettlementPeriodData[]) => void
@@ -82,6 +113,7 @@ export const useModellingStore = create<ModellingState>((set, get) => ({
   currentUser: getStoredUser(),
   dataOverrides: {},
   unitServices: {},
+  areaRequirements: initialAreaRequirements(),
 
   setDataOverride: (bmUnitId, field, value) =>
     set(state => ({
@@ -108,11 +140,39 @@ export const useModellingStore = create<ModellingState>((set, get) => ({
       return { unitServices: next }
     }),
 
+  setAreaRequirement: (area, sp, field, value) =>
+    set(state => {
+      const rows = (state.areaRequirements[area] ?? []).map(r =>
+        r.sp === sp ? { ...r, [field]: value } : r
+      )
+      const newReqs = { ...state.areaRequirements, [area]: rows }
+      const committedActions = state.drafts.filter(d => d.status === 'committed').flatMap(d => d.actions)
+      return {
+        areaRequirements: newReqs,
+        settlementPeriods: computeAreaAvailabilities(state.settlementPeriods, committedActions, state.units, newReqs),
+      }
+    }),
+
+  fillAreaRequirements: (area, requirement, contracted) =>
+    set(state => {
+      const rows = (state.areaRequirements[area] ?? []).map(r => ({
+        ...r,
+        ...(requirement !== undefined ? { requirement } : {}),
+        ...(contracted  !== undefined ? { contracted  } : {}),
+      }))
+      const newReqs = { ...state.areaRequirements, [area]: rows }
+      const committedActions = state.drafts.filter(d => d.status === 'committed').flatMap(d => d.actions)
+      return {
+        areaRequirements: newReqs,
+        settlementPeriods: computeAreaAvailabilities(state.settlementPeriods, committedActions, state.units, newReqs),
+      }
+    }),
+
   setUnits: (units) => set({ units }),
 
   setSettlementPeriods: (periods) =>
     set(state => ({
-      settlementPeriods: refreshAggregates(periods, state.drafts, state.units),
+      settlementPeriods: refreshAllAggregates(periods, state.drafts, state.units, state.areaRequirements),
     })),
 
   setLoading: (loading) => set({ isLoading: loading }),
@@ -197,7 +257,7 @@ export const useModellingStore = create<ModellingState>((set, get) => ({
       return {
         drafts,
         settlementPeriods: isCommitted
-          ? refreshAggregates(state.settlementPeriods, drafts, state.units)
+          ? refreshAllAggregates(state.settlementPeriods, drafts, state.units, state.areaRequirements)
           : state.settlementPeriods,
       }
     }),
@@ -229,7 +289,7 @@ export const useModellingStore = create<ModellingState>((set, get) => ({
       return {
         drafts,
         settlementPeriods: needsRefresh
-          ? refreshAggregates(state.settlementPeriods, drafts, state.units)
+          ? refreshAllAggregates(state.settlementPeriods, drafts, state.units, state.areaRequirements)
           : state.settlementPeriods,
       }
     }),
@@ -273,7 +333,7 @@ export const useModellingStore = create<ModellingState>((set, get) => ({
       return {
         drafts,
         settlementPeriods: draft.status === 'committed'
-          ? refreshAggregates(state.settlementPeriods, drafts, state.units)
+          ? refreshAllAggregates(state.settlementPeriods, drafts, state.units, state.areaRequirements)
           : state.settlementPeriods,
       }
     }),
@@ -347,7 +407,7 @@ export const useModellingStore = create<ModellingState>((set, get) => ({
       )
       return {
         drafts,
-        settlementPeriods: refreshAggregates(state.settlementPeriods, drafts, state.units),
+        settlementPeriods: refreshAllAggregates(state.settlementPeriods, drafts, state.units, state.areaRequirements),
       }
     }),
 
@@ -361,7 +421,7 @@ export const useModellingStore = create<ModellingState>((set, get) => ({
       return {
         drafts,
         settlementPeriods: wasCommitted
-          ? refreshAggregates(state.settlementPeriods, drafts, state.units)
+          ? refreshAllAggregates(state.settlementPeriods, drafts, state.units, state.areaRequirements)
           : state.settlementPeriods,
       }
     }),
@@ -378,7 +438,7 @@ export const useModellingStore = create<ModellingState>((set, get) => ({
       return {
         drafts,
         settlementPeriods: wasCommitted
-          ? refreshAggregates(state.settlementPeriods, drafts, state.units)
+          ? refreshAllAggregates(state.settlementPeriods, drafts, state.units, state.areaRequirements)
           : state.settlementPeriods,
       }
     }),
@@ -399,7 +459,7 @@ export const useModellingStore = create<ModellingState>((set, get) => ({
         activeDraftId: null,
         selectedUnits: new Set<string>(),
         settlementPeriods: hadCommitted
-          ? refreshAggregates(state.settlementPeriods, [], state.units)
+          ? refreshAllAggregates(state.settlementPeriods, [], state.units, state.areaRequirements)
           : state.settlementPeriods,
       }
     }),
