@@ -13,6 +13,7 @@ export interface TweakState {
   showSidebar: boolean
   selectionPattern: 'buttons' | 'click'
   reservePct: number
+  chartInteractionMode: 'drag' | 'twoClick' | 'deficit'
 }
 
 // ── Shared sub-components ─────────────────────────────────────────────────────
@@ -135,6 +136,15 @@ function TweaksTab({
           <span style={{ fontSize: 12, color: 'var(--text-soft)' }}>%</span>
         </div>
       </div>
+      <SegControl
+        value={tweaks.chartInteractionMode}
+        options={[
+          { value: 'drag',     label: 'Drag' },
+          { value: 'twoClick', label: '2-Click' },
+          { value: 'deficit',  label: 'Deficit zone' },
+        ]}
+        onChange={v => onChangeTweak('chartInteractionMode', v)}
+      />
     </div>
   )
 }
