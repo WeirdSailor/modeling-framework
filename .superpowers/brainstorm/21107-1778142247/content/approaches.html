@@ -1,0 +1,114 @@
+<h2>Cost-by-Reason breakdown — 3 approaches</h2>
+<p class="subtitle">All live on the Committed tab, committed units only. Pick the layout that fits how you'd actually use it.</p>
+
+<div class="cards">
+
+  <!-- Option A -->
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#1a1d23;border-radius:6px;padding:12px;font-family:monospace;font-size:11px;color:#c9d1d9">
+        <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+          <span style="background:#2d333b;border:1px solid #444;border-radius:4px;padding:3px 10px;color:#aaa">All</span>
+          <span style="background:#f59e0b22;border:1px solid #f59e0b;border-radius:4px;padding:3px 10px;color:#f59e0b">Margin</span>
+          <span style="background:#2d333b;border:1px solid #444;border-radius:4px;padding:3px 10px;color:#aaa">Inertia</span>
+          <span style="background:#2d333b;border:1px solid #444;border-radius:4px;padding:3px 10px;color:#aaa">Voltage</span>
+          <span style="background:#2d333b;border:1px solid #444;border-radius:4px;padding:3px 10px;color:#aaa">Reserve</span>
+          <span style="background:#2d333b;border:1px solid #444;border-radius:4px;padding:3px 10px;color:#aaa">Constraint</span>
+        </div>
+        <div style="display:flex;gap:16px;background:#2d333b;border-radius:4px;padding:8px 12px;margin-bottom:8px;font-size:11px">
+          <span style="color:#aaa">4 units</span>
+          <span style="color:#aaa">Σ MEL <span style="color:#e6edf3">1,240 MW</span></span>
+          <span style="color:#aaa">Est. cost <span style="color:#4ade80;font-weight:600">£87,600</span></span>
+        </div>
+        <div style="border-top:1px solid #30363d;padding-top:8px">
+          <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr;gap:4px;color:#888;font-size:10px;padding:0 4px;margin-bottom:4px">
+            <span>BMU</span><span>Type</span><span style="text-align:right">NDZ</span><span style="text-align:right">SEL</span><span style="text-align:right">MEL</span><span style="text-align:right">£SEL</span><span style="text-align:right">£MEL</span><span style="text-align:right">PN</span>
+          </div>
+          <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr;gap:4px;font-size:10px;padding:4px;border-radius:3px;background:#22272e">
+            <span style="color:#79c0ff">DRAXX-1</span><span style="color:#f59e0b;background:#f59e0b22;padding:1px 4px;border-radius:3px;font-size:9px">CCGT</span><span style="text-align:right;color:#aaa">8m</span><span style="text-align:right;color:#aaa">300</span><span style="text-align:right;color:#e6edf3">600</span><span style="text-align:right;color:#aaa">£85</span><span style="text-align:right;color:#aaa">£95</span><span style="text-align:right;color:#aaa">120</span>
+          </div>
+          <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr;gap:4px;font-size:10px;padding:4px;border-radius:3px;margin-top:2px">
+            <span style="color:#79c0ff">STAY-G1</span><span style="color:#ec4899;background:#ec489922;padding:1px 4px;border-radius:3px;font-size:9px">CCGT</span><span style="text-align:right;color:#aaa">12m</span><span style="text-align:right;color:#aaa">240</span><span style="text-align:right;color:#e6edf3">480</span><span style="text-align:right;color:#aaa">£90</span><span style="text-align:right;color:#aaa">£110</span><span style="text-align:right;color:#aaa">0</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A — Filter pills + summary bar</h3>
+      <p>Pill row selects one reason code at a time. Summary bar above the table updates instantly — unit count, total MEL, estimated cost. Simple and fast to switch between reasons.</p>
+    </div>
+  </div>
+
+  <!-- Option B -->
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#1a1d23;border-radius:6px;padding:12px;font-family:monospace;font-size:11px;color:#c9d1d9">
+        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:10px">
+          <div style="background:#f59e0b18;border:1px solid #f59e0b66;border-radius:5px;padding:7px 8px;cursor:pointer">
+            <div style="font-size:9px;color:#f59e0b;font-weight:600;text-transform:uppercase">Margin</div>
+            <div style="color:#e6edf3;font-size:13px;font-weight:700;margin:2px 0">£87k</div>
+            <div style="color:#aaa;font-size:9px">4 units · 1,240 MW</div>
+          </div>
+          <div style="background:#8b5cf618;border:1px solid #8b5cf666;border-radius:5px;padding:7px 8px">
+            <div style="font-size:9px;color:#8b5cf6;font-weight:600;text-transform:uppercase">Inertia</div>
+            <div style="color:#e6edf3;font-size:13px;font-weight:700;margin:2px 0">£52k</div>
+            <div style="color:#aaa;font-size:9px">2 units · 720 MW</div>
+          </div>
+          <div style="background:#06b6d418;border:1px solid #06b6d466;border-radius:5px;padding:7px 8px">
+            <div style="font-size:9px;color:#06b6d4;font-weight:600;text-transform:uppercase">Voltage</div>
+            <div style="color:#e6edf3;font-size:13px;font-weight:700;margin:2px 0">£24k</div>
+            <div style="color:#aaa;font-size:9px">1 unit · 320 MW</div>
+          </div>
+          <div style="background:#f9731618;border:1px solid #f9731666;border-radius:5px;padding:7px 8px">
+            <div style="font-size:9px;color:#f97316;font-weight:600;text-transform:uppercase">Reserve</div>
+            <div style="color:#e6edf3;font-size:13px;font-weight:700;margin:2px 0">£31k</div>
+            <div style="color:#aaa;font-size:9px">2 units · 440 MW</div>
+          </div>
+          <div style="background:#ec489918;border:1px solid #ec489966;border-radius:5px;padding:7px 8px">
+            <div style="font-size:9px;color:#ec4899;font-weight:600;text-transform:uppercase">Constraint</div>
+            <div style="color:#e6edf3;font-size:13px;font-weight:700;margin:2px 0">—</div>
+            <div style="color:#aaa;font-size:9px">0 units</div>
+          </div>
+        </div>
+        <div style="border-top:1px solid #30363d;padding-top:8px;color:#888;font-size:10px;text-align:center">← click a card to filter table below</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B — Summary cards + click-to-filter</h3>
+      <p>All reason codes visible as cards at once — cost, unit count, total MW. Click any card to filter the table below. You see the full picture without switching tabs, and can drill in on one reason code.</p>
+    </div>
+  </div>
+
+  <!-- Option C -->
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#1a1d23;border-radius:6px;padding:12px;font-family:monospace;font-size:11px;color:#c9d1d9;overflow:hidden">
+        <div style="background:#f59e0b18;border-left:3px solid #f59e0b;padding:5px 10px;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center">
+          <span style="color:#f59e0b;font-weight:600;font-size:11px">▾ MARGIN</span>
+          <span style="color:#aaa;font-size:10px">4 units · £87,600</span>
+        </div>
+        <div style="padding:0 4px;margin-bottom:8px">
+          <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:4px;font-size:10px;padding:3px 4px;background:#22272e;border-radius:2px">
+            <span style="color:#79c0ff">DRAXX-1</span><span style="color:#f59e0b;background:#f59e0b22;padding:1px 4px;border-radius:3px;font-size:9px">CCGT</span><span style="text-align:right;color:#aaa">600 MW</span><span style="text-align:right;color:#4ade80">£36k</span>
+          </div>
+        </div>
+        <div style="background:#8b5cf618;border-left:3px solid #8b5cf6;padding:5px 10px;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center">
+          <span style="color:#8b5cf6;font-weight:600;font-size:11px">▾ INERTIA</span>
+          <span style="color:#aaa;font-size:10px">2 units · £52,000</span>
+        </div>
+        <div style="padding:0 4px">
+          <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:4px;font-size:10px;padding:3px 4px;background:#22272e;border-radius:2px">
+            <span style="color:#79c0ff">STAY-G1</span><span style="color:#ec4899;background:#ec489922;padding:1px 4px;border-radius:3px;font-size:9px">CCGT</span><span style="text-align:right;color:#aaa">480 MW</span><span style="text-align:right;color:#4ade80">£29k</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C — Grouped table, no filter</h3>
+      <p>Table is split into collapsible sections by reason code. Each section header shows the subtotal. No filtering — everything visible at once. Best if you regularly compare reasons side-by-side.</p>
+    </div>
+  </div>
+
+</div>
+
+<p class="subtitle" style="margin-top:16px">My recommendation: <strong>B</strong> — you see the full cost breakdown at a glance (which is the primary goal), and can still drill into any reason code without losing context of the others.</p>

@@ -1,0 +1,252 @@
+<h2>Design — Section 2: Popover Detail</h2>
+<p class="subtitle">Button states and popover anatomy. Review and confirm before we move to the component breakdown.</p>
+
+<style>
+  .mock-panel {
+    background: #0f1117;
+    border: 1px solid #2a2d3a;
+    border-radius: 8px;
+    overflow: visible;
+    font-family: system-ui, -apple-system, sans-serif;
+    font-size: 12.5px;
+    color: #d1d5db;
+  }
+  .mock-head {
+    padding: 10px 14px;
+    border-bottom: 1px solid #2a2d3a;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    background: #161920;
+    border-radius: 8px 8px 0 0;
+  }
+  .mock-title {
+    font-size: 13px; font-weight: 600; color: #f9fafb;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .mock-pill {
+    font-size: 11px; background: #1e2230; color: #6b7280;
+    padding: 1px 8px; border-radius: 999px;
+  }
+  .mock-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .mock-input {
+    background: #0f1117; border: 1px solid #374151; border-radius: 6px;
+    padding: 5px 10px 5px 28px; color: #9ca3af; width: 150px; font-size: 12px;
+    position: relative;
+  }
+  .mock-select {
+    background: #0f1117; border: 1px solid #374151; border-radius: 6px;
+    padding: 5px 10px; color: #9ca3af; font-size: 12px;
+  }
+
+  /* Button states */
+  .gsp-btn {
+    background: #0f1117; border: 1px solid #374151; border-radius: 6px;
+    padding: 5px 10px; color: #9ca3af; font-size: 12px;
+    display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+    white-space: nowrap; position: relative;
+  }
+  .gsp-btn.has-inc { border-color: #4f46e5; color: #a5b4fc; background: #1e1b4b; }
+  .gsp-btn.has-exc { border-color: #dc2626; color: #fca5a5; background: #450a0a; }
+  .gsp-btn.has-both { border-color: #4f46e5; color: #a5b4fc; background: #1e1b4b; }
+
+  .b-inc { background: #4f46e5; color: #fff; font-size: 10px; border-radius: 999px; padding: 1px 5px; font-weight: 600; }
+  .b-exc { background: #dc2626; color: #fff; font-size: 10px; border-radius: 999px; padding: 1px 5px; font-weight: 600; }
+
+  /* Popover */
+  .pop {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    background: #1a1d27;
+    border: 1px solid #374151;
+    border-radius: 8px;
+    box-shadow: 0 8px 32px rgba(0,0,0,.6);
+    width: 270px;
+    z-index: 20;
+  }
+  .pop-header {
+    padding: 8px 12px;
+    font-size: 11px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: .05em; color: #6b7280;
+    border-bottom: 1px solid #2a2d3a;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .pop-clear {
+    color: #6366f1; font-size: 11px; font-weight: 400;
+    text-transform: none; letter-spacing: 0; cursor: pointer;
+  }
+  .pop-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 5px 12px; gap: 8px;
+  }
+  .pop-row:hover { background: #1e2230; }
+  .pop-label { font-size: 12px; color: #d1d5db; }
+  .pop-sub { font-size: 10px; color: #6b7280; }
+
+  .tg { display: flex; border-radius: 5px; overflow: hidden; border: 1px solid #374151; flex-shrink: 0; }
+  .tg-btn {
+    padding: 3px 8px; font-size: 11px; font-weight: 600;
+    background: #0f1117; color: #6b7280;
+    border: none; cursor: pointer; border-right: 1px solid #374151;
+    line-height: 1.4;
+  }
+  .tg-btn:last-child { border-right: none; }
+  .tg-btn.active-inc { background: #064e3b; color: #6ee7b7; }
+  .tg-btn.active-neu { background: #1e2230; color: #d1d5db; }
+  .tg-btn.active-exc { background: #7f1d1d; color: #fca5a5; }
+
+  .pop-footer {
+    padding: 7px 12px; border-top: 1px solid #2a2d3a;
+    font-size: 11px; color: #6b7280; text-align: right;
+  }
+  .pop-footer span { color: #6ee7b7; } .pop-footer span.exc { color: #fca5a5; }
+
+  .section { margin-bottom: 28px; }
+  .section-label {
+    font-size: 11px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: .06em; color: #6b7280; margin-bottom: 10px;
+  }
+
+  .states-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-start; margin-bottom: 8px; }
+  .state-item { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+  .state-caption { font-size: 10px; color: #6b7280; }
+
+  .annotation {
+    font-size: 11px; color: #9ca3af; line-height: 1.6;
+    background: #1a1d27; border: 1px solid #2a2d3a; border-radius: 6px;
+    padding: 10px 12px; margin-top: 12px;
+  }
+  .annotation strong { color: #d1d5db; }
+
+  .mock-table-stub {
+    padding: 8px 14px; font-size: 11.5px; color: #4b5563;
+    font-family: 'SF Mono', monospace; border-radius: 0 0 8px 8px;
+  }
+  .mock-table-stub div { padding: 3px 0; border-bottom: 1px solid #1e2230; }
+  .mock-table-stub div:last-child { border-bottom: none; }
+</style>
+
+<!-- Section 1: Button states -->
+<div class="section">
+  <div class="section-label">Button states</div>
+  <div class="states-row">
+    <div class="state-item">
+      <div class="gsp-btn">GSP ▾</div>
+      <div class="state-caption">Inactive — no filter</div>
+    </div>
+    <div class="state-item">
+      <div class="gsp-btn has-inc">GSP ▾ <span class="b-inc">+2</span></div>
+      <div class="state-caption">2 zones included</div>
+    </div>
+    <div class="state-item">
+      <div class="gsp-btn has-exc">GSP ▾ <span class="b-exc">−1</span></div>
+      <div class="state-caption">1 zone excluded</div>
+    </div>
+    <div class="state-item">
+      <div class="gsp-btn has-both">GSP ▾ <span class="b-inc">+2</span> <span class="b-exc">−1</span></div>
+      <div class="state-caption">Mixed (your example)</div>
+    </div>
+  </div>
+</div>
+
+<!-- Section 2: Open popover -->
+<div class="section">
+  <div class="section-label">Open popover — annotated</div>
+  <div style="position:relative; display:inline-block; width:100%;">
+    <div class="mock-panel">
+      <div class="mock-head">
+        <div class="mock-title">Available units <span class="mock-pill">47 of 312</span></div>
+        <div class="mock-toolbar">
+          <div style="position:relative;display:flex;align-items:center">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2" style="position:absolute;left:9px"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+            <div class="mock-input">Search BMU…</div>
+          </div>
+          <div class="mock-select">All types ▾</div>
+          <div class="mock-select">Scenario… ▾</div>
+          <div class="gsp-btn has-both" style="position:relative">
+            GSP ▾ <span class="b-inc">+2</span> <span class="b-exc">−1</span>
+            <div class="pop">
+              <div class="pop-header">
+                GSP Groups
+                <span class="pop-clear">Clear all</span>
+              </div>
+              <div class="pop-row">
+                <div>
+                  <div class="pop-label">_F · North Scotland</div>
+                </div>
+                <div class="tg">
+                  <button class="tg-btn active-inc">+</button>
+                  <button class="tg-btn">·</button>
+                  <button class="tg-btn">−</button>
+                </div>
+              </div>
+              <div class="pop-row">
+                <div>
+                  <div class="pop-label">_G · South Scotland</div>
+                </div>
+                <div class="tg">
+                  <button class="tg-btn active-inc">+</button>
+                  <button class="tg-btn">·</button>
+                  <button class="tg-btn">−</button>
+                </div>
+              </div>
+              <div class="pop-row">
+                <div>
+                  <div class="pop-label">_P · Northern England</div>
+                </div>
+                <div class="tg">
+                  <button class="tg-btn">+</button>
+                  <button class="tg-btn">·</button>
+                  <button class="tg-btn active-exc">−</button>
+                </div>
+              </div>
+              <div class="pop-row" style="opacity:.55">
+                <div><div class="pop-label">_N · North West England</div></div>
+                <div class="tg">
+                  <button class="tg-btn">+</button>
+                  <button class="tg-btn active-neu">·</button>
+                  <button class="tg-btn">−</button>
+                </div>
+              </div>
+              <div class="pop-row" style="opacity:.55">
+                <div><div class="pop-label">_M · Yorkshire</div></div>
+                <div class="tg">
+                  <button class="tg-btn">+</button>
+                  <button class="tg-btn active-neu">·</button>
+                  <button class="tg-btn">−</button>
+                </div>
+              </div>
+              <div class="pop-row" style="opacity:.55">
+                <div><div class="pop-label">_A · East England</div></div>
+                <div class="tg">
+                  <button class="tg-btn">+</button>
+                  <button class="tg-btn active-neu">·</button>
+                  <button class="tg-btn">−</button>
+                </div>
+              </div>
+              <div class="pop-row" style="opacity:.4; font-size:11px; color:#6b7280; padding-top: 2px">
+                + 8 more zones (scrollable)…
+              </div>
+              <div class="pop-footer">
+                Showing: <span>_F, _G</span> · Hiding: <span class="exc">_P</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="mock-table-stub">
+        <div style="color:#6ee7b7">✓ COCKENZ-1 (_F) — included</div>
+        <div style="color:#6ee7b7">✓ GALS-1 (_G) — included</div>
+        <div style="opacity:.3; text-decoration:line-through">✗ DRAXX-1 (_P) — excluded</div>
+        <div style="opacity:.3; text-decoration:line-through">✗ STAY-1 (_P) — excluded</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="annotation">
+    <strong>Toggle semantics:</strong> Each row has three segments — <strong style="color:#6ee7b7">+</strong> (include), <strong style="color:#d1d5db">·</strong> (neutral), <strong style="color:#fca5a5">−</strong> (exclude). Clicking a segment activates it immediately. The active segment is highlighted. Neutral (·) is the default for all zones.<br><br>
+    <strong>Footer summary:</strong> A one-line summary at the bottom of the open popover: "Showing: _F, _G · Hiding: _P" — gives instant confirmation without closing the popover.<br><br>
+    <strong>Dismiss:</strong> Click outside the popover or press Escape to close. The button badge persists to show the filter is active.
+  </div>
+</div>

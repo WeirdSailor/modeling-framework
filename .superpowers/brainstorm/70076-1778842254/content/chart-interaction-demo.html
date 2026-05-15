@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Chart Interaction Demo</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0f1218; color: #e2e8f0; font-family: system-ui, sans-serif; padding: 24px; }
+  h1 { font-size: 18px; font-weight: 600; color: #f1f5f9; margin-bottom: 6px; }
+  .subtitle { font-size: 13px; color: #64748b; margin-bottom: 28px; }
+
+  .demos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+
+  .demo-card {
+    background: #161a22;
+    border: 2px solid #2d3441;
+    border-radius: 12px;
+    padding: 16px;
+    cursor: default;
+    transition: border-color 0.2s;
+  }
+  .demo-card.selected { border-color: #6366f1; }
+  .demo-card h3 { font-size: 14px; font-weight: 600; color: #f1f5f9; margin-bottom: 4px; }
+  .demo-card p { font-size: 12px; color: #64748b; margin-bottom: 12px; line-height: 1.5; }
+
+  .chart-area {
+    position: relative;
+    height: 160px;
+    background: #0f1218;
+    border-radius: 8px;
+    border: 1px solid #1f2530;
+    overflow: hidden;
+    user-select: none;
+  }
+  canvas { position: absolute; inset: 0; }
+
+  .solve-panel {
+    margin-top: 10px;
+    padding: 9px 12px;
+    background: #1f2530;
+    border-radius: 8px;
+    border: 1px solid #2d3441;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-height: 40px;
+  }
+  .solve-panel .info { font-size: 11px; color: #64748b; font-family: monospace; }
+  .solve-panel .info span.good { color: #a5b4fc; }
+  .solve-panel .info span.bad { color: #f87171; }
+  .solve-btn {
+    background: #6366f1;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 5px 12px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .solve-btn.visible { opacity: 1; }
+
+  .hint {
+    font-size: 11px;
+    color: #475569;
+    margin-top: 8px;
+    text-align: center;
+    font-style: italic;
+  }
+
+  .select-btn {
+    margin-top: 10px;
+    width: 100%;
+    padding: 8px;
+    background: transparent;
+    border: 1px solid #2d3441;
+    color: #94a3b8;
+    border-radius: 8px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .select-btn:hover { border-color: #6366f1; color: #a5b4fc; }
+  .select-btn.chosen { background: #312e81; border-color: #6366f1; color: #c7d2fe; font-weight: 600; }
+</style>
+</head>
+<body>
+
+<h1>Chart Interaction — Try Each Approach</h1>
+<p class="subtitle">These are live demos. Interact with each chart to feel the difference, then click "Choose this approach" below.</p>
+
+<div class="demos">
+  <!-- APPROACH A: DRAG TO SELECT -->
+  <div class="demo-card" id="card-a">
+    <h3>A — Drag to Select</h3>
+    <p>Click and drag across the chart to select a time range. Drag handles let you resize.</p>
+    <div class="chart-area" id="chart-a">
+      <canvas id="canvas-a"></canvas>
+    </div>
+    <div class="hint" id="hint-a">↔ Click and drag on the chart</div>
+    <div class="solve-panel" id="panel-a">
+      <div class="info" id="info-a">Select a range to see deficit info</div>
+      <button class="solve-btn" id="solve-a">Solve ↗</button>
+    </div>
+    <button class="select-btn" id="pick-a" onclick="choose('a')">Choose this approach</button>
+  </div>
+
+  <!-- APPROACH B: CLICK TWO POINTS -->
+  <div class="demo-card" id="card-b">
+    <h3>B — Click Two Points</h3>
+    <p>Click once to pin the start SP, click again to pin the end. Click a third time to reset.</p>
+    <div class="chart-area" id="chart-b">
+      <canvas id="canvas-b"></canvas>
+    </div>
+    <div class="hint" id="hint-b">① Click start point on chart</div>
+    <div class="solve-panel" id="panel-b">
+      <div class="info" id="info-b">Click to set start point</div>
+      <button class="solve-btn" id="solve-b">Solve ↗</button>
+    </div>
+    <button class="select-btn" id="pick-b" onclick="choose('b')">Choose this approach</button>
+  </div>
+
+  <!-- APPROACH C: CLICK DEFICIT ZONE -->
+  <div class="demo-card" id="card-c">
+    <h3>C — Click Deficit Zone</h3>
+    <p>Click anywhere in a red deficit area — the system auto-selects the full contiguous deficit.</p>
+    <div class="chart-area" id="chart-c">
+      <canvas id="canvas-c"></canvas>
+    </div>
+    <div class="hint" id="hint-c">🖱 Click a red deficit area</div>
+    <div class="solve-panel" id="panel-c">
+      <div class="info" id="info-c">Click a deficit zone to analyse</div>
+      <button class="solve-btn" id="solve-c">Solve ↗</button>
+    </div>
+    <button class="select-btn" id="pick-c" onclick="choose('c')">Choose this approach</button>
+  </div>
+</div>
+
+<script>
+// ── Shared chart data (48 SPs, simulated EMX, TR2, demand) ──
+const N = 48
+const SPS = Array.from({length: N}, (_, i) => i)
+
+// Simulated values
+function genCurve() {
+  // EMX: generally high, dips in the middle to create a deficit
+  const emx = [
+    32000,31800,31500,31200,30800,30400,30000,29800,
+    29500,29200,29000,28800,28600,28400,28200,28000,
+    27800,27600,27500,27300,27200,27100,27000,26900,
+    26800,27000,27300,27600,27900,28200,28500,28800,
+    29100,29400,29700,30000,30300,30600,30900,31200,
+    31500,31800,32000,32200,32400,32500,32600,32700
+  ]
+  // TR2: demand + 10% reserve, relatively flat with morning/evening peaks
+  const tr2 = [
+    28000,27800,27500,27200,27000,26800,26700,26600,
+    27000,27500,28000,28500,29000,29200,29300,29400,
+    29300,29200,29100,29000,28900,28800,28700,28800,
+    28900,29000,29200,29400,29500,29600,29500,29400,
+    29200,29000,28800,28600,28400,28200,28100,28000,
+    27900,27800,27700,27600,27500,27400,27300,27200
+  ]
+  // Deficit SPs: where emx < tr2
+  const deficit = emx.map((e, i) => e - tr2[i])
+  return { emx, tr2, deficit }
+}
+
+const DATA = genCurve()
+const TIMES = Array.from({length: N}, (_, i) => {
+  const totalMins = 6 * 60 + i * 30
+  const h = Math.floor(totalMins / 60) % 24
+  const m = totalMins % 60
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`
+})
+
+// Find deficit ranges
+function getDeficitRanges() {
+  const ranges = []
+  let start = -1
+  for (let i = 0; i < N; i++) {
+    if (DATA.deficit[i] < 0 && start === -1) start = i
+    if ((DATA.deficit[i] >= 0 || i === N-1) && start !== -1) {
+      ranges.push({ from: start, to: DATA.deficit[i] < 0 ? i : i - 1 })
+      start = -1
+    }
+  }
+  return ranges
+}
+const DEFICIT_RANGES = getDeficitRanges()
+
+// ── Chart drawing ──
+function setupCanvas(id) {
+  const canvas = document.getElementById(id)
+  const parent = canvas.parentElement
+  const dpr = window.devicePixelRatio || 1
+  canvas.width = parent.clientWidth * dpr
+  canvas.height = parent.clientHeight * dpr
+  canvas.style.width = parent.clientWidth + 'px'
+  canvas.style.height = parent.clientHeight + 'px'
+  const ctx = canvas.getContext('2d')
+  ctx.scale(dpr, dpr)
+  return { canvas, ctx, w: parent.clientWidth, h: parent.clientHeight }
+}
+
+function spToX(sp, w) { return 32 + (sp / (N - 1)) * (w - 40) }
+function valToY(val, h, min, max) { return 8 + (1 - (val - min) / (max - min)) * (h - 20) }
+
+function drawChart(ctx, w, h, selFrom, selTo, selStyle, highlightRange) {
+  ctx.clearRect(0, 0, w, h)
+
+  const min = 25000, max = 34000
+  const toX = sp => spToX(sp, w)
+  const toY = val => valToY(val, h, min, max)
+  const zeroY = toY(0) // not needed but...
+
+  // Grid
+  ctx.strokeStyle = '#1f2530'
+  ctx.lineWidth = 1
+  for (let y = 26000; y <= 33000; y += 2000) {
+    ctx.beginPath()
+    ctx.moveTo(32, toY(y))
+    ctx.lineTo(w - 8, toY(y))
+    ctx.stroke()
+  }
+
+  // Deficit fill areas (red)
+  for (const range of DEFICIT_RANGES) {
+    const isHighlighted = highlightRange && highlightRange.from === range.from
+    ctx.fillStyle = isHighlighted ? 'rgba(239,68,68,0.35)' : 'rgba(239,68,68,0.18)'
+    ctx.beginPath()
+    ctx.moveTo(toX(range.from), toY(DATA.emx[range.from]))
+    for (let i = range.from; i <= range.to; i++) {
+      ctx.lineTo(toX(i), toY(DATA.emx[i]))
+    }
+    for (let i = range.to; i >= range.from; i--) {
+      ctx.lineTo(toX(i), toY(DATA.tr2[i]))
+    }
+    ctx.closePath()
+    ctx.fill()
+    if (isHighlighted) {
+      ctx.strokeStyle = 'rgba(239,68,68,0.8)'
+      ctx.lineWidth = 1
+      ctx.setLineDash([3, 2])
+      ctx.beginPath()
+      ctx.moveTo(toX(range.from), 0)
+      ctx.lineTo(toX(range.from), h)
+      ctx.stroke()
+      ctx.beginPath()
+      ctx.moveTo(toX(range.to), 0)
+      ctx.lineTo(toX(range.to), h)
+      ctx.stroke()
+      ctx.setLineDash([])
+    }
+  }
+
+  // Selection overlay (for A and B)
+  if (selFrom !== null && selTo !== null) {
+    const x1 = toX(Math.min(selFrom, selTo))
+    const x2 = toX(Math.max(selFrom, selTo))
+    ctx.fillStyle = selStyle === 'indigo' ? 'rgba(99,102,241,0.15)' : 'rgba(251,191,36,0.1)'
+    ctx.fillRect(x1, 0, x2 - x1, h)
+    const lineCol = selStyle === 'indigo' ? '#6366f1' : '#fbbf24'
+    ctx.strokeStyle = lineCol
+    ctx.lineWidth = 2
+    ctx.beginPath(); ctx.moveTo(x1, 0); ctx.lineTo(x1, h); ctx.stroke()
+    ctx.beginPath(); ctx.moveTo(x2, 0); ctx.lineTo(x2, h); ctx.stroke()
+    // Handles for drag
+    if (selStyle === 'indigo') {
+      ctx.fillStyle = '#6366f1'
+      ctx.beginPath(); ctx.roundRect(x1 - 5, h/2 - 14, 10, 28, 4); ctx.fill()
+      ctx.beginPath(); ctx.roundRect(x2 - 5, h/2 - 14, 10, 28, 4); ctx.fill()
+    }
+  } else if (selFrom !== null && selTo === null) {
+    // First pin (approach B)
+    const x = toX(selFrom)
+    ctx.strokeStyle = '#fbbf24'
+    ctx.lineWidth = 1.5
+    ctx.setLineDash([4, 3])
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke()
+    ctx.setLineDash([])
+    ctx.fillStyle = '#fbbf24'
+    ctx.beginPath(); ctx.arc(x, toY(DATA.emx[selFrom]), 5, 0, Math.PI * 2); ctx.fill()
+  }
+
+  // TR2 line (orange)
+  ctx.strokeStyle = '#fb923c'
+  ctx.lineWidth = 1.5
+  ctx.setLineDash([])
+  ctx.beginPath()
+  for (let i = 0; i < N; i++) {
+    i === 0 ? ctx.moveTo(toX(i), toY(DATA.tr2[i])) : ctx.lineTo(toX(i), toY(DATA.tr2[i]))
+  }
+  ctx.stroke()
+
+  // EMX line (green)
+  ctx.strokeStyle = '#34d399'
+  ctx.lineWidth = 2
+  ctx.beginPath()
+  for (let i = 0; i < N; i++) {
+    i === 0 ? ctx.moveTo(toX(i), toY(DATA.emx[i])) : ctx.lineTo(toX(i), toY(DATA.emx[i]))
+  }
+  ctx.stroke()
+
+  // Time labels
+  ctx.fillStyle = '#475569'
+  ctx.font = '9px monospace'
+  ctx.textAlign = 'center'
+  for (let i = 0; i < N; i += 8) {
+    ctx.fillText(TIMES[i], toX(i), h - 2)
+  }
+
+  // Hover cursor helper text on top
+  ctx.fillStyle = '#1e293b'
+  ctx.font = '9px monospace'
+}
+
+// ────────────────────────────────────
+// APPROACH A: Drag to select
+// ────────────────────────────────────
+let aState = { dragging: false, from: null, to: null }
+const { canvas: canA, ctx: ctxA, w: wA, h: hA } = setupCanvas('canvas-a')
+
+function xToSp(x, w) {
+  return Math.max(0, Math.min(N - 1, Math.round(((x - 32) / (w - 40)) * (N - 1))))
+}
+
+function drawA() {
+  drawChart(ctxA, wA, hA, aState.from, aState.to, 'indigo', null)
+}
+drawA()
+
+canA.addEventListener('mousedown', e => {
+  const rect = canA.getBoundingClientRect()
+  aState.dragging = true
+  aState.from = xToSp(e.clientX - rect.left, wA)
+  aState.to = null
+  drawA()
+  document.getElementById('hint-a').textContent = '↔ Drag to set end of range'
+  document.getElementById('info-a').innerHTML = 'Drag to set range...'
+  document.getElementById('solve-a').classList.remove('visible')
+})
+
+document.addEventListener('mousemove', e => {
+  if (!aState.dragging) return
+  const rect = canA.getBoundingClientRect()
+  aState.to = xToSp(e.clientX - rect.left, wA)
+  drawA()
+})
+
+document.addEventListener('mouseup', () => {
+  if (!aState.dragging) return
+  aState.dragging = false
+  if (aState.from !== null && aState.to !== null && aState.from !== aState.to) {
+    const f = Math.min(aState.from, aState.to)
+    const t = Math.max(aState.from, aState.to)
+    const worst = Math.min(...DATA.deficit.slice(f, t + 1))
+    const worstIdx = DATA.deficit.slice(f, t + 1).indexOf(worst) + f
+    document.getElementById('hint-a').textContent = `Selected ${TIMES[f]} → ${TIMES[t]} · Drag handles to adjust`
+    if (worst < 0) {
+      document.getElementById('info-a').innerHTML =
+        `Range: <span class="good">${TIMES[f]} → ${TIMES[t]}</span> · Worst deficit: <span class="bad">${Math.round(worst).toLocaleString()} MW</span>`
+      document.getElementById('solve-a').classList.add('visible')
+      document.getElementById('panel-a').style.borderColor = '#6366f1'
+    } else {
+      document.getElementById('info-a').innerHTML =
+        `Range: <span class="good">${TIMES[f]} → ${TIMES[t]}</span> · <span style="color:#34d399">No deficit in range</span>`
+      document.getElementById('panel-a').style.borderColor = '#2d3441'
+    }
+  }
+})
+
+// ────────────────────────────────────
+// APPROACH B: Click two points
+// ────────────────────────────────────
+let bState = { phase: 0, from: null, to: null }
+const { canvas: canB, ctx: ctxB, w: wB, h: hB } = setupCanvas('canvas-b')
+
+function drawB() {
+  drawChart(ctxB, wB, hB, bState.from, bState.to, 'amber', null)
+}
+drawB()
+
+canB.addEventListener('click', e => {
+  const rect = canB.getBoundingClientRect()
+  const sp = xToSp(e.clientX - rect.left, wB)
+
+  if (bState.phase === 0) {
+    bState.from = sp; bState.to = null; bState.phase = 1
+    document.getElementById('hint-b').textContent = `② Now click end point`
+    document.getElementById('info-b').innerHTML = `Start: <span class="good">${TIMES[sp]}</span> · Click end point`
+    document.getElementById('solve-b').classList.remove('visible')
+    document.getElementById('panel-b').style.borderColor = '#2d3441'
+  } else if (bState.phase === 1) {
+    bState.to = sp; bState.phase = 2
+    const f = Math.min(bState.from, bState.to)
+    const t = Math.max(bState.from, bState.to)
+    const worst = Math.min(...DATA.deficit.slice(f, t + 1))
+    document.getElementById('hint-b').textContent = `✓ Range set · Click anywhere to reset`
+    if (worst < 0) {
+      document.getElementById('info-b').innerHTML =
+        `<span class="good">${TIMES[f]} → ${TIMES[t]}</span> · Worst: <span class="bad">${Math.round(worst).toLocaleString()} MW</span>`
+      document.getElementById('solve-b').classList.add('visible')
+      document.getElementById('panel-b').style.borderColor = '#fbbf24'
+    } else {
+      document.getElementById('info-b').innerHTML =
+        `<span class="good">${TIMES[f]} → ${TIMES[t]}</span> · <span style="color:#34d399">No deficit</span>`
+    }
+  } else {
+    bState = { phase: 0, from: null, to: null }
+    document.getElementById('hint-b').textContent = '① Click start point on chart'
+    document.getElementById('info-b').innerHTML = 'Click to set start point'
+    document.getElementById('solve-b').classList.remove('visible')
+    document.getElementById('panel-b').style.borderColor = '#2d3441'
+  }
+  drawB()
+})
+
+// ────────────────────────────────────
+// APPROACH C: Click deficit zone
+// ────────────────────────────────────
+let cState = { selected: null }
+const { canvas: canC, ctx: ctxC, w: wC, h: hC } = setupCanvas('canvas-c')
+
+function drawC() {
+  drawChart(ctxC, wC, hC,
+    cState.selected ? cState.selected.from : null,
+    cState.selected ? cState.selected.to : null,
+    'red', cState.selected)
+}
+drawC()
+
+canC.addEventListener('mousemove', e => {
+  const rect = canC.getBoundingClientRect()
+  const sp = xToSp(e.clientX - rect.left, wC)
+  const inDeficit = DEFICIT_RANGES.find(r => sp >= r.from && sp <= r.to)
+  canC.style.cursor = inDeficit ? 'pointer' : 'default'
+})
+
+canC.addEventListener('click', e => {
+  const rect = canC.getBoundingClientRect()
+  const sp = xToSp(e.clientX - rect.left, wC)
+
+  // Check if clicked inside a deficit range
+  const hit = DEFICIT_RANGES.find(r => sp >= r.from && sp <= r.to)
+
+  if (hit) {
+    if (cState.selected && cState.selected.from === hit.from) {
+      // Toggle off
+      cState.selected = null
+      document.getElementById('hint-c').textContent = '🖱 Click a red deficit area'
+      document.getElementById('info-c').innerHTML = 'Click a deficit zone to analyse'
+      document.getElementById('solve-c').classList.remove('visible')
+      document.getElementById('panel-c').style.borderColor = '#2d3441'
+    } else {
+      cState.selected = hit
+      const worst = Math.min(...DATA.deficit.slice(hit.from, hit.to + 1))
+      const dur = hit.to - hit.from + 1
+      document.getElementById('hint-c').textContent = `✓ Auto-selected ${dur} SPs · Click again to deselect`
+      document.getElementById('info-c').innerHTML =
+        `Auto: <span class="bad">${TIMES[hit.from]} → ${TIMES[hit.to]}</span> · Worst: <span class="bad">${Math.round(worst).toLocaleString()} MW</span>`
+      document.getElementById('solve-c').classList.add('visible')
+      document.getElementById('panel-c').style.borderColor = '#ef4444'
+    }
+  } else {
+    cState.selected = null
+    document.getElementById('hint-c').textContent = '🖱 Click a red deficit area'
+    document.getElementById('info-c').innerHTML = 'Click a deficit zone to analyse'
+    document.getElementById('solve-c').classList.remove('visible')
+    document.getElementById('panel-c').style.borderColor = '#2d3441'
+  }
+  drawC()
+})
+
+// ── Choose ──
+let chosen = null
+function choose(id) {
+  chosen = id
+  ;['a','b','c'].forEach(x => {
+    document.getElementById(`card-${x}`).classList.toggle('selected', x === id)
+    const btn = document.getElementById(`pick-${x}`)
+    btn.classList.toggle('chosen', x === id)
+    btn.textContent = x === id ? '✓ Selected' : 'Choose this approach'
+  })
+
+  // Send event to server
+  fetch('/event', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type: 'click', choice: id, text: `Approach ${id.toUpperCase()}` })
+  }).catch(() => {})
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,156 @@
+<h2>How should you select a deficit period on the Chart?</h2>
+<p class="subtitle">Three interaction patterns — pick the one that feels most natural for this tool</p>
+
+<div class="cards">
+
+  <!-- OPTION A -->
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="card-image" style="padding:16px;background:#0f1218;border-radius:8px;margin-bottom:12px">
+      <div style="font-size:10px;color:#64748b;margin-bottom:6px;font-family:monospace">Margin Analysis — 48 Settlement Periods</div>
+      <!-- Chart mockup: drag brush -->
+      <div style="position:relative;height:110px;background:#0f1218;border-radius:4px;overflow:hidden">
+        <!-- Grid lines -->
+        <div style="position:absolute;inset:0;display:flex;flex-direction:column;justify-content:space-around;padding:4px 0">
+          <div style="border-top:1px dashed #1f2530;width:100%"></div>
+          <div style="border-top:1px dashed #1f2530;width:100%"></div>
+          <div style="border-top:1px dashed #1f2530;width:100%"></div>
+        </div>
+        <!-- Zero line -->
+        <div style="position:absolute;top:62%;left:0;right:0;border-top:1px dashed #2d3441"></div>
+        <!-- EMX line (green) -->
+        <svg style="position:absolute;inset:0" viewBox="0 0 300 110" preserveAspectRatio="none">
+          <polyline points="0,40 30,38 60,35 90,42 120,55 150,65 180,70 210,60 240,50 270,42 300,38" fill="none" stroke="#34d399" stroke-width="2"/>
+          <!-- TR2 orange line -->
+          <polyline points="0,72 30,72 60,72 90,72 120,72 150,72 180,72 210,72 240,72 270,72 300,72" fill="none" stroke="#fb923c" stroke-width="1.5"/>
+          <!-- Deficit fill -->
+          <polygon points="120,65 150,72 150,72 120,72" fill="#ef4444" fill-opacity="0.3"/>
+          <polygon points="120,65 150,65 180,70 180,72 150,72 120,72" fill="#ef4444" fill-opacity="0.3"/>
+          <!-- Brush selection overlay -->
+          <rect x="105" y="0" width="90" height="110" fill="#6366f1" fill-opacity="0.15" rx="2"/>
+          <line x1="105" y1="0" x2="105" y2="110" stroke="#6366f1" stroke-width="2"/>
+          <line x1="195" y1="0" x2="195" y2="110" stroke="#6366f1" stroke-width="2"/>
+          <!-- Drag handle indicators -->
+          <rect x="101" y="45" width="8" height="20" rx="3" fill="#6366f1"/>
+          <rect x="191" y="45" width="8" height="20" rx="3" fill="#6366f1"/>
+        </svg>
+        <!-- Time labels -->
+        <div style="position:absolute;bottom:2px;left:0;right:0;display:flex;justify-content:space-around;font-size:8px;color:#475569;font-family:monospace">
+          <span>10:00</span><span>12:00</span><span>14:00</span><span>16:00</span><span>18:00</span>
+        </div>
+      </div>
+      <!-- Solve panel that appears -->
+      <div style="margin-top:8px;background:#1f2530;border-radius:6px;padding:8px 10px;border:1px solid #6366f1;display:flex;align-items:center;gap:10px">
+        <div style="flex:1">
+          <div style="font-size:9px;color:#94a3b8;font-family:monospace">Selected: <span style="color:#a5b4fc">12:30 → 15:00</span> · Worst deficit: <span style="color:#f87171">−312 MW</span></div>
+        </div>
+        <div style="background:#6366f1;color:#fff;font-size:9px;padding:4px 10px;border-radius:4px;font-weight:600;white-space:nowrap">Solve ↗</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A — Drag to Select (Brush)</h3>
+      <p>Click and drag across the chart to brush a time range. Drag handles appear at start/end. A solve panel materialises below showing the worst deficit in the range. Works for any range — deficit or surplus.</p>
+      <div class="pros-cons" style="margin-top:8px">
+        <div class="pros"><h4>Pros</h4><ul><li>Very intuitive drag gesture</li><li>Works on any range (deficit or not)</li><li>Easy to resize by dragging handles</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Recharts Brush may need customisation</li><li>Slightly more effort than single click</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- OPTION B -->
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="card-image" style="padding:16px;background:#0f1218;border-radius:8px;margin-bottom:12px">
+      <div style="font-size:10px;color:#64748b;margin-bottom:6px;font-family:monospace">Margin Analysis — 48 Settlement Periods</div>
+      <div style="position:relative;height:110px;background:#0f1218;border-radius:4px;overflow:hidden">
+        <div style="position:absolute;inset:0;display:flex;flex-direction:column;justify-content:space-around;padding:4px 0">
+          <div style="border-top:1px dashed #1f2530;width:100%"></div>
+          <div style="border-top:1px dashed #1f2530;width:100%"></div>
+          <div style="border-top:1px dashed #1f2530;width:100%"></div>
+        </div>
+        <div style="position:absolute;top:62%;left:0;right:0;border-top:1px dashed #2d3441"></div>
+        <svg style="position:absolute;inset:0" viewBox="0 0 300 110" preserveAspectRatio="none">
+          <polyline points="0,40 30,38 60,35 90,42 120,55 150,65 180,70 210,60 240,50 270,42 300,38" fill="none" stroke="#34d399" stroke-width="2"/>
+          <polyline points="0,72 300,72" fill="none" stroke="#fb923c" stroke-width="1.5"/>
+          <polygon points="120,65 180,70 180,72 120,72" fill="#ef4444" fill-opacity="0.3"/>
+          <!-- First click pin -->
+          <line x1="115" y1="0" x2="115" y2="110" stroke="#fbbf24" stroke-width="1.5" stroke-dasharray="3,2"/>
+          <circle cx="115" cy="55" r="5" fill="#fbbf24"/>
+          <text x="118" y="18" fill="#fbbf24" font-size="8" font-family="monospace">①Start</text>
+          <!-- Second click pin -->
+          <line x1="195" y1="0" x2="195" y2="110" stroke="#fbbf24" stroke-width="1.5" stroke-dasharray="3,2"/>
+          <circle cx="195" cy="70" r="5" fill="#fbbf24"/>
+          <text x="165" y="18" fill="#fbbf24" font-size="8" font-family="monospace">②End</text>
+          <!-- Selected area highlight -->
+          <rect x="115" y="0" width="80" height="110" fill="#fbbf24" fill-opacity="0.08"/>
+        </svg>
+        <div style="position:absolute;bottom:2px;left:0;right:0;display:flex;justify-content:space-around;font-size:8px;color:#475569;font-family:monospace">
+          <span>10:00</span><span>12:00</span><span>14:00</span><span>16:00</span><span>18:00</span>
+        </div>
+      </div>
+      <div style="margin-top:8px;background:#1f2530;border-radius:6px;padding:8px 10px;border:1px solid #fbbf24;display:flex;align-items:center;gap:10px">
+        <div style="flex:1">
+          <div style="font-size:9px;color:#94a3b8;font-family:monospace">Selected: <span style="color:#fde68a">12:30 → 15:30</span> · Worst deficit: <span style="color:#f87171">−312 MW</span></div>
+        </div>
+        <div style="background:#d97706;color:#fff;font-size:9px;padding:4px 10px;border-radius:4px;font-weight:600;white-space:nowrap">Solve ↗</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B — Click Two Points</h3>
+      <p>Click once to pin the start SP, click again to pin the end. Pins appear as vertical markers. The band between them highlights. A solve panel shows worst deficit in range.</p>
+      <div class="pros-cons" style="margin-top:8px">
+        <div class="pros"><h4>Pros</h4><ul><li>Precise SP-level selection</li><li>Clear visual feedback (two pins)</li><li>Simple Recharts ReferenceArea implementation</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Two clicks required</li><li>Need a way to cancel/reset selection</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- OPTION C -->
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="card-image" style="padding:16px;background:#0f1218;border-radius:8px;margin-bottom:12px">
+      <div style="font-size:10px;color:#64748b;margin-bottom:6px;font-family:monospace">Margin Analysis — 48 Settlement Periods</div>
+      <div style="position:relative;height:110px;background:#0f1218;border-radius:4px;overflow:hidden">
+        <div style="position:absolute;inset:0;display:flex;flex-direction:column;justify-content:space-around;padding:4px 0">
+          <div style="border-top:1px dashed #1f2530;width:100%"></div>
+          <div style="border-top:1px dashed #1f2530;width:100%"></div>
+          <div style="border-top:1px dashed #1f2530;width:100%"></div>
+        </div>
+        <div style="position:absolute;top:62%;left:0;right:0;border-top:1px dashed #2d3441"></div>
+        <svg style="position:absolute;inset:0" viewBox="0 0 300 110" preserveAspectRatio="none">
+          <polyline points="0,40 30,38 60,35 90,42 120,55 150,65 180,70 210,60 240,50 270,42 300,38" fill="none" stroke="#34d399" stroke-width="2"/>
+          <polyline points="0,72 300,72" fill="none" stroke="#fb923c" stroke-width="1.5"/>
+          <!-- Deficit zones — clickable, pulsing border to indicate interactivity -->
+          <polygon points="115,55 150,65 180,70 195,60 195,72 115,72" fill="#ef4444" fill-opacity="0.4"/>
+          <!-- Clicked/selected deficit zone bright highlight -->
+          <rect x="115" y="0" width="80" height="110" fill="#ef4444" fill-opacity="0.12" rx="2"/>
+          <line x1="115" y1="0" x2="115" y2="110" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="3,2"/>
+          <line x1="195" y1="0" x2="195" y2="110" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="3,2"/>
+          <!-- "Click me" cursor indicator -->
+          <text x="130" y="45" fill="#fca5a5" font-size="8" font-family="monospace">click deficit</text>
+          <text x="134" y="55" fill="#fca5a5" font-size="8" font-family="monospace">zone ↓</text>
+        </svg>
+        <div style="position:absolute;bottom:2px;left:0;right:0;display:flex;justify-content:space-around;font-size:8px;color:#475569;font-family:monospace">
+          <span>10:00</span><span>12:00</span><span>14:00</span><span>16:00</span><span>18:00</span>
+        </div>
+      </div>
+      <div style="margin-top:8px;background:#1f2530;border-radius:6px;padding:8px 10px;border:1px solid #ef4444;display:flex;align-items:center;gap:10px">
+        <div style="flex:1">
+          <div style="font-size:9px;color:#94a3b8;font-family:monospace">Auto-selected deficit: <span style="color:#fca5a5">12:30 → 15:30</span> · Worst: <span style="color:#f87171">−312 MW</span></div>
+        </div>
+        <div style="background:#dc2626;color:#fff;font-size:9px;padding:4px 10px;border-radius:4px;font-weight:600;white-space:nowrap">Solve ↗</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C — Click Deficit Zone</h3>
+      <p>The red deficit areas are clickable. Clicking any point in a red zone auto-selects the full contiguous deficit period. No range dragging needed — one click for the common case.</p>
+      <div class="pros-cons" style="margin-top:8px">
+        <div class="pros"><h4>Pros</h4><ul><li>One click for the most common case</li><li>Feels direct — click the problem</li><li>Auto-computes deficit extent</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Can't select non-deficit periods</li><li>Multiple separate deficits need separate clicks</li><li>Less control over exact SP range</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<p class="subtitle" style="margin-top:16px;text-align:center">Click a card to select — or select multiple if you'd like to combine approaches</p>

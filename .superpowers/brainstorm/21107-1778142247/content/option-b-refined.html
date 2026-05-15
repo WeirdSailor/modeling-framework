@@ -1,0 +1,116 @@
+<h2>Option B — refined with "Total" card</h2>
+<p class="subtitle">First card = entire scheduling solution. Clicking any reason card filters the table. Clicking the active card resets to All.</p>
+
+<div class="mockup">
+  <div class="mockup-header">Committed tab — summary row + filtered table</div>
+  <div class="mockup-body" style="padding:0">
+
+    <!-- Summary pills (existing) -->
+    <div style="padding:10px 20px;border-bottom:1px solid #30363d;background:#1c2128;display:flex;align-items:center;gap:12px;font-family:monospace;font-size:12px">
+      <span style="color:#8b949e">9 units across 3 committed drafts</span>
+      <span style="background:#238636;color:#fff;font-size:11px;padding:2px 8px;border-radius:4px">Alpha</span>
+      <span style="background:#238636;color:#fff;font-size:11px;padding:2px 8px;border-radius:4px">Bravo</span>
+      <span style="background:#238636;color:#fff;font-size:11px;padding:2px 8px;border-radius:4px">Charlie</span>
+    </div>
+
+    <!-- Cost breakdown cards (NEW) -->
+    <div style="padding:12px 20px;border-bottom:1px solid #30363d;background:#161b22;display:flex;gap:8px;flex-wrap:wrap">
+
+      <!-- All / Total card — active -->
+      <div style="background:#2d333b;border:2px solid #58a6ff;border-radius:6px;padding:8px 14px;cursor:pointer;min-width:100px">
+        <div style="font-size:9px;color:#58a6ff;font-weight:700;text-transform:uppercase;letter-spacing:.6px">Total</div>
+        <div style="color:#e6edf3;font-size:16px;font-weight:700;margin:3px 0">£194k</div>
+        <div style="color:#8b949e;font-size:10px">9 units · 2,720 MW</div>
+      </div>
+
+      <!-- Margin -->
+      <div style="background:#1c2128;border:1px solid #30363d;border-radius:6px;padding:8px 14px;cursor:pointer;min-width:100px">
+        <div style="font-size:9px;color:#f59e0b;font-weight:700;text-transform:uppercase;letter-spacing:.6px">Margin</div>
+        <div style="color:#e6edf3;font-size:16px;font-weight:700;margin:3px 0">£87k</div>
+        <div style="color:#8b949e;font-size:10px">4 units · 1,240 MW</div>
+      </div>
+
+      <!-- Inertia -->
+      <div style="background:#1c2128;border:1px solid #30363d;border-radius:6px;padding:8px 14px;cursor:pointer;min-width:100px">
+        <div style="font-size:9px;color:#8b5cf6;font-weight:700;text-transform:uppercase;letter-spacing:.6px">Inertia</div>
+        <div style="color:#e6edf3;font-size:16px;font-weight:700;margin:3px 0">£52k</div>
+        <div style="color:#8b949e;font-size:10px">2 units · 720 MW</div>
+      </div>
+
+      <!-- Voltage -->
+      <div style="background:#1c2128;border:1px solid #30363d;border-radius:6px;padding:8px 14px;cursor:pointer;min-width:100px">
+        <div style="font-size:9px;color:#06b6d4;font-weight:700;text-transform:uppercase;letter-spacing:.6px">Voltage</div>
+        <div style="color:#e6edf3;font-size:16px;font-weight:700;margin:3px 0">£24k</div>
+        <div style="color:#8b949e;font-size:10px">1 unit · 320 MW</div>
+      </div>
+
+      <!-- Reserve -->
+      <div style="background:#1c2128;border:1px solid #30363d;border-radius:6px;padding:8px 14px;cursor:pointer;min-width:100px">
+        <div style="font-size:9px;color:#f97316;font-weight:700;text-transform:uppercase;letter-spacing:.6px">Reserve</div>
+        <div style="color:#e6edf3;font-size:16px;font-weight:700;margin:3px 0">£31k</div>
+        <div style="color:#8b949e;font-size:10px">2 units · 440 MW</div>
+      </div>
+
+      <!-- Constraint — zero state -->
+      <div style="background:#1c2128;border:1px solid #30363d;border-radius:6px;padding:8px 14px;cursor:pointer;min-width:100px;opacity:0.45">
+        <div style="font-size:9px;color:#ec4899;font-weight:700;text-transform:uppercase;letter-spacing:.6px">Constraint</div>
+        <div style="color:#e6edf3;font-size:16px;font-weight:700;margin:3px 0">—</div>
+        <div style="color:#8b949e;font-size:10px">0 units</div>
+      </div>
+
+    </div>
+
+    <!-- Table (existing, filtered to All) -->
+    <div style="padding:8px 20px 0;font-family:monospace;font-size:11px;color:#c9d1d9">
+      <div style="display:grid;grid-template-columns:24px 2fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1.5fr 1fr;gap:4px;color:#8b949e;font-size:10px;padding:4px;border-bottom:1px solid #30363d;margin-bottom:4px">
+        <span>☐</span><span>BMU</span><span>Type</span><span style="text-align:right">NDZ</span><span style="text-align:right">MZT</span><span style="text-align:right">MNZT</span><span style="text-align:right">SEL</span><span style="text-align:right">MEL</span><span style="text-align:right">£SEL</span><span style="text-align:right">£MEL</span><span style="text-align:right">PN</span><span>Event</span><span>Reason</span><span>Draft</span>
+      </div>
+      <div style="display:grid;grid-template-columns:24px 2fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1.5fr 1fr;gap:4px;padding:4px;background:#22272e;border-radius:3px;margin-bottom:2px;align-items:center">
+        <span style="color:#8b949e">☐</span>
+        <span style="color:#79c0ff">DRAXX-1<br><span style="color:#8b949e;font-size:9px">_A</span></span>
+        <span style="background:#f59e0b22;color:#f59e0b;padding:1px 5px;border-radius:3px;font-size:9px;white-space:nowrap">CCGT</span>
+        <span style="text-align:right;color:#8b949e">8m</span><span style="text-align:right;color:#8b949e">30m</span><span style="text-align:right;color:#8b949e">60m</span>
+        <span style="text-align:right">300</span><span style="text-align:right">600</span>
+        <span style="text-align:right;color:#8b949e">£85</span><span style="text-align:right;color:#8b949e">£95</span>
+        <span style="text-align:right">120</span>
+        <span style="color:#8b949e;font-size:9px">DS</span>
+        <span style="color:#f59e0b;font-size:9px">Margin</span>
+        <span style="background:#23863644;color:#4ade80;padding:1px 5px;border-radius:3px;font-size:9px">Alpha</span>
+      </div>
+      <div style="display:grid;grid-template-columns:24px 2fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1.5fr 1fr;gap:4px;padding:4px;align-items:center;margin-bottom:2px">
+        <span style="color:#8b949e">☐</span>
+        <span style="color:#79c0ff">STAY-G1<br><span style="color:#8b949e;font-size:9px">_K</span></span>
+        <span style="background:#8b5cf622;color:#8b5cf6;padding:1px 5px;border-radius:3px;font-size:9px;white-space:nowrap">CCGT</span>
+        <span style="text-align:right;color:#8b949e">12m</span><span style="text-align:right;color:#8b949e">60m</span><span style="text-align:right;color:#8b949e">90m</span>
+        <span style="text-align:right">240</span><span style="text-align:right">480</span>
+        <span style="text-align:right;color:#8b949e">£90</span><span style="text-align:right;color:#8b949e">£110</span>
+        <span style="text-align:right;color:#8b949e">—</span>
+        <span style="color:#8b949e;font-size:9px">AS</span>
+        <span style="color:#8b5cf6;font-size:9px">Inertia</span>
+        <span style="background:#23863644;color:#4ade80;padding:1px 5px;border-radius:3px;font-size:9px">Bravo</span>
+      </div>
+      <div style="color:#8b949e;font-size:10px;padding:6px 4px;font-style:italic">… 7 more rows</div>
+    </div>
+
+  </div>
+</div>
+
+<div class="section" style="margin-top:20px">
+  <h3>A few details to confirm</h3>
+  <div class="options">
+    <div class="option" data-choice="hide-zero" onclick="toggleSelect(this)">
+      <div class="letter">1</div>
+      <div class="content">
+        <h3>Hide zero-unit cards</h3>
+        <p>Only show cards for reason codes that have at least one committed unit. Cleaner when most codes are unused.</p>
+      </div>
+    </div>
+    <div class="option" data-choice="show-zero" onclick="toggleSelect(this)">
+      <div class="letter">2</div>
+      <div class="content">
+        <h3>Always show all 5 reason cards</h3>
+        <p>Show all cards even if count = 0 (dimmed). Useful as a checklist — you can see at a glance which reasons have no units yet.</p>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,5 @@
+{"type":"server-started","port":56162,"host":"127.0.0.1","url_host":"localhost","url":"http://localhost:56162","screen_dir":"/Users/nazar/Developer/modeling-framework/.superpowers/brainstorm/26067-1778152953/content","state_dir":"/Users/nazar/Developer/modeling-framework/.superpowers/brainstorm/26067-1778152953/state"}
+{"type":"screen-added","file":"/Users/nazar/Developer/modeling-framework/.superpowers/brainstorm/26067-1778152953/content/approaches.html"}
+{"type":"screen-added","file":"/Users/nazar/Developer/modeling-framework/.superpowers/brainstorm/26067-1778152953/content/waiting-1.html"}
+{"type":"screen-added","file":"/Users/nazar/Developer/modeling-framework/.superpowers/brainstorm/26067-1778152953/content/popover-detail.html"}
+{"type":"server-stopped","reason":"idle timeout"}

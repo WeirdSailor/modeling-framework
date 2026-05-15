@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Deficit Solver — Full Flow Design</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0a0d13; color: #e2e8f0; font-family: system-ui, sans-serif; padding: 24px; }
+
+  h1 { font-size: 17px; font-weight: 600; color: #f1f5f9; margin-bottom: 4px; }
+  .subtitle { font-size: 12px; color: #64748b; margin-bottom: 24px; }
+
+  /* ── Step flow ── */
+  .steps { display: flex; align-items: center; gap: 0; margin-bottom: 28px; }
+  .step { display: flex; align-items: center; gap: 8px; padding: 7px 14px; border-radius: 999px; font-size: 12px; font-weight: 500; color: #475569; background: #161a22; border: 1px solid #2d3441; cursor: pointer; transition: all .15s; }
+  .step.active { background: #1e1b4b; border-color: #6366f1; color: #a5b4fc; }
+  .step .num { width: 20px; height: 20px; border-radius: 50%; background: #2d3441; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; }
+  .step.active .num { background: #6366f1; color: #fff; }
+  .arrow { color: #2d3441; padding: 0 6px; font-size: 14px; }
+
+  /* ── Panels ── */
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  /* ── Shared card ── */
+  .card { background: #161a22; border: 1px solid #2d3441; border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+  .card-title { font-size: 11px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 10px; }
+
+  /* ── Chart canvas card ── */
+  .chart-wrap { position: relative; height: 200px; background: #0f1218; border-radius: 8px; border: 1px solid #1f2530; overflow: hidden; user-select: none; }
+  canvas { position: absolute; inset: 0; }
+
+  /* ── Solve panel ── */
+  .solve-bar {
+    margin-top: 10px; padding: 10px 14px;
+    background: #1a1f2e; border-radius: 8px;
+    border: 1px solid #2d3441;
+    display: flex; align-items: center; gap: 12px;
+    transition: border-color .2s;
+  }
+  .solve-bar.active { border-color: #6366f1; }
+  .solve-bar .fields { display: flex; gap: 16px; flex: 1; }
+  .field-group { display: flex; flex-direction: column; gap: 3px; }
+  .field-label { font-size: 9px; text-transform: uppercase; letter-spacing: .06em; color: #475569; }
+  .field-val { font-size: 12px; font-family: monospace; color: #94a3b8; }
+  .field-val.set { color: #a5b4fc; }
+  .field-val.deficit { color: #f87171; font-weight: 600; }
+  .solve-btn { padding: 7px 18px; background: #6366f1; color: #fff; font-size: 12px; font-weight: 600; border-radius: 7px; border: none; cursor: pointer; white-space: nowrap; opacity: .35; pointer-events: none; transition: opacity .2s; }
+  .solve-btn.ready { opacity: 1; pointer-events: all; }
+
+  /* ── Config tweak mockup ── */
+  .tweak-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #1f2530; }
+  .tweak-row:last-child { border-bottom: none; }
+  .tweak-label { font-size: 12px; color: #94a3b8; }
+  .tweak-desc { font-size: 10px; color: #475569; }
+  .seg { display: flex; border: 1px solid #2d3441; border-radius: 6px; overflow: hidden; }
+  .seg-opt { padding: 4px 10px; font-size: 11px; color: #64748b; cursor: pointer; transition: all .15s; background: #0f1218; }
+  .seg-opt.active { background: #6366f1; color: #fff; font-weight: 600; }
+
+  /* ── Workspace tab ── */
+  .ws-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .ws-field { display: flex; flex-direction: column; gap: 4px; }
+  .ws-field label { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: #475569; }
+  .ws-input { padding: 7px 10px; background: #0f1218; border: 1px solid #2d3441; border-radius: 6px; font-size: 12px; font-family: monospace; color: #a5b4fc; }
+  .ws-input.highlight { border-color: #6366f1; background: #1e1b4b22; }
+  .ws-input.deficit-field { border-color: #ef4444; color: #f87171; background: #1a0a0a; }
+  .ws-badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 600; background: #312e81; color: #a5b4fc; border: 1px solid #4338ca; margin-left: 8px; }
+  .ws-badge.auto { background: #14532d22; color: #86efac; border-color: #16a34a; }
+
+  /* ── Available table ── */
+  table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  th { padding: 6px 8px; text-align: left; font-size: 9px; text-transform: uppercase; letter-spacing: .06em; color: #475569; border-bottom: 1px solid #1f2530; }
+  td { padding: 6px 8px; border-bottom: 1px solid #1a1f2e; color: #94a3b8; font-family: monospace; }
+  tr.recommended { background: rgba(99,102,241,.10); }
+  tr.recommended td { color: #c7d2fe; }
+  tr.recommended td.rank { color: #818cf8; font-weight: 700; }
+  tr.top { background: rgba(99,102,241,.18); }
+  tr.top td { color: #e0e7ff; }
+  tr.top td.rank { color: #6366f1; font-weight: 700; }
+  .chip { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 9px; font-weight: 600; }
+  .chip-ccgt { background: #1e3a5f; color: #60a5fa; }
+  .chip-ocgt { background: #1a2e1a; color: #86efac; }
+  .chip-ps { background: #2d1b4e; color: #c084fc; }
+  .chip-sr { background: #1e3a5f; color: #60a5fa; }
+  .solve-cover { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; background: #14532d33; border: 1px solid #16a34a; border-radius: 4px; color: #86efac; font-size: 9px; font-weight: 600; }
+  .rank-badge { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; background: #6366f1; color: #fff; font-size: 9px; font-weight: 700; }
+  .add-btn { padding: 2px 8px; border-radius: 4px; border: 1px solid #2d3441; background: transparent; color: #64748b; font-size: 10px; cursor: pointer; }
+  tr.top .add-btn { border-color: #6366f1; color: #a5b4fc; }
+  .cumulative-bar { height: 4px; background: #1f2530; border-radius: 2px; margin-top: 4px; }
+  .cumulative-fill { height: 4px; background: #6366f1; border-radius: 2px; }
+
+  /* step nav */
+  .step-footer { display: flex; justify-content: flex-end; margin-top: 16px; }
+  .nav-btn { padding: 8px 18px; background: #6366f1; color: #fff; border: none; border-radius: 7px; font-size: 12px; font-weight: 600; cursor: pointer; }
+  .nav-btn.ghost { background: transparent; border: 1px solid #2d3441; color: #64748b; margin-right: 8px; }
+  .note { font-size: 11px; color: #475569; margin-top: 8px; padding: 8px 12px; background: #161a22; border-radius: 6px; border-left: 2px solid #4338ca; }
+
+  .hint-text { font-size: 11px; color: #475569; text-align: center; margin-top: 6px; font-style: italic; }
+  .coverage-summary { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: #0f2318; border: 1px solid #16a34a; border-radius: 6px; margin-bottom: 10px; }
+  .coverage-summary .cov-label { font-size: 11px; color: #86efac; flex: 1; }
+  .coverage-summary .cov-num { font-size: 13px; font-weight: 700; font-family: monospace; color: #34d399; }
+  .select-top-btn { padding: 6px 14px; background: #14532d; border: 1px solid #16a34a; color: #86efac; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer; }
+</style>
+</head>
+<body>
+
+<h1>Deficit Solver — Full Design Flow</h1>
+<p class="subtitle">Step through the three screens to see how the feature works end-to-end</p>
+
+<div class="steps">
+  <div class="step active" id="tab-1" onclick="gotoStep(1)"><span class="num">1</span> Chart — Select Range</div>
+  <div class="arrow">›</div>
+  <div class="step" id="tab-2" onclick="gotoStep(2)"><span class="num">2</span> Config — Interaction Mode</div>
+  <div class="arrow">›</div>
+  <div class="step" id="tab-3" onclick="gotoStep(3)"><span class="num">3</span> Workspace — Solve</div>
+</div>
+
+<!-- ═══════════════ STEP 1: CHART ═══════════════ -->
+<div class="panel active" id="panel-1">
+  <div class="card">
+    <div class="card-title">Chart Tab — Drag to select a deficit range</div>
+    <div class="chart-wrap" id="chart-wrap">
+      <canvas id="main-canvas"></canvas>
+    </div>
+    <p class="hint-text" id="chart-hint">↔ Click and drag on the chart to select a time range</p>
+    <div class="solve-bar" id="main-solve-bar">
+      <div class="fields">
+        <div class="field-group">
+          <div class="field-label">From</div>
+          <div class="field-val" id="fval-from">—</div>
+        </div>
+        <div class="field-group">
+          <div class="field-label">To</div>
+          <div class="field-val" id="fval-to">—</div>
+        </div>
+        <div class="field-group">
+          <div class="field-label">Duration</div>
+          <div class="field-val" id="fval-dur">—</div>
+        </div>
+        <div class="field-group">
+          <div class="field-label">Worst Deficit</div>
+          <div class="field-val deficit" id="fval-def">—</div>
+        </div>
+      </div>
+      <button class="solve-btn" id="main-solve-btn" onclick="activateSolve()">Solve ↗</button>
+    </div>
+    <p class="note">The <strong>Worst Deficit</strong> is the most negative Margin (EMX − TR2) across all SPs in the selected range. This is what gets pre-filled into the Workspace as the MW target to solve.</p>
+  </div>
+  <div class="step-footer">
+    <button class="nav-btn ghost" onclick="gotoStep(2)">Skip to Config tweak →</button>
+    <button class="nav-btn" onclick="gotoStep(3)">See Workspace result →</button>
+  </div>
+</div>
+
+<!-- ═══════════════ STEP 2: CONFIG TWEAK ═══════════════ -->
+<div class="panel" id="panel-2">
+  <div class="card">
+    <div class="card-title">⚙ Config → Tweaks — Chart Interaction Mode</div>
+    <p style="font-size:12px;color:#64748b;margin-bottom:14px">Operators can switch between three interaction styles. "Drag" is the default. All three produce the same output (From, To, Worst Deficit MW).</p>
+
+    <div class="tweak-row">
+      <div>
+        <div class="tweak-label">Chart interaction mode</div>
+        <div class="tweak-desc">How operators select a deficit period on the Chart tab</div>
+      </div>
+      <div class="seg">
+        <div class="seg-opt active" onclick="setMode(this,'drag')">Drag</div>
+        <div class="seg-opt" onclick="setMode(this,'twoClick')">2-Click</div>
+        <div class="seg-opt" onclick="setMode(this,'deficit')">Deficit</div>
+      </div>
+    </div>
+
+    <div class="note" id="mode-note" style="margin-top:14px">
+      <strong>Drag (default):</strong> Click and drag across the chart to brush a time range. Handles appear at each end for fine adjustment. Works for any range — deficit or surplus.
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Mode descriptions</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+      <div style="padding:10px;background:#0f1218;border-radius:8px;border:1px solid #6366f1">
+        <div style="font-size:11px;font-weight:600;color:#a5b4fc;margin-bottom:4px">Drag (default)</div>
+        <div style="font-size:10px;color:#475569;line-height:1.5">Click and drag to brush any time range. Handles for fine adjustment. Most flexible — works on deficits AND surplus periods.</div>
+      </div>
+      <div style="padding:10px;background:#0f1218;border-radius:8px;border:1px solid #2d3441">
+        <div style="font-size:11px;font-weight:600;color:#94a3b8;margin-bottom:4px">2-Click</div>
+        <div style="font-size:10px;color:#475569;line-height:1.5">Click once to pin start, click again to pin end. Good for precise SP-level boundary selection. Click a third time to reset.</div>
+      </div>
+      <div style="padding:10px;background:#0f1218;border-radius:8px;border:1px solid #2d3441">
+        <div style="font-size:11px;font-weight:600;color:#94a3b8;margin-bottom:4px">Deficit Zone</div>
+        <div style="font-size:10px;color:#475569;line-height:1.5">Click anywhere in a red deficit area — auto-selects the full contiguous deficit period. Fastest for the common case (one click).</div>
+      </div>
+    </div>
+  </div>
+  <div class="step-footer">
+    <button class="nav-btn ghost" onclick="gotoStep(1)">← Back to Chart</button>
+    <button class="nav-btn" onclick="gotoStep(3)">See Workspace →</button>
+  </div>
+</div>
+
+<!-- ═══════════════ STEP 3: WORKSPACE ═══════════════ -->
+<div class="panel" id="panel-3">
+  <div class="card">
+    <div class="card-title">Workspace Tab — after clicking "Solve ↗"</div>
+
+    <!-- Draft header (DraftDetails) -->
+    <div style="background:#0f1218;border-radius:8px;border:1px solid #1f2530;padding:12px 14px;margin-bottom:10px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div style="font-size:13px;font-weight:600;color:#f1f5f9">Draft 1 — Margin event</div>
+        <div style="display:flex;gap:6px">
+          <span style="padding:3px 8px;background:#14532d;color:#86efac;border-radius:4px;font-size:10px">Commit</span>
+          <span style="padding:3px 8px;background:#1f2530;color:#64748b;border-radius:4px;font-size:10px">Discard</span>
+        </div>
+      </div>
+
+      <div class="ws-layout">
+        <div class="ws-field">
+          <label>From <span class="ws-badge auto">auto-filled</span></label>
+          <div class="ws-input highlight">13|13:00</div>
+        </div>
+        <div class="ws-field">
+          <label>To <span class="ws-badge auto">auto-filled</span></label>
+          <div class="ws-input highlight">21|17:00</div>
+        </div>
+        <div class="ws-field">
+          <label>Scenario</label>
+          <div class="ws-input">Margin</div>
+        </div>
+        <div class="ws-field">
+          <label>MW to solve <span class="ws-badge" style="background:#1a0a0a;color:#f87171;border-color:#dc2626">deficit</span></label>
+          <div class="ws-input deficit-field">−312 MW</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Coverage summary -->
+    <div class="coverage-summary">
+      <div class="cov-label">Top ranked units cover: <strong>418 MW</strong> of <strong>312 MW</strong> needed</div>
+      <div class="cov-num">134%</div>
+      <button class="select-top-btn">✓ Select top units</button>
+    </div>
+
+    <!-- Available table with ranking -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <div class="card-title" style="margin-bottom:0">Available units — ranked by Margin scenario <span style="font-size:9px;color:#4338ca;background:#1e1b4b;padding:2px 6px;border-radius:4px;margin-left:4px">Solve mode</span></div>
+      <button id="select-checked-btn" onclick="this.textContent='✓ Added to draft';this.style.background='#14532d';this.style.borderColor='#16a34a';this.style.color='#86efac'" style="padding:5px 14px;background:#6366f1;color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer">Select (2 checked)</button>
+    </div>
+    <div style="overflow-x:auto">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th><input type="checkbox" checked title="toggle all"></th>
+          <th>BMU</th>
+          <th>Type</th>
+          <th>MEL</th>
+          <th>PN</th>
+          <th>Avail. MW</th>
+          <th>Cumulative</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="top">
+          <td class="rank"><span class="rank-badge">1</span></td>
+          <td><input type="checkbox" checked onchange="updateCount()"></td>
+          <td>T_HUMR-1</td>
+          <td><span class="chip chip-ccgt">CCGT</span></td>
+          <td>860</td><td>560</td>
+          <td style="color:#34d399;font-weight:700">+300 MW</td>
+          <td>
+            <div style="font-size:10px;color:#86efac">300 MW (96%)</div>
+            <div class="cumulative-bar"><div class="cumulative-fill" style="width:96%"></div></div>
+          </td>
+        </tr>
+        <tr class="top">
+          <td class="rank"><span class="rank-badge">2</span></td>
+          <td><input type="checkbox" checked onchange="updateCount()"></td>
+          <td>T_BAGE-1</td>
+          <td><span class="chip chip-ocgt">OCGT</span></td>
+          <td>118</td><td>0</td>
+          <td style="color:#34d399;font-weight:700">+118 MW</td>
+          <td>
+            <div style="font-size:10px;color:#34d399">418 MW ✓ <span class="solve-cover">covers deficit</span></div>
+            <div class="cumulative-bar"><div class="cumulative-fill" style="width:100%;background:#16a34a"></div></div>
+          </td>
+        </tr>
+        <tr class="recommended">
+          <td class="rank" style="color:#4b5563">3</td>
+          <td><input type="checkbox" onchange="updateCount()"></td>
+          <td>T_CNQPS-2</td>
+          <td><span class="chip chip-ps">PS</span></td>
+          <td>390</td><td>200</td>
+          <td style="color:#6b7280">+190 MW</td>
+          <td><div style="font-size:10px;color:#374151">already covered</div></td>
+        </tr>
+        <tr class="recommended">
+          <td class="rank" style="color:#4b5563">4</td>
+          <td><input type="checkbox" onchange="updateCount()"></td>
+          <td>T_STAY-4</td>
+          <td><span class="chip chip-ccgt">CCGT</span></td>
+          <td>420</td><td>280</td>
+          <td style="color:#6b7280">+140 MW</td>
+          <td><div style="font-size:10px;color:#374151">already covered</div></td>
+        </tr>
+        <tr>
+          <td style="color:#2d3441">5</td>
+          <td><input type="checkbox" onchange="updateCount()"></td>
+          <td>T_PEHE-1</td>
+          <td><span class="chip chip-ccgt">CCGT</span></td>
+          <td>290</td><td>210</td>
+          <td>+80 MW</td>
+          <td></td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+    <p class="note" style="margin-top:10px">
+      Rows 1–2 are <strong>pre-checked</strong>: minimum set covering the 312 MW deficit, ranked by scenario. Rows 3–4 are the next tier (dimly highlighted). Tick or untick any rows, then click <strong>Select</strong> — same button as normal unit selection.
+    </p>
+  </div>
+
+  <div class="step-footer">
+    <button class="nav-btn ghost" onclick="gotoStep(2)">← Back to Config</button>
+    <button class="nav-btn ghost" onclick="gotoStep(1)">← Back to Chart</button>
+  </div>
+</div>
+
+<script>
+// ── Step navigation ──
+function gotoStep(n) {
+  [1,2,3].forEach(i => {
+    document.getElementById(`panel-${i}`).classList.toggle('active', i===n)
+    document.getElementById(`tab-${i}`).classList.toggle('active', i===n)
+  })
+}
+
+// ── Config tweak ──
+const modeNotes = {
+  drag: '<strong>Drag (default):</strong> Click and drag across the chart to brush a time range. Handles appear at each end for fine adjustment. Works for any range — deficit or surplus.',
+  twoClick: '<strong>2-Click:</strong> Click once to pin start, click again to pin end. Precise SP-level selection. Click a third time to reset.',
+  deficit: '<strong>Deficit Zone:</strong> Click anywhere in a red area — auto-selects the full contiguous deficit period. One click for the most common workflow.'
+}
+function setMode(el, mode) {
+  document.querySelectorAll('.seg-opt').forEach(o => o.classList.remove('active'))
+  el.classList.add('active')
+  document.getElementById('mode-note').innerHTML = modeNotes[mode]
+}
+
+// ── Chart (Step 1) ──
+const N = 48
+function genData() {
+  const emx = [32000,31800,31500,31200,30800,30400,30000,29800,29500,29200,29000,28800,28600,28400,28200,28000,27800,27600,27500,27300,27200,27100,27000,26900,26800,27000,27300,27600,27900,28200,28500,28800,29100,29400,29700,30000,30300,30600,30900,31200,31500,31800,32000,32200,32400,32500,32600,32700]
+  const tr2 = [28000,27800,27500,27200,27000,26800,26700,26600,27000,27500,28000,28500,29000,29200,29300,29400,29300,29200,29100,29000,28900,28800,28700,28800,28900,29000,29200,29400,29500,29600,29500,29400,29200,29000,28800,28600,28400,28200,28100,28000,27900,27800,27700,27600,27500,27400,27300,27200]
+  const deficit = emx.map((e,i) => e-tr2[i])
+  return {emx,tr2,deficit}
+}
+const DATA = genData()
+const TIMES = Array.from({length:N},(_,i)=>{
+  const m=6*60+i*30,h=Math.floor(m/60)%24,mn=m%60
+  return `${String(h).padStart(2,'0')}:${String(mn).padStart(2,'0')}`
+})
+const DEFICIT_RANGES = (() => {
+  const r=[]; let s=-1
+  for(let i=0;i<N;i++){
+    if(DATA.deficit[i]<0 && s===-1) s=i
+    if((DATA.deficit[i]>=0||i===N-1)&&s!==-1){r.push({from:s,to:DATA.deficit[i]<0?i:i-1});s=-1}
+  }
+  return r
+})()
+
+const wrap = document.getElementById('chart-wrap')
+const can  = document.getElementById('main-canvas')
+const dpr  = window.devicePixelRatio||1
+function sizeCanvas() {
+  can.width  = wrap.clientWidth*dpr
+  can.height = wrap.clientHeight*dpr
+  can.style.width  = wrap.clientWidth+'px'
+  can.style.height = wrap.clientHeight+'px'
+}
+sizeCanvas()
+const ctx = can.getContext('2d')
+ctx.scale(dpr,dpr)
+const W = () => wrap.clientWidth
+const H = () => wrap.clientHeight
+
+function spToX(sp){return 36+(sp/(N-1))*(W()-44)}
+function valToY(v){const mn=25000,mx=34000;return 8+(1-(v-mn)/(mx-mn))*(H()-18)}
+function xToSp(x){return Math.max(0,Math.min(N-1,Math.round(((x-36)/(W()-44))*(N-1))))}
+
+let drag={active:false,from:null,to:null}
+
+function draw(){
+  ctx.clearRect(0,0,W(),H())
+  // grid
+  ctx.strokeStyle='#1f2530'; ctx.lineWidth=1
+  for(let y=26000;y<=33000;y+=2000){
+    ctx.beginPath(); ctx.moveTo(36,valToY(y)); ctx.lineTo(W()-8,valToY(y)); ctx.stroke()
+  }
+  // deficit fill
+  for(const r of DEFICIT_RANGES){
+    ctx.fillStyle='rgba(239,68,68,0.18)'
+    ctx.beginPath(); ctx.moveTo(spToX(r.from),valToY(DATA.emx[r.from]))
+    for(let i=r.from;i<=r.to;i++) ctx.lineTo(spToX(i),valToY(DATA.emx[i]))
+    for(let i=r.to;i>=r.from;i--) ctx.lineTo(spToX(i),valToY(DATA.tr2[i]))
+    ctx.closePath(); ctx.fill()
+  }
+  // selection
+  if(drag.from!==null && drag.to!==null){
+    const x1=spToX(Math.min(drag.from,drag.to))
+    const x2=spToX(Math.max(drag.from,drag.to))
+    ctx.fillStyle='rgba(99,102,241,0.15)'; ctx.fillRect(x1,0,x2-x1,H())
+    ctx.strokeStyle='#6366f1'; ctx.lineWidth=2
+    ctx.beginPath(); ctx.moveTo(x1,0); ctx.lineTo(x1,H()); ctx.stroke()
+    ctx.beginPath(); ctx.moveTo(x2,0); ctx.lineTo(x2,H()); ctx.stroke()
+    if(typeof ctx.roundRect==='function'){
+      ctx.fillStyle='#6366f1'
+      ctx.beginPath(); ctx.roundRect(x1-5,H()/2-14,10,28,4); ctx.fill()
+      ctx.beginPath(); ctx.roundRect(x2-5,H()/2-14,10,28,4); ctx.fill()
+    }
+  }
+  // TR2
+  ctx.strokeStyle='#fb923c'; ctx.lineWidth=1.5; ctx.setLineDash([])
+  ctx.beginPath()
+  for(let i=0;i<N;i++) i?ctx.lineTo(spToX(i),valToY(DATA.tr2[i])):ctx.moveTo(spToX(i),valToY(DATA.tr2[i]))
+  ctx.stroke()
+  // EMX
+  ctx.strokeStyle='#34d399'; ctx.lineWidth=2
+  ctx.beginPath()
+  for(let i=0;i<N;i++) i?ctx.lineTo(spToX(i),valToY(DATA.emx[i])):ctx.moveTo(spToX(i),valToY(DATA.emx[i]))
+  ctx.stroke()
+  // labels
+  ctx.fillStyle='#475569'; ctx.font='9px monospace'; ctx.textAlign='center'
+  for(let i=0;i<N;i+=8) ctx.fillText(TIMES[i],spToX(i),H()-3)
+}
+draw()
+
+function updatePanel(){
+  if(drag.from===null||drag.to===null){
+    ['from','to','dur','def'].forEach(k=>document.getElementById('fval-'+k).textContent='—')
+    document.getElementById('main-solve-btn').classList.remove('ready')
+    document.getElementById('main-solve-bar').classList.remove('active')
+    return
+  }
+  const f=Math.min(drag.from,drag.to), t=Math.max(drag.from,drag.to)
+  const worst=Math.min(...DATA.deficit.slice(f,t+1))
+  const dur=(t-f+1)*30
+  document.getElementById('fval-from').textContent=TIMES[f]
+  document.getElementById('fval-from').className='field-val set'
+  document.getElementById('fval-to').textContent=TIMES[t]
+  document.getElementById('fval-to').className='field-val set'
+  document.getElementById('fval-dur').textContent=`${dur} min`
+  document.getElementById('fval-dur').className='field-val set'
+  if(worst<0){
+    document.getElementById('fval-def').textContent=`${Math.round(worst).toLocaleString()} MW`
+    document.getElementById('main-solve-btn').classList.add('ready')
+    document.getElementById('main-solve-bar').classList.add('active')
+    document.getElementById('chart-hint').textContent=`Selected ${TIMES[f]} → ${TIMES[t]} · Worst deficit: ${Math.round(worst).toLocaleString()} MW · Click Solve to continue`
+  } else {
+    document.getElementById('fval-def').textContent='No deficit'
+    document.getElementById('fval-def').className='field-val'
+    document.getElementById('main-solve-btn').classList.remove('ready')
+    document.getElementById('chart-hint').textContent=`Selected ${TIMES[f]} → ${TIMES[t]} · No deficit in range`
+  }
+}
+
+can.addEventListener('mousedown',e=>{
+  const r=can.getBoundingClientRect()
+  drag={active:true,from:xToSp(e.clientX-r.left),to:null}
+  draw()
+})
+document.addEventListener('mousemove',e=>{
+  if(!drag.active)return
+  const r=can.getBoundingClientRect()
+  drag.to=xToSp(e.clientX-r.left)
+  draw(); updatePanel()
+})
+document.addEventListener('mouseup',()=>{
+  if(!drag.active)return
+  drag.active=false
+  if(drag.from===drag.to){drag={active:false,from:null,to:null}; draw(); updatePanel()}
+})
+
+function activateSolve(){
+  gotoStep(3)
+  fetch('/event',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({type:'click',choice:'solve',text:'Solve button clicked'})}).catch(()=>{})
+}
+
+function updateCount(){
+  const n = document.querySelectorAll('#panel-3 tbody input[type=checkbox]:checked').length
+  const btn = document.getElementById('select-checked-btn')
+  if(btn && !btn.textContent.startsWith('✓')){
+    btn.textContent = `Select (${n} checked)`
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,373 @@
+<h2>Constraint Filter — UI Approaches</h2>
+<p class="subtitle">Three ways to add per-zone include/exclude filtering to the Available Units panel. Each zone can be: neutral (no effect) · included (show only) · excluded (hide).</p>
+
+<style>
+  .tb { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11px; }
+  .mock-panel {
+    background: #0f1117;
+    border: 1px solid #2a2d3a;
+    border-radius: 8px;
+    overflow: hidden;
+    font-family: system-ui, -apple-system, sans-serif;
+    font-size: 12.5px;
+    color: #d1d5db;
+    width: 100%;
+  }
+  .mock-head {
+    padding: 10px 14px;
+    border-bottom: 1px solid #2a2d3a;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    background: #161920;
+  }
+  .mock-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .mock-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #f9fafb;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .mock-pill {
+    font-size: 11px;
+    background: #1e2230;
+    color: #6b7280;
+    padding: 1px 8px;
+    border-radius: 999px;
+  }
+  .mock-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .mock-input {
+    background: #0f1117;
+    border: 1px solid #374151;
+    border-radius: 6px;
+    padding: 5px 10px 5px 28px;
+    color: #9ca3af;
+    width: 160px;
+    font-size: 12px;
+    position: relative;
+  }
+  .mock-select {
+    background: #0f1117;
+    border: 1px solid #374151;
+    border-radius: 6px;
+    padding: 5px 10px;
+    color: #9ca3af;
+    font-size: 12px;
+  }
+  .mock-btn-filter {
+    background: #0f1117;
+    border: 1px solid #374151;
+    border-radius: 6px;
+    padding: 5px 10px;
+    color: #9ca3af;
+    font-size: 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+  }
+  .mock-btn-filter.active {
+    border-color: #4f46e5;
+    color: #a5b4fc;
+    background: #1e1b4b;
+  }
+  .badge-active {
+    background: #4f46e5;
+    color: #fff;
+    font-size: 10px;
+    border-radius: 999px;
+    padding: 0 5px;
+    font-weight: 600;
+  }
+  .badge-inc { background: #065f46; color: #6ee7b7; font-size: 10px; border-radius: 999px; padding: 0 5px; }
+  .badge-exc { background: #7f1d1d; color: #fca5a5; font-size: 10px; border-radius: 999px; padding: 0 5px; }
+
+  /* Popover */
+  .mock-popover {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    background: #1a1d27;
+    border: 1px solid #374151;
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.5);
+    width: 260px;
+    z-index: 10;
+    padding: 8px 0;
+  }
+  .pop-header {
+    padding: 6px 12px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: #6b7280;
+    border-bottom: 1px solid #2a2d3a;
+    display: flex;
+    justify-content: space-between;
+  }
+  .pop-clear { color: #6366f1; font-size: 11px; cursor: pointer; font-weight: 400; text-transform: none; letter-spacing: 0; }
+  .pop-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 5px 12px;
+    gap: 8px;
+  }
+  .pop-label { font-size: 12px; color: #d1d5db; flex: 1; }
+  .pop-sub { font-size: 10px; color: #6b7280; }
+  .toggle-group {
+    display: flex;
+    border-radius: 4px;
+    overflow: hidden;
+    border: 1px solid #374151;
+  }
+  .toggle-btn {
+    padding: 2px 7px;
+    font-size: 11px;
+    background: #0f1117;
+    color: #6b7280;
+    border: none;
+    cursor: pointer;
+    border-right: 1px solid #374151;
+  }
+  .toggle-btn:last-child { border-right: none; }
+  .toggle-btn.inc { background: #064e3b; color: #6ee7b7; }
+  .toggle-btn.exc { background: #7f1d1d; color: #fca5a5; }
+
+  /* Filter strip */
+  .filter-strip {
+    padding: 8px 14px;
+    border-bottom: 1px solid #2a2d3a;
+    background: #13161f;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .strip-label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: #6b7280;
+    flex-shrink: 0;
+  }
+  .zone-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border-radius: 5px;
+    font-size: 11px;
+    border: 1px solid #374151;
+    background: #0f1117;
+    color: #9ca3af;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .zone-chip.inc {
+    background: #064e3b;
+    border-color: #065f46;
+    color: #6ee7b7;
+  }
+  .zone-chip.exc {
+    background: #450a0a;
+    border-color: #7f1d1d;
+    color: #fca5a5;
+  }
+  .strip-clear {
+    margin-left: auto;
+    font-size: 11px;
+    color: #6366f1;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  /* Table stub */
+  .mock-table-stub {
+    padding: 10px 14px;
+    font-size: 11.5px;
+    color: #4b5563;
+    font-family: 'SF Mono', monospace;
+  }
+  .mock-table-stub div { padding: 4px 0; border-bottom: 1px solid #1e2230; }
+  .mock-table-stub div:last-child { border-bottom: none; }
+  .t-bmu { color: #a5b4fc; width: 100px; display: inline-block; }
+  .t-gsp { color: #6b7280; width: 40px; display: inline-block; }
+  .t-type { display: inline-block; }
+
+  .rel { position: relative; }
+</style>
+
+<div class="options">
+
+  <!-- Option A: Popover -->
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Toolbar Popover</h3>
+      <p>A "GSP Filter" button sits in the existing toolbar. Clicking it opens a floating panel with all 14 zones — each has a 3-way toggle: neutral / include / exclude. The button shows a summary badge when active.</p>
+      <div class="mock-panel" style="margin-top:12px">
+        <div class="mock-head">
+          <div class="mock-title-row">
+            <div class="mock-title">Available units <span class="mock-pill">47 of 312</span></div>
+          </div>
+          <div class="mock-toolbar">
+            <div style="position:relative;display:flex;align-items:center">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2" style="position:absolute;left:9px"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+              <div class="mock-input">Search BMU…</div>
+            </div>
+            <div class="mock-select">All types ▾</div>
+            <div class="mock-select">Scenario… ▾</div>
+            <div class="mock-btn-filter active" style="position:relative">
+              GSP Filter ▾ <span class="badge-active">2</span><span class="badge-exc" style="margin-left:2px">1</span>
+              <div class="mock-popover" onclick="event.stopPropagation()">
+                <div class="pop-header">GSP Groups <span class="pop-clear">Clear all</span></div>
+                <div class="pop-row">
+                  <div><div class="pop-label">_F · North Scotland</div></div>
+                  <div class="toggle-group">
+                    <button class="toggle-btn inc">+</button>
+                    <button class="toggle-btn">·</button>
+                    <button class="toggle-btn">−</button>
+                  </div>
+                </div>
+                <div class="pop-row">
+                  <div><div class="pop-label">_G · South Scotland</div></div>
+                  <div class="toggle-group">
+                    <button class="toggle-btn inc">+</button>
+                    <button class="toggle-btn">·</button>
+                    <button class="toggle-btn">−</button>
+                  </div>
+                </div>
+                <div class="pop-row">
+                  <div><div class="pop-label">_P · Northern England</div></div>
+                  <div class="toggle-group">
+                    <button class="toggle-btn">+</button>
+                    <button class="toggle-btn">·</button>
+                    <button class="toggle-btn exc">−</button>
+                  </div>
+                </div>
+                <div class="pop-row" style="opacity:.5">
+                  <div><div class="pop-label">_N · North West England</div></div>
+                  <div class="toggle-group">
+                    <button class="toggle-btn">+</button>
+                    <button class="toggle-btn" style="background:#1e2230;color:#d1d5db">·</button>
+                    <button class="toggle-btn">−</button>
+                  </div>
+                </div>
+                <div class="pop-row" style="color:#6b7280;font-size:11px;padding-top:2px">+ 10 more zones…</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="mock-table-stub">
+          <div><span class="t-bmu">COCKENZ-1</span><span class="t-gsp">_F</span> <span style="color:#6ee7b7">✓ included</span></div>
+          <div><span class="t-bmu">GALS-1</span><span class="t-gsp">_G</span> <span style="color:#6ee7b7">✓ included</span></div>
+          <div style="opacity:.3;text-decoration:line-through"><span class="t-bmu">DRAXX-1</span><span class="t-gsp">_P</span> <span style="color:#fca5a5">✗ excluded</span></div>
+        </div>
+      </div>
+      <div class="pros-cons" style="margin-top:10px">
+        <div class="pros"><h4>Pros</h4><ul><li>Zero permanent space — toolbar unchanged when inactive</li><li>Handles all 14 zones in scrollable list</li><li>Easy to extend with real constraint data later</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Active filters hidden behind a click</li><li>Popover closes if you misclick</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Option B: Filter Strip -->
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Collapsible Filter Strip</h3>
+      <p>A second row appears below the toolbar. Collapsed by default — click "GSP" to expand. Each zone is a chip: click once for include (green), click again for exclude (red), again to reset. Active filters stay visible as chips even when collapsed.</p>
+      <div class="mock-panel" style="margin-top:12px">
+        <div class="mock-head">
+          <div class="mock-title-row">
+            <div class="mock-title">Available units <span class="mock-pill">47 of 312</span></div>
+          </div>
+          <div class="mock-toolbar">
+            <div style="position:relative;display:flex;align-items:center">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2" style="position:absolute;left:9px"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+              <div class="mock-input">Search BMU…</div>
+            </div>
+            <div class="mock-select">All types ▾</div>
+            <div class="mock-select">Scenario… ▾</div>
+          </div>
+        </div>
+        <!-- Expanded strip -->
+        <div class="filter-strip">
+          <span class="strip-label">GSP ▾</span>
+          <span class="zone-chip inc">+ _F · N.Scotland</span>
+          <span class="zone-chip inc">+ _G · S.Scotland</span>
+          <span class="zone-chip exc">− _P · N.England</span>
+          <span class="zone-chip">_N · NW England</span>
+          <span class="zone-chip">_M · Yorkshire</span>
+          <span class="zone-chip">_A · E.England</span>
+          <span style="font-size:11px;color:#6b7280">+8 more</span>
+          <span class="strip-clear">Clear</span>
+        </div>
+        <div class="mock-table-stub">
+          <div><span class="t-bmu">COCKENZ-1</span><span class="t-gsp">_F</span> <span style="color:#6ee7b7">✓ included</span></div>
+          <div><span class="t-bmu">GALS-1</span><span class="t-gsp">_G</span> <span style="color:#6ee7b7">✓ included</span></div>
+          <div style="opacity:.3"><span class="t-bmu">DRAXX-1</span><span class="t-gsp">_P</span> <span style="color:#fca5a5">✗ excluded</span></div>
+        </div>
+      </div>
+      <div class="pros-cons" style="margin-top:10px">
+        <div class="pros"><h4>Pros</h4><ul><li>Active filters always visible — no hidden state</li><li>3-state chip click is fast once learned</li><li>Collapses to save space when not in use</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Adds a permanent row to the panel header</li><li>14 chips wrap to multiple lines on smaller screens</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Option C: Hybrid -->
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Toolbar Button + Active Chips</h3>
+      <p>A "GSP" button opens a checklist popover to select zones. Selected zones then appear as compact chips directly in the toolbar (with +/− toggle on each chip). The toolbar wraps naturally when filters are active.</p>
+      <div class="mock-panel" style="margin-top:12px">
+        <div class="mock-head">
+          <div class="mock-title-row">
+            <div class="mock-title">Available units <span class="mock-pill">47 of 312</span></div>
+          </div>
+          <div class="mock-toolbar">
+            <div style="position:relative;display:flex;align-items:center">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2" style="position:absolute;left:9px"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+              <div class="mock-input">Search BMU…</div>
+            </div>
+            <div class="mock-select">All types ▾</div>
+            <div class="mock-select">Scenario… ▾</div>
+            <div class="mock-btn-filter">+ GSP</div>
+            <!-- Active chips inline in toolbar -->
+            <span class="zone-chip inc" style="font-size:11px">_F · N.Scotland ✕</span>
+            <span class="zone-chip inc" style="font-size:11px">_G · S.Scotland ✕</span>
+            <span class="zone-chip exc" style="font-size:11px">_P · N.England ✕</span>
+          </div>
+        </div>
+        <div class="mock-table-stub">
+          <div><span class="t-bmu">COCKENZ-1</span><span class="t-gsp">_F</span> <span style="color:#6ee7b7">✓ included</span></div>
+          <div><span class="t-bmu">GALS-1</span><span class="t-gsp">_G</span> <span style="color:#6ee7b7">✓ included</span></div>
+          <div style="opacity:.3"><span class="t-bmu">DRAXX-1</span><span class="t-gsp">_P</span> <span style="color:#fca5a5">✗ excluded</span></div>
+        </div>
+      </div>
+      <div class="pros-cons" style="margin-top:10px">
+        <div class="pros"><h4>Pros</h4><ul><li>Active filters visible inline — glanceable</li><li>+ toggle on each chip to flip include/exclude</li><li>No extra rows — toolbar wraps naturally</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Toolbar gets wide with many active filters</li><li>Two interactions needed: open popover to add, then chip to toggle</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+</div>
