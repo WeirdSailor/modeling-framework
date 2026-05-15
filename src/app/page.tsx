@@ -70,6 +70,7 @@ export default function Home() {
     adjustedMw: number
   } | null>(null)
   const [clearSelectionKey, setClearSelectionKey] = useState(0)
+  const [solvePanelVisible, setSolvePanelVisible] = useState(false)
   const [dataMode, setDataMode] = useState<'real' | 'historical'>('real')
   const [historicalDate, setHistoricalDate] = useState<string>(
     () => dateToSettlementDate(new Date(Date.now() - 24 * 60 * 60 * 1000))
@@ -186,6 +187,7 @@ export default function Home() {
 
   const handleSolveSelect = useCallback((fromSp: number, toSp: number, worstDeficitMw: number) => {
     setSolveTarget({ fromSp, toSp, worstDeficitMw, adjustedMw: Math.abs(worstDeficitMw) })
+    setSolvePanelVisible(true)
   }, [])
 
   const handleSolveMwChange = useCallback((mw: number) => {
@@ -196,10 +198,11 @@ export default function Home() {
     if (!solveTarget) return
     const draftId = createDraft()
     updateDraftWindow(draftId, solveTarget.fromSp, solveTarget.toSp)
-    setSolveTarget(null)
+    setSolvePanelVisible(false)
     setClearSelectionKey(k => k + 1)
+    setScenario('margin')
     setActiveTab('workspace')
-  }, [solveTarget, createDraft, updateDraftWindow])
+  }, [solveTarget, createDraft, updateDraftWindow, setScenario])
 
   // ── derived data ──
   const activeDraft = drafts.find(d => d.id === activeDraftId) ?? null
@@ -562,14 +565,14 @@ export default function Home() {
               display: 'flex', alignItems: 'center', gap: 20,
               padding: '10px 16px',
               background: 'var(--bg-panel)',
-              border: `1px solid ${solveTarget ? '#6366f1' : 'var(--border)'}`,
+              border: `1px solid ${solvePanelVisible ? '#6366f1' : 'var(--border)'}`,
               borderRadius: 8,
               flexShrink: 0,
             }}>
               {(['From', 'To', 'Duration', 'Worst Deficit'] as const).map(lbl => {
                 let val = '—'
                 let color: string | undefined
-                if (solveTarget) {
+                if (solveTarget && solvePanelVisible) {
                   const dur = (solveTarget.toSp - solveTarget.fromSp + 1) * 30
                   if (lbl === 'From')          val = fmtSlot(solveTarget.fromSp)
                   if (lbl === 'To')            val = fmtSlot(solveTarget.toSp)
@@ -582,24 +585,24 @@ export default function Home() {
                 return (
                   <div key={lbl} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                     <span style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-faint)' }}>{lbl}</span>
-                    <span style={{ fontSize: 12, fontFamily: 'monospace', color: color ?? (solveTarget ? 'var(--text)' : 'var(--text-faint)'), fontWeight: color ? 700 : 400 }}>{val}</span>
+                    <span style={{ fontSize: 12, fontFamily: 'monospace', color: color ?? (solvePanelVisible ? 'var(--text)' : 'var(--text-faint)'), fontWeight: color ? 700 : 400 }}>{val}</span>
                   </div>
                 )
               })}
               <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
-                {solveTarget && (
+                {solvePanelVisible && (
                   <button
                     style={{ fontSize: 11, color: 'var(--text-faint)', background: 'none', border: 'none', cursor: 'pointer' }}
-                    onClick={() => setSolveTarget(null)}
+                    onClick={() => { setSolveTarget(null); setSolvePanelVisible(false) }}
                   >
                     ✕ Clear
                   </button>
                 )}
                 <button
                   className="btn btn-primary"
-                  disabled={!solveTarget}
+                  disabled={!solvePanelVisible}
                   onClick={handleSolveNavigate}
-                  style={{ fontSize: 12, opacity: solveTarget ? 1 : 0.35, padding: '6px 16px' }}
+                  style={{ fontSize: 12, opacity: solvePanelVisible ? 1 : 0.35, padding: '6px 16px' }}
                 >
                   Solve ↗
                 </button>
