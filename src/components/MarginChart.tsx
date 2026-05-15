@@ -223,10 +223,11 @@ export function MarginChart({
   }, [chartInteractionMode])
 
   function fireSolveSelect(idxA: number, idxB: number) {
+    console.log('[chart] fireSolveSelect idxA=', idxA, 'idxB=', idxB, 'onSolveSelect=', !!onSolveSelect)
     if (!onSolveSelect) return
     const lo = Math.min(idxA, idxB)
     const hi = Math.max(idxA, idxB)
-    const fromSp = lo + 1   // slot index 0-based → SP number 1-based
+    const fromSp = lo + 1
     const toSp   = hi + 1
     const worst  = Math.min(
       ...settlementPeriods.slice(lo, hi + 1).map(sp => {
@@ -234,7 +235,9 @@ export function MarginChart({
         return sp.emx - tr2
       })
     )
+    console.log('[chart] worst deficit in range=', worst)
     if (worst < 0) onSolveSelect(fromSp, toSp, worst)
+    else console.log('[chart] no deficit in selected range — onSolveSelect NOT called')
   }
 
   if (isLoading || settlementPeriods.length === 0) {
@@ -395,8 +398,10 @@ export function MarginChart({
           data={chartData}
           margin={{ top: 8, right: 16, left: 8, bottom: 8 }}
           onMouseDown={e => {
+            console.log('[chart] mousedown fired, activeTooltipIndex=', e?.activeTooltipIndex, 'mode=', chartInteractionMode)
             if (chartInteractionMode !== 'drag') return
             const idx = typeof e?.activeTooltipIndex === 'number' ? e.activeTooltipIndex : null
+            console.log('[chart] drag idx=', idx)
             if (idx == null) return
             isDraggingRef.current = true
             dragStartRef.current  = idx
@@ -405,12 +410,14 @@ export function MarginChart({
             setIsDragging(true)
           }}
           onMouseMove={e => {
-            if (chartInteractionMode !== 'drag' || !isDraggingRef.current) return
-            const idx = typeof e?.activeTooltipIndex === 'number' ? e.activeTooltipIndex : null
-            if (idx == null) return
-            setDragEnd(idx)
+            if (chartInteractionMode === 'drag' && isDraggingRef.current) {
+              const idx = typeof e?.activeTooltipIndex === 'number' ? e.activeTooltipIndex : null
+              console.log('[chart] mousemove while dragging, idx=', idx)
+              if (idx != null) setDragEnd(idx)
+            }
           }}
           onMouseUp={e => {
+            console.log('[chart] mouseup fired, activeTooltipIndex=', e?.activeTooltipIndex)
             if (chartInteractionMode !== 'drag') return
             dragFiredRef.current  = true
             isDraggingRef.current = false
@@ -428,6 +435,7 @@ export function MarginChart({
             }
           }}
           onClick={e => {
+            console.log('[chart] click fired, activeTooltipIndex=', e?.activeTooltipIndex, 'mode=', chartInteractionMode)
             if (chartInteractionMode === 'twoClick') {
               const idx = typeof e?.activeTooltipIndex === 'number' ? e.activeTooltipIndex : null
               if (idx == null) return
