@@ -240,6 +240,19 @@ export function MarginChart({
     else console.log('[chart] no deficit in selected range — onSolveSelect NOT called')
   }
 
+  // Must be before early return so hook count is stable across renders
+  const deficitRanges = useMemo(() => {
+    const ranges: { lo: number; hi: number }[] = []
+    let start = -1
+    settlementPeriods.forEach((sp, i) => {
+      const inDeficit = sp.emx - sp.demand * (1 + reservePct / 100) < 0
+      if (inDeficit && start === -1) start = i
+      if (!inDeficit && start !== -1) { ranges.push({ lo: start, hi: i - 1 }); start = -1 }
+    })
+    if (start !== -1) ranges.push({ lo: start, hi: settlementPeriods.length - 1 })
+    return ranges
+  }, [settlementPeriods, reservePct])
+
   if (isLoading || settlementPeriods.length === 0) {
     return (
       <div style={{
@@ -348,18 +361,6 @@ export function MarginChart({
 
     return point
   })
-
-  const deficitRanges = useMemo(() => {
-    const ranges: { lo: number; hi: number }[] = []
-    let start = -1
-    chartData.forEach((pt, i) => {
-      const inDeficit = (pt.margin as number) < 0
-      if (inDeficit && start === -1) start = i
-      if (!inDeficit && start !== -1) { ranges.push({ lo: start, hi: i - 1 }); start = -1 }
-    })
-    if (start !== -1) ranges.push({ lo: start, hi: chartData.length - 1 })
-    return ranges
-  }, [chartData])
 
   const tooltipRenderer = renderTooltip(activeDrafts, t, reservePct)
   const frontierLabel   = frontierIndex >= 0 ? (chartData[frontierIndex]?.label as string ?? null) : null
