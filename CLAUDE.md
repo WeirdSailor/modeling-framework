@@ -142,15 +142,15 @@ These values are also persisted in a **localStorage cache** (see Standing Data C
 
 | File | Role |
 |------|------|
-| `src/app/page.tsx` | Top-level: data loading, layout, tab switching, derived data, confirm modals, sharing actions; owns `hiddenDraftIds` state for chart draft visibility |
+| `src/app/page.tsx` | Top-level: data loading, layout, tab switching, derived data, confirm modals, sharing actions; owns `hiddenDraftIds` state for chart draft visibility; owns `solveTarget` state for the Deficit Solver (fromSp, toSp, worstDeficitMw) |
 | `src/components/DraftSidebar.tsx` | Identity picker ("You are: [NSE ▼]"), window time + Refresh, draft list filtered to current user, "Shared with me" collapsible section; coloured circle visibility toggle per active draft; collapse button (‹/›) at top; New Draft button pinned to bottom footer |
-| `src/components/DraftDetails.tsx` | Draft header: share icon (left of name, opens sharing popover), name input, description field (truncated, hover tooltip), From/To SP pickers + Scenario/GSP filter buttons in same row, action buttons; no cost/meta row, no state badge; From/To options display as `DD\|HH:MM` |
-| `src/components/AvailableTable.tsx` | Available units table: sort, checkbox or click selection, type + service chips; no toolbar — Scenario/GSP filters live in DraftDetails and are passed as props; Select button appears in header only when rows are checked |
+| `src/components/DraftDetails.tsx` | Draft header: share icon (left of name, opens sharing popover), name input, description field (truncated, hover tooltip), From/To SP pickers + Scenario/GSP filter buttons in same row, action buttons; no cost/meta row, no state badge; From/To options display as `DD\|HH:MM`; accepts `solveMw?: number \| null` prop — shows a red "N MW deficit" badge when set |
+| `src/components/AvailableTable.tsx` | Available units table: sort, checkbox or click selection, type + service chips; no toolbar — Scenario/GSP filters live in DraftDetails and are passed as props; Select button appears in header only when rows are checked; **Deficit Solver**: `solveMode` + `solveMw` props enable covering-set pre-check (highlighted rows) |
 | `src/components/SelectedTable.tsx` | Selected units in active draft: Σ PN / Σ MEL / Est. value totals, notes input, remove button, service chip; **From/To columns** (before Event) with inline selects for per-unit window editing; To can be cleared to undefined (open-ended) |
 | `src/components/CommittedTab.tsx` | Committed-tab view: cost breakdown cards (Total + per-reason), click-to-filter table, change-indicator arrows (↑/↓), service chip, bulk remove; **From/To columns** (read-only, before Event) |
 | `src/components/RedeclareTab.tsx` | Redeclare-tab view: editable data columns for committed units (simulates redeclarations); amber row highlight on override; Reset per-row and Reset all; Service (SR/QR) assign select |
-| `src/components/MarginChart.tsx` | Recharts chart: solid EMX/EOL/EMI baseline for all SPs + solid orange TR2 line (demand × reserve multiplier) + partial draft overlays (dotted only where draft has actions) + gate-closure frontier + midnight marker; draft visibility controlled via `hiddenDraftIds` prop; `reservePct` prop (default 10) controls TR2; dark-mode aware via MutationObserver |
-| `src/components/ConfigPanel.tsx` | Floating config panel (4 tabs): **tweaks** (theme/layout/sidebar/selection/TR2 reserve %), **scenarios** (ranking criteria), **data** (Real-time/Historical mode switch, date picker, start-time select, Load button), **standing data** (backfill + sync controls) |
+| `src/components/MarginChart.tsx` | Recharts chart: solid EMX/EOL/EMI baseline for all SPs + solid orange TR2 line (demand × reserve multiplier) + partial draft overlays (dotted only where draft has actions) + gate-closure frontier + midnight marker; draft visibility controlled via `hiddenDraftIds` prop; `reservePct` prop (default 10) controls TR2; dark-mode aware via MutationObserver; **Deficit Solver**: `chartInteractionMode` prop enables drag / 2-click / deficit-zone selection; fires `onSolveSelect(fromSp, toSp, worstDeficitMw)` callback |
+| `src/components/ConfigPanel.tsx` | Floating config panel (4 tabs): **tweaks** (theme/layout/sidebar/selection/TR2 reserve %, **chart interaction mode** — drag/2-click/deficit zone), **scenarios** (ranking criteria), **data** (Real-time/Historical mode switch, date picker, start-time select, Load button), **standing data** (backfill + sync controls) |
 | `src/components/GraphTab.tsx` | BMU Summary tab: read-only table of all units contributing to the margin chart — units with PN > 1 in any SP (including those outside the reference list) plus committed-draft units; Source badge differentiates "PN" (green) vs "User" (blue) vs "Both"; columns match AvailableTable with PN inserted before SEL; sorted by PN descending |
 | `src/components/StandingDataTab.tsx` | Standing data tab UI: shows coverage (NDZ/MZT/MNZT/SEL per unit count), runs one-time backfill, shows per-batch progress, Sync Recent button after backfill completes |
 | `src/components/ConfirmModal.tsx` | Dark-mode-aware confirm dialog (replaces native browser confirm) |
@@ -187,6 +187,62 @@ These values are also persisted in a **localStorage cache** (see Standing Data C
 - **Draft overlay partial rendering** — `MarginChart` only draws the dotted draft line for SPs where `draft.actions.some(a => a.fromPeriod <= slotIdx && a.toPeriod >= slotIdx)`. Adjacent SPs (one either side of the affected range) are included as bridge points at the baseline value so the line connects cleanly. Do not revert to rendering the full 48-SP dotted line.
 - **Margin = EMX − TR2, not EMX − demand** — the chart recomputes margin in `chartData` as `sp.emx − sp.demand × (1 + reservePct/100)`. The store's `sp.margin` field (which is `emx − demand`) is intentionally ignored by the chart. Draft overlay margins in the tooltip also use TR2 as the reference. Do not change the chart to use `sp.margin` or `raw.demand` as the margin baseline.
 - **`sp.mel[bmUnit] ?? pn` in `computeAggregates`** — the MEL fallback is `pn`, not `0`. Using `0` causes EMX < EOL for any unit in `sp.pn` that is absent from the `units` array (e.g., units dropped by the decommissioned filter). Do not revert to `?? 0`.
+- **Recharts 3.x `activeTooltipIndex` is a STRING** — In Recharts 3.8.x, `CategoricalChartState.activeTooltipIndex` has type `TooltipIndex = string | null`. It is passed as e.g. `"28"`, not `28`. `typeof e?.activeTooltipIndex === 'number'` always returns `false`. Always parse it: `const idx = raw != null ? parseInt(String(raw), 10) : null; if (idx == null || isNaN(idx)) return`. Do not use the number type guard.
+- **Drag tracking in `MarginChart` requires `useRef`, not `useState`** — `onMouseDown` calls `setIsDragging(true)` but React batches state updates; by the time `onMouseMove` fires, `isDragging` is still `false`. Use `isDraggingRef = useRef(false)` and `dragStartRef = useRef<number | null>(null)` for synchronous tracking inside event handlers. `useState` values are only safe to read in render.
+- **`deficitRanges` useMemo in `MarginChart` must be before the early return** — The early return `if (isLoading || settlementPeriods.length === 0) return` is at line ~256. Any `useMemo`/`useEffect` placed after it is skipped when loading, causing a hooks-order violation on the next render. All hooks must be declared before any conditional return.
+- **`solveTarget` in `page.tsx` is local state, not Zustand** — same pattern as `reservePct`, `hiddenDraftIds`, `sidebarOpen`. Do not lift to the store.
+- **Clearing `solveTarget`** — must be reset in `loadData` (real-time refresh), inside `doLoad` in `loadHistoricalData`, and whenever the operator manually edits the draft From/To in `DraftDetails`. Missing any of these leaves a stale solve badge after data changes.
+
+---
+
+## Deficit Solver
+
+Allows operators to identify a deficit period on the chart and auto-populate the active draft's From/To window, then see which units cover the gap.
+
+### Workflow
+
+1. **Chart selection** — operator selects a range using one of three modes (Config → Tweaks → Chart interaction):
+   - **Drag** (default) — click-and-drag across SPs; a blue `ReferenceArea` highlights the selection.
+   - **2-Click** — first click sets start (amber dashed `ReferenceLine`), second click completes range.
+   - **Deficit zone** — click anywhere inside an existing deficit zone; the full contiguous deficit range is auto-selected.
+
+2. **`onSolveSelect` callback fires** — `MarginChart` calls `onSolveSelect(fromSp, toSp, worstDeficitMw)` only if the selected range contains at least one slot where `EMX < TR2`. No-deficit selections are silently ignored.
+
+3. **`solveTarget` state in `page.tsx`** — stores `{ fromSp, toSp, worstDeficitMw }`. When set:
+   - App switches to the **Workspace** tab.
+   - Active draft's From/To is updated via `updateDraftWindow`.
+   - A **Solve bar** appears below the chart (visible on Chart tab) showing From, To, Duration, Worst Deficit, and a "Solve ↗" button that re-switches to Workspace.
+   - `DraftDetails` receives `solveMw` and shows a red deficit badge.
+   - `AvailableTable` receives `solveMode=true` and `solveMw`.
+
+4. **Covering set pre-check in `AvailableTable`** — when `solveMode` is true, a `coveringSet` useMemo walks `visible` units in scenario-ranked order, accumulating `max(0, mel − pn)` until the running total meets `solveMw`. Those units are highlighted (indigo background) and seeded into `pendingIds` via a `useEffect`.
+
+5. **Clearing** — `solveTarget` is reset to `null` when: data is reloaded, or the operator manually edits the draft's From or To (via `DraftDetails`).
+
+### State ownership
+
+```ts
+// page.tsx local state — NOT in Zustand
+solveTarget: { fromSp: number; toSp: number; worstDeficitMw: number } | null
+```
+
+### Key invariants
+
+- `worstDeficitMw` is always negative (it is `min(emx − tr2)` over the range).
+- `AvailableTable` receives `solveMw = Math.abs(worstDeficitMw)` — a positive MW target.
+- The Solve bar's "Worst deficit" display shows the raw negative value with `toLocaleString`.
+- `deficitRanges` in `MarginChart` is computed **before the early return** (`isLoading || settlementPeriods.length === 0`). Moving it after causes a hooks-order violation when the loading state changes.
+
+### `TweakState` addition
+
+```ts
+export interface TweakState {
+  // ... existing fields ...
+  chartInteractionMode: 'drag' | 'twoClick' | 'deficit'
+}
+```
+
+Default: `'drag'`. Controlled via a `SegControl` in Config → Tweaks tab. Changing mode resets all drag/click state in `MarginChart` via a `useEffect` on `chartInteractionMode`.
 
 ---
 
@@ -358,6 +414,9 @@ const spCovered = (slotIdx) => draft.actions.some(a => a.fromPeriod <= slotIdx &
 ```ts
 const activeDrafts = drafts.filter(d => d.status === 'draft' && !hiddenDraftIds.has(d.id))
 ```
+
+### Deficit Solver selection overlay
+A blue `ReferenceArea` (`fill="#6366f1"`, `fillOpacity=0.15`) is drawn between `dragStart` and `dragEnd` indices whenever both are non-null. In 2-click mode, an amber dashed `ReferenceLine` marks the start point while waiting for the second click. All selection state (`dragStart`, `dragEnd`, `clickPhase`, `clickStart`) is local to `MarginChart` — not in Zustand.
 
 ### Reference markers
 - **Gate closure** — amber `ReferenceLine` + shaded `ReferenceArea` for unconfirmed SPs; only shown in real-time mode (hidden when all SPs have `hasConfirmedPn`).
