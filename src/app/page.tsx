@@ -69,6 +69,7 @@ export default function Home() {
     worstDeficitMw: number
     adjustedMw: number
   } | null>(null)
+  const [clearSelectionKey, setClearSelectionKey] = useState(0)
   const [dataMode, setDataMode] = useState<'real' | 'historical'>('real')
   const [historicalDate, setHistoricalDate] = useState<string>(
     () => dateToSettlementDate(new Date(Date.now() - 24 * 60 * 60 * 1000))
@@ -195,6 +196,8 @@ export default function Home() {
     if (!solveTarget) return
     const draftId = createDraft()
     updateDraftWindow(draftId, solveTarget.fromSp, solveTarget.toSp)
+    setSolveTarget(null)
+    setClearSelectionKey(k => k + 1)
     setActiveTab('workspace')
   }, [solveTarget, createDraft, updateDraftWindow])
 
@@ -550,6 +553,7 @@ export default function Home() {
               hiddenDraftIds={hiddenDraftIds}
               reservePct={tweaks.reservePct}
               chartInteractionMode={tweaks.chartInteractionMode}
+              clearSelectionKey={clearSelectionKey}
               onSolveSelect={handleSolveSelect}
             />
 

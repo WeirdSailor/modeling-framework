@@ -162,7 +162,7 @@ export default function AvailableTable({
     const ids = new Set<string>()
     for (const row of visible) {
       if (activeDraftUnitIds.has(row.bmUnitId)) continue
-      const available = Math.max(0, row.mel - row.pn)
+      const available = row.mel ?? 0
       if (available <= 0) continue
       ids.add(row.bmUnitId)
       running += available

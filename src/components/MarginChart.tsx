@@ -165,11 +165,13 @@ export function MarginChart({
   hiddenDraftIds = new Set<string>(),
   reservePct = 10,
   chartInteractionMode = 'drag',
+  clearSelectionKey = 0,
   onSolveSelect,
 }: {
   hiddenDraftIds?: Set<string>
   reservePct?: number
   chartInteractionMode?: 'drag' | 'twoClick' | 'deficit'
+  clearSelectionKey?: number
   onSolveSelect?: (fromSp: number, toSp: number, worstDeficitMw: number) => void
 }) {
   const settlementPeriods = useModellingStore(state => state.settlementPeriods)
@@ -221,6 +223,17 @@ export function MarginChart({
     setClickPhase(0)
     setClickStart(null)
   }, [chartInteractionMode])
+
+  useEffect(() => {
+    if (clearSelectionKey === 0) return
+    isDraggingRef.current = false
+    dragStartRef.current  = null
+    setDragStart(null)
+    setDragEnd(null)
+    setIsDragging(false)
+    setClickPhase(0)
+    setClickStart(null)
+  }, [clearSelectionKey])
 
   function fireSolveSelect(idxA: number, idxB: number) {
     if (!onSolveSelect) return
