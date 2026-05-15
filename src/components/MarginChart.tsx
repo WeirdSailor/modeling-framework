@@ -187,28 +187,34 @@ export function MarginChart({
   const [clickPhase, setClickPhase] = useState<0 | 1>(0)
   const [clickStart, setClickStart] = useState<number | null>(null)
 
-  // Tracks whether the drag was already finalised by ComposedChart's onMouseUp
-  // (which fires when releasing inside the chart). The document handler only
-  // acts if the mouseup happened outside the chart area.
-  const dragFiredRef = useRef(false)
+  // Refs for synchronous drag tracking — React setState is async so onMouseMove
+  // would see stale isDragging/dragStart from the previous render.
+  const isDraggingRef  = useRef(false)
+  const dragStartRef   = useRef<number | null>(null)
+  const dragFiredRef   = useRef(false)
 
   useEffect(() => {
     function onDocMouseUp() {
-      if (!isDragging) return
+      if (!isDraggingRef.current) return
       if (dragFiredRef.current) { dragFiredRef.current = false; return }
+      isDraggingRef.current = false
       setIsDragging(false)
-      if (dragStart !== null && dragEnd !== null && dragStart !== dragEnd) {
-        fireSolveSelect(dragStart, dragEnd)
+      const start = dragStartRef.current
+      if (start !== null && dragEnd !== null && start !== dragEnd) {
+        fireSolveSelect(start, dragEnd)
       } else {
         setDragStart(null)
         setDragEnd(null)
       }
+      dragStartRef.current = null
     }
     document.addEventListener('mouseup', onDocMouseUp)
     return () => document.removeEventListener('mouseup', onDocMouseUp)
-  }, [isDragging, dragStart, dragEnd])
+  }, [dragEnd])
 
   useEffect(() => {
+    isDraggingRef.current = false
+    dragStartRef.current  = null
     setDragStart(null)
     setDragEnd(null)
     setIsDragging(false)
@@ -392,25 +398,30 @@ export function MarginChart({
             if (chartInteractionMode !== 'drag') return
             const idx = typeof e?.activeTooltipIndex === 'number' ? e.activeTooltipIndex : null
             if (idx == null) return
+            isDraggingRef.current = true
+            dragStartRef.current  = idx
             setDragStart(idx)
             setDragEnd(idx)
             setIsDragging(true)
           }}
           onMouseMove={e => {
-            if (chartInteractionMode !== 'drag' || !isDragging) return
+            if (chartInteractionMode !== 'drag' || !isDraggingRef.current) return
             const idx = typeof e?.activeTooltipIndex === 'number' ? e.activeTooltipIndex : null
             if (idx == null) return
             setDragEnd(idx)
           }}
           onMouseUp={e => {
             if (chartInteractionMode !== 'drag') return
-            dragFiredRef.current = true   // tell the document handler we already handled this
+            dragFiredRef.current  = true
+            isDraggingRef.current = false
             setIsDragging(false)
             const rawIdx = typeof e?.activeTooltipIndex === 'number' ? e.activeTooltipIndex : null
-            const idx = rawIdx ?? dragEnd
-            if (dragStart !== null && idx !== null && dragStart !== idx) {
+            const idx   = rawIdx ?? dragEnd
+            const start = dragStartRef.current
+            dragStartRef.current  = null
+            if (start !== null && idx !== null && start !== idx) {
               setDragEnd(idx)
-              fireSolveSelect(dragStart, idx)
+              fireSolveSelect(start, idx)
             } else {
               setDragStart(null)
               setDragEnd(null)
