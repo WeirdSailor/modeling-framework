@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, Fragment } from 'react'
+import { useEffect, useState, useRef, Fragment } from 'react'
 import {
   ComposedChart,
   Area,
@@ -161,13 +161,67 @@ function renderTooltip(activeDrafts: DraftPlan[], t: ChartTheme, reservePct: num
   }
 }
 
-export function MarginChart({ hiddenDraftIds = new Set<string>(), reservePct = 10 }: { hiddenDraftIds?: Set<string>; reservePct?: number }) {
+export function MarginChart({
+  hiddenDraftIds = new Set<string>(),
+  reservePct = 10,
+  chartInteractionMode = 'drag',
+  onSolveSelect,
+}: {
+  hiddenDraftIds?: Set<string>
+  reservePct?: number
+  chartInteractionMode?: 'drag' | 'twoClick' | 'deficit'
+  onSolveSelect?: (fromSp: number, toSp: number, worstDeficitMw: number) => void
+}) {
   const settlementPeriods = useModellingStore(state => state.settlementPeriods)
   const drafts            = useModellingStore(state => state.drafts)
   const units             = useModellingStore(state => state.units)
   const isLoading         = useModellingStore(state => state.isLoading)
   const isDark            = useDarkMode()
   const t                 = isDark ? DARK : LIGHT
+
+  // Interaction state — slot indices (0-based, matching chartData array positions)
+  const [dragStart, setDragStart]   = useState<number | null>(null)
+  const [dragEnd,   setDragEnd]     = useState<number | null>(null)
+  const [isDragging, setIsDragging] = useState(false)
+  // twoClick: 0 = waiting for start, 1 = waiting for end
+  const [clickPhase, setClickPhase] = useState<0 | 1>(0)
+  const [clickStart, setClickStart] = useState<number | null>(null)
+
+  // Tracks whether the drag was already finalised by ComposedChart's onMouseUp
+  // (which fires when releasing inside the chart). The document handler only
+  // acts if the mouseup happened outside the chart area.
+  const dragFiredRef = useRef(false)
+
+  useEffect(() => {
+    function onDocMouseUp() {
+      if (!isDragging) return
+      if (dragFiredRef.current) { dragFiredRef.current = false; return }
+      setIsDragging(false)
+      if (dragStart !== null && dragEnd !== null && dragStart !== dragEnd) {
+        fireSolveSelect(dragStart, dragEnd)
+      } else {
+        setDragStart(null)
+        setDragEnd(null)
+      }
+    }
+    document.addEventListener('mouseup', onDocMouseUp)
+    return () => document.removeEventListener('mouseup', onDocMouseUp)
+  }, [isDragging, dragStart, dragEnd])
+
+  function fireSolveSelect(idxA: number, idxB: number) {
+    if (!onSolveSelect) return
+    const lo = Math.min(idxA, idxB)
+    const hi = Math.max(idxA, idxB)
+    const fromSp = lo + 1   // slot index 0-based → SP number 1-based
+    const toSp   = hi + 1
+    const worst  = Math.min(
+      ...settlementPeriods.slice(lo, hi + 1).map(sp => {
+        const tr2 = sp.demand * (1 + reservePct / 100)
+        return sp.emx - tr2
+      })
+    )
+    if (worst < 0) onSolveSelect(fromSp, toSp, worst)
+  }
 
   if (isLoading || settlementPeriods.length === 0) {
     return (
@@ -309,9 +363,40 @@ export function MarginChart({ hiddenDraftIds = new Set<string>(), reservePct = 1
         </div>
       </div>
 
-      <div style={{ flex: 1, minHeight: 0 }}>
+      <div style={{ flex: 1, minHeight: 0, cursor: 'crosshair' }}>
       <ResponsiveContainer width="100%" height="100%">
-        <ComposedChart data={chartData} margin={{ top: 8, right: 16, left: 8, bottom: 8 }}>
+        <ComposedChart
+          data={chartData}
+          margin={{ top: 8, right: 16, left: 8, bottom: 8 }}
+          onMouseDown={e => {
+            if (chartInteractionMode !== 'drag') return
+            const idx = typeof e?.activeTooltipIndex === 'number' ? e.activeTooltipIndex : null
+            if (idx == null) return
+            setDragStart(idx)
+            setDragEnd(idx)
+            setIsDragging(true)
+          }}
+          onMouseMove={e => {
+            if (chartInteractionMode !== 'drag' || !isDragging) return
+            const idx = typeof e?.activeTooltipIndex === 'number' ? e.activeTooltipIndex : null
+            if (idx == null) return
+            setDragEnd(idx)
+          }}
+          onMouseUp={e => {
+            if (chartInteractionMode !== 'drag') return
+            dragFiredRef.current = true   // tell the document handler we already handled this
+            setIsDragging(false)
+            const rawIdx = typeof e?.activeTooltipIndex === 'number' ? e.activeTooltipIndex : null
+            const idx = rawIdx ?? dragEnd
+            if (dragStart !== null && idx !== null && dragStart !== idx) {
+              setDragEnd(idx)
+              fireSolveSelect(dragStart, idx)
+            } else {
+              setDragStart(null)
+              setDragEnd(null)
+            }
+          }}
+        >
           <CartesianGrid strokeDasharray="3 3" stroke={t.grid} />
 
           <XAxis
@@ -337,6 +422,24 @@ export function MarginChart({ hiddenDraftIds = new Set<string>(), reservePct = 1
           />
 
           <ReferenceLine y={0} stroke={t.zeroLine} strokeDasharray="4 4" />
+
+          {dragStart !== null && dragEnd !== null && (() => {
+            const lo = Math.min(dragStart, dragEnd)
+            const hi = Math.max(dragStart, dragEnd)
+            const x1Label = chartData[lo]?.label as string
+            const x2Label = chartData[hi]?.label as string
+            return (
+              <ReferenceArea
+                x1={x1Label}
+                x2={x2Label}
+                fill="#6366f1"
+                fillOpacity={0.15}
+                stroke="#6366f1"
+                strokeOpacity={0.6}
+                strokeWidth={1}
+              />
+            )
+          })()}
 
           {frontierLabel && (
             <ReferenceArea
