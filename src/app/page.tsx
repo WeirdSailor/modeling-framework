@@ -240,7 +240,7 @@ export default function Home() {
 
   const unitById = useMemo(() => new Map(units.map(u => [u.bmUnitId, u])), [units])
 
-const activeDraftUnitIds = useMemo(
+  const activeDraftUnitIds = useMemo(
     () => new Set(activeDraft?.actions.map(a => a.bmUnitId) ?? []),
     [activeDraft]
   )
