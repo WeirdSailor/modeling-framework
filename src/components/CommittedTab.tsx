@@ -76,7 +76,7 @@ function ServiceChip({ service }: { service: ServiceType | undefined }) {
   return <span className={`chip chip-${service.toLowerCase()}`}>{service}</span>
 }
 
-function ChangeArrow({ current, snapshotVal, unit = '' }: { current: number; snapshotVal: number; unit?: string }) {
+function ChangeArrow({ current, snapshotVal, unit = '', invertColors = false }: { current: number; snapshotVal: number; unit?: string; invertColors?: boolean }) {
   if (snapshotVal === 0) return null
   const pct = (current - snapshotVal) / snapshotVal * 100
   if (Math.abs(pct) < CHANGE_THRESHOLD) return null
@@ -85,7 +85,7 @@ function ChangeArrow({ current, snapshotVal, unit = '' }: { current: number; sna
   const tooltip = `Was: ${snapshotVal.toFixed(0)}${unit} → Now: ${current.toFixed(0)}${unit} (${sign}${pct.toFixed(0)}%)`
   return (
     <span
-      className={`change-arrow ${up ? 'change-up' : 'change-down'}`}
+      className={`change-arrow ${up ? 'change-up' : 'change-down'}${invertColors ? ' invert' : ''}`}
       title={tooltip}
     >
       {up ? '↑' : '↓'}
@@ -406,11 +406,11 @@ export default function CommittedTab({
                   </td>
                   <td className="mono num">
                     {effPriceToSel > 0 ? `£${effPriceToSel}` : '—'}
-                    {snap && <ChangeArrow current={effPriceToSel} snapshotVal={snap.priceToSel} unit="£" />}
+                    {snap && <ChangeArrow current={effPriceToSel} snapshotVal={snap.priceToSel} unit="£" invertColors />}
                   </td>
                   <td className="mono num">
                     {effPriceToMel > 0 ? `£${effPriceToMel}` : '—'}
-                    {snap && <ChangeArrow current={effPriceToMel} snapshotVal={snap.priceToMel} unit="£" />}
+                    {snap && <ChangeArrow current={effPriceToMel} snapshotVal={snap.priceToMel} unit="£" invertColors />}
                   </td>
                   <td className="mono num">{row.pn > 0 ? row.pn.toFixed(0) : '—'}</td>
                   <td className="time-col">

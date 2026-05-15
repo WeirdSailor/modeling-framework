@@ -160,100 +160,96 @@ export default function DraftSidebar({
       </div>
 
       <div className="sidebar-scroll">
-      <div className="sidebar-section">
-        <div className="sidebar-label">
-          <span>Editing</span>
-          <span className="count-pill count-pill-sm">{editing.length}</span>
-        </div>
-        <ul className="draft-list">
-          {editing.length === 0 && (
-            <li className="draft-list-empty">No drafts in progress</li>
-          )}
-          {editing.map(d => (
-            <DraftListItem
-              key={d.id} draft={d} active={d.id === activeId}
-              onClick={() => onSelect(d.id)} periods={settlementPeriods}
-              isHidden={hiddenDraftIds.has(d.id)}
-              onToggleVisibility={() => onToggleChartVisibility(d.id)}
-            />
-          ))}
-        </ul>
-      </div>
-
-      <div className="sidebar-section">
-        <button
-          className="sidebar-label-toggle"
-          onClick={() => setShowCommitted(!showCommitted)}
-        >
-          <span>Committed</span>
-          <span className="count-pill count-pill-sm">{committed.length}</span>
-          <span className={`caret ${showCommitted ? 'open' : ''}`}>▾</span>
-        </button>
-        {showCommitted && (
+      {editing.length > 0 && (
+        <div className="sidebar-section">
+          <div className="sidebar-label">
+            <span>Editing</span>
+            <span className="count-pill count-pill-sm">{editing.length}</span>
+          </div>
           <ul className="draft-list">
-            {committed.length === 0 && (
-              <li className="draft-list-empty">No committed drafts</li>
-            )}
-            {committed.map(d => (
+            {editing.map(d => (
               <DraftListItem
                 key={d.id} draft={d} active={d.id === activeId}
                 onClick={() => onSelect(d.id)} periods={settlementPeriods}
-              />
-            ))}
-          </ul>
-        )}
-      </div>
-
-      <div className="sidebar-section">
-        <button
-          className="sidebar-label-toggle"
-          onClick={() => setShowArchive(!showArchive)}
-        >
-          <span>Discarded</span>
-          <span className="count-pill count-pill-sm">{archive.length}</span>
-          <span className={`caret ${showArchive ? 'open' : ''}`}>▾</span>
-        </button>
-        {showArchive && (
-          <ul className="draft-list">
-            {archive.length === 0 && (
-              <li className="draft-list-empty">Nothing discarded yet</li>
-            )}
-            {archive.map(d => (
-              <DraftListItem
-                key={d.id} draft={d} active={d.id === activeId}
-                onClick={() => onSelect(d.id)} periods={settlementPeriods}
-              />
-            ))}
-          </ul>
-        )}
-      </div>
-
-      <div className="sidebar-section">
-        <button
-          className="sidebar-label-toggle"
-          onClick={() => setShowShared(!showShared)}
-        >
-          <span>Shared with me</span>
-          <span className="count-pill count-pill-sm">{sharedWithMe.length}</span>
-          <span className={`caret ${showShared ? 'open' : ''}`}>▾</span>
-        </button>
-        {showShared && (
-          <ul className="draft-list">
-            {sharedWithMe.length === 0 && (
-              <li className="draft-list-empty">Nothing shared with you</li>
-            )}
-            {sharedWithMe.map(d => (
-              <DraftListItem
-                key={d.id} draft={d} active={d.id === activeId}
-                onClick={() => onSelect(d.id)} periods={settlementPeriods}
-                sharedBy={d.ownerId}
                 isHidden={hiddenDraftIds.has(d.id)}
                 onToggleVisibility={() => onToggleChartVisibility(d.id)}
               />
             ))}
           </ul>
-        )}
-      </div>
+        </div>
+      )}
+
+      {committed.length > 0 && (
+        <div className="sidebar-section">
+          <button
+            className="sidebar-label-toggle"
+            onClick={() => setShowCommitted(!showCommitted)}
+          >
+            <span>Committed</span>
+            <span className="count-pill count-pill-sm">{committed.length}</span>
+            <span className={`caret ${showCommitted ? 'open' : ''}`}>▾</span>
+          </button>
+          {showCommitted && (
+            <ul className="draft-list">
+              {committed.map(d => (
+                <DraftListItem
+                  key={d.id} draft={d} active={d.id === activeId}
+                  onClick={() => onSelect(d.id)} periods={settlementPeriods}
+                />
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
+      {archive.length > 0 && (
+        <div className="sidebar-section">
+          <button
+            className="sidebar-label-toggle"
+            onClick={() => setShowArchive(!showArchive)}
+          >
+            <span>Discarded</span>
+            <span className="count-pill count-pill-sm">{archive.length}</span>
+            <span className={`caret ${showArchive ? 'open' : ''}`}>▾</span>
+          </button>
+          {showArchive && (
+            <ul className="draft-list">
+              {archive.map(d => (
+                <DraftListItem
+                  key={d.id} draft={d} active={d.id === activeId}
+                  onClick={() => onSelect(d.id)} periods={settlementPeriods}
+                />
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
+      {sharedWithMe.length > 0 && (
+        <div className="sidebar-section">
+          <button
+            className="sidebar-label-toggle"
+            onClick={() => setShowShared(!showShared)}
+          >
+            <span>Shared with me</span>
+            <span className="count-pill count-pill-sm">{sharedWithMe.length}</span>
+            <span className={`caret ${showShared ? 'open' : ''}`}>▾</span>
+          </button>
+          {showShared && (
+            <ul className="draft-list">
+              {sharedWithMe.map(d => (
+                <DraftListItem
+                  key={d.id} draft={d} active={d.id === activeId}
+                  onClick={() => onSelect(d.id)} periods={settlementPeriods}
+                  sharedBy={d.ownerId}
+                  isHidden={hiddenDraftIds.has(d.id)}
+                  onToggleVisibility={() => onToggleChartVisibility(d.id)}
+                />
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
       </div>
 
       <div className="sidebar-footer">

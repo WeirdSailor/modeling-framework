@@ -141,7 +141,7 @@ function TweaksTab({
         options={[
           { value: 'drag',     label: 'Drag' },
           { value: 'twoClick', label: '2-Click' },
-          { value: 'deficit',  label: 'Deficit zone' },
+          { value: 'deficit',  label: 'Shortfall zone' },
         ]}
         onChange={v => onChangeTweak('chartInteractionMode', v)}
       />

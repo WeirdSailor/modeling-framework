@@ -585,11 +585,13 @@ input[type="checkbox"]:disabled { cursor: not-allowed; opacity: .4; }
 
 /* data-change indicators */
 .change-arrow {
-  font-size: 10px; font-weight: 700; margin-left: 3px;
+  font-size: 14px; font-weight: 900; margin-left: 4px;
   cursor: help; line-height: 1;
 }
 .change-up   { color: #22c55e; }
 .change-down { color: #ef4444; }
+.change-up.invert   { color: #ef4444; }
+.change-down.invert { color: #22c55e; }
 
 /* redeclare tab inputs */
 .redeclare-input {

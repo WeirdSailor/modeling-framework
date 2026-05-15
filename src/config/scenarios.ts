@@ -27,7 +27,7 @@ export const SCENARIOS: ScenarioConfig[] = [
     name: 'Margin',
     shortDescription: 'Maximise available MW',
     description:
-      'Identifies units that can contribute the most additional generation capacity to close a margin deficit. Prioritises units with the largest gap between their current output (PN) and their maximum export limit (MEL).',
+      'Identifies units that can contribute the most additional generation capacity to close a margin shortfall. Prioritises units with the largest gap between their current output (PN) and their maximum export limit (MEL).',
     rankingBasis: 'Available MW (MEL − PN) descending',
     bestFor:
       'National Grid Margin Notices, LOLP events, or any situation where total system generation needs to be increased quickly.',

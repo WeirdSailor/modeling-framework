@@ -569,7 +569,7 @@ export default function Home() {
               borderRadius: 8,
               flexShrink: 0,
             }}>
-              {(['From', 'To', 'Duration', 'Worst Deficit'] as const).map(lbl => {
+              {(['From', 'To', 'Duration', 'Worst Shortfall'] as const).map(lbl => {
                 let val = '—'
                 let color: string | undefined
                 if (solveTarget && solvePanelVisible) {
@@ -577,7 +577,7 @@ export default function Home() {
                   if (lbl === 'From')          val = fmtSlot(solveTarget.fromSp)
                   if (lbl === 'To')            val = fmtSlot(solveTarget.toSp)
                   if (lbl === 'Duration')      val = dur < 60 ? `${dur} min` : `${(dur / 60).toFixed(1)} h`
-                  if (lbl === 'Worst Deficit') {
+                  if (lbl === 'Worst Shortfall') {
                     val = `${Math.round(solveTarget.worstDeficitMw).toLocaleString('en-GB')} MW`
                     color = '#ef4444'
                   }

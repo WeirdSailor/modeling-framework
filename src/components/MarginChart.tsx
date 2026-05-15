@@ -398,7 +398,7 @@ export function MarginChart({
           </span>
           <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
             <span style={{ display: 'inline-block', width: 12, height: 12, borderRadius: 3, background: '#ef4444', opacity: .7 }} />
-            Deficit
+            Shortfall
           </span>
         </div>
       </div>
@@ -559,7 +559,7 @@ export function MarginChart({
 
           <Area dataKey="marginPositive" name="Surplus margin" baseValue={0}
             fill="#22c55e" fillOpacity={0.25} stroke="none" legendType="none" dot={false} activeDot={false} />
-          <Area dataKey="marginNegative" name="Deficit margin" baseValue={0}
+          <Area dataKey="marginNegative" name="Shortfall" baseValue={0}
             fill="#ef4444" fillOpacity={0.25} stroke="none" legendType="none" dot={false} activeDot={false} />
 
           <Line dataKey="emi"    name="EMI"    stroke={t.emi}    strokeWidth={1.5} dot={false} activeDot={{ r: 3 }} />
