@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef, Fragment } from 'react'
+import { useEffect, useMemo, useState, useRef, Fragment } from 'react'
 import {
   ComposedChart,
   Area,
@@ -208,6 +208,14 @@ export function MarginChart({
     return () => document.removeEventListener('mouseup', onDocMouseUp)
   }, [isDragging, dragStart, dragEnd])
 
+  useEffect(() => {
+    setDragStart(null)
+    setDragEnd(null)
+    setIsDragging(false)
+    setClickPhase(0)
+    setClickStart(null)
+  }, [chartInteractionMode])
+
   function fireSolveSelect(idxA: number, idxB: number) {
     if (!onSolveSelect) return
     const lo = Math.min(idxA, idxB)
@@ -332,6 +340,18 @@ export function MarginChart({
     return point
   })
 
+  const deficitRanges = useMemo(() => {
+    const ranges: { lo: number; hi: number }[] = []
+    let start = -1
+    chartData.forEach((pt, i) => {
+      const inDeficit = (pt.margin as number) < 0
+      if (inDeficit && start === -1) start = i
+      if (!inDeficit && start !== -1) { ranges.push({ lo: start, hi: i - 1 }); start = -1 }
+    })
+    if (start !== -1) ranges.push({ lo: start, hi: chartData.length - 1 })
+    return ranges
+  }, [chartData])
+
   const tooltipRenderer = renderTooltip(activeDrafts, t, reservePct)
   const frontierLabel   = frontierIndex >= 0 ? (chartData[frontierIndex]?.label as string ?? null) : null
   const lastLabel       = chartData[chartData.length - 1]?.label as string
@@ -396,6 +416,38 @@ export function MarginChart({
               setDragEnd(null)
             }
           }}
+          onClick={e => {
+            if (chartInteractionMode === 'twoClick') {
+              const idx = typeof e?.activeTooltipIndex === 'number' ? e.activeTooltipIndex : null
+              if (idx == null) return
+              if (clickPhase === 0) {
+                setClickStart(idx)
+                setDragStart(idx)
+                setDragEnd(idx)
+                setClickPhase(1)
+              } else {
+                // second click — complete selection
+                const start = clickStart!
+                setClickPhase(0)
+                setClickStart(null)
+                if (start !== idx) {
+                  setDragEnd(idx)
+                  fireSolveSelect(start, idx)
+                } else {
+                  setDragStart(null)
+                  setDragEnd(null)
+                }
+              }
+            } else if (chartInteractionMode === 'deficit') {
+              const idx = typeof e?.activeTooltipIndex === 'number' ? e.activeTooltipIndex : null
+              if (idx == null) return
+              const range = deficitRanges.find(r => idx >= r.lo && idx <= r.hi)
+              if (!range) { setDragStart(null); setDragEnd(null); return }
+              setDragStart(range.lo)
+              setDragEnd(range.hi)
+              fireSolveSelect(range.lo, range.hi)
+            }
+          }}
         >
           <CartesianGrid strokeDasharray="3 3" stroke={t.grid} />
 
@@ -440,6 +492,15 @@ export function MarginChart({
               />
             )
           })()}
+
+          {chartInteractionMode === 'twoClick' && clickPhase === 1 && clickStart !== null && (
+            <ReferenceLine
+              x={chartData[clickStart]?.label as string}
+              stroke="#fbbf24"
+              strokeDasharray="4 3"
+              label={{ value: '① start', position: 'insideTopRight', fontSize: 9, fill: '#fbbf24' }}
+            />
+          )}
 
           {frontierLabel && (
             <ReferenceArea
