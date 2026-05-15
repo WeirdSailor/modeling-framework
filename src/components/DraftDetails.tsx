@@ -24,6 +24,7 @@ interface Props {
   onScenarioChange: (s: string) => void
   gspFilter: Record<string, 'include' | 'exclude'>
   onGspFilterChange: (f: Record<string, 'include' | 'exclude'>) => void
+  solveMw?: number | null
 }
 
 
@@ -163,6 +164,7 @@ export default function DraftDetails({
   onCommit, onDiscard, onReopen, onDelete, onDuplicate,
   onShare, onUnshare,
   scenario, onScenarioChange, gspFilter, onGspFilterChange,
+  solveMw = null,
 }: Props) {
   const [shareOpen, setShareOpen] = useState(false)
   const [scenarioOpen, setScenarioOpen] = useState(false)
@@ -368,6 +370,20 @@ export default function DraftDetails({
           })()}
         </div>
       </div>
+
+      {solveMw !== null && solveMw !== undefined && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0' }}>
+          <span style={{ fontSize: 11, color: 'var(--text-faint)' }}>MW to solve:</span>
+          <span style={{
+            fontSize: 12, fontFamily: 'monospace', fontWeight: 700, color: '#ef4444',
+            background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)',
+            borderRadius: 4, padding: '1px 8px',
+          }}>
+            {Math.round(solveMw).toLocaleString('en-GB')} MW
+          </span>
+          <span style={{ fontSize: 10, color: 'var(--text-faint)', fontStyle: 'italic' }}>deficit — adjust chart range to change</span>
+        </div>
+      )}
 
       <div className="dd-right">
         <div className="dd-actions">
