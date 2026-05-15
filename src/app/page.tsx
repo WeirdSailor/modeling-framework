@@ -67,6 +67,7 @@ export default function Home() {
     fromSp: number
     toSp: number
     worstDeficitMw: number
+    adjustedMw: number
   } | null>(null)
   const [dataMode, setDataMode] = useState<'real' | 'historical'>('real')
   const [historicalDate, setHistoricalDate] = useState<string>(
@@ -183,12 +184,19 @@ export default function Home() {
   }, [])
 
   const handleSolveSelect = useCallback((fromSp: number, toSp: number, worstDeficitMw: number) => {
-    setSolveTarget({ fromSp, toSp, worstDeficitMw })
+    setSolveTarget({ fromSp, toSp, worstDeficitMw, adjustedMw: Math.abs(worstDeficitMw) })
+  }, [])
+
+  const handleSolveMwChange = useCallback((mw: number) => {
+    setSolveTarget(t => t ? { ...t, adjustedMw: Math.max(1, mw) } : t)
+  }, [])
+
+  const handleSolveNavigate = useCallback(() => {
+    if (!solveTarget) return
+    const draftId = createDraft()
+    updateDraftWindow(draftId, solveTarget.fromSp, solveTarget.toSp)
     setActiveTab('workspace')
-    if (activeDraftId) {
-      updateDraftWindow(activeDraftId, fromSp, toSp)
-    }
-  }, [activeDraftId, updateDraftWindow])
+  }, [solveTarget, createDraft, updateDraftWindow])
 
   // ── derived data ──
   const activeDraft = drafts.find(d => d.id === activeDraftId) ?? null
@@ -463,7 +471,8 @@ export default function Home() {
                   currentUser={currentUser}
                   onChangeName={name => renameDraft(activeDraftId!, name)}
                   onChangeDescription={desc => updateDraftDescription(activeDraftId!, desc)}
-                  solveMw={solveTarget?.worstDeficitMw ?? null}
+                  solveMw={solveTarget?.adjustedMw ?? null}
+                  onSolveMwChange={handleSolveMwChange}
                   onChangeFrom={from => {
                     setSolveTarget(null)
                     updateDraftWindow(activeDraftId!, from, activeDraft.toPeriod)
@@ -498,7 +507,7 @@ export default function Home() {
                     gspFilter={gspFilter}
                     onAddUnits={handleAddUnits}
                     solveMode={solveTarget !== null}
-                    solveMw={solveTarget ? Math.abs(solveTarget.worstDeficitMw) : null}
+                    solveMw={solveTarget?.adjustedMw ?? null}
                   />
                   <SelectedTable
                     draft={activeDraft}
@@ -585,7 +594,7 @@ export default function Home() {
                 <button
                   className="btn btn-primary"
                   disabled={!solveTarget}
-                  onClick={() => solveTarget && setActiveTab('workspace')}
+                  onClick={handleSolveNavigate}
                   style={{ fontSize: 12, opacity: solveTarget ? 1 : 0.35, padding: '6px 16px' }}
                 >
                   Solve ↗

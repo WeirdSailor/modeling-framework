@@ -25,6 +25,7 @@ interface Props {
   gspFilter: Record<string, 'include' | 'exclude'>
   onGspFilterChange: (f: Record<string, 'include' | 'exclude'>) => void
   solveMw?: number | null
+  onSolveMwChange?: (mw: number) => void
 }
 
 
@@ -164,7 +165,7 @@ export default function DraftDetails({
   onCommit, onDiscard, onReopen, onDelete, onDuplicate,
   onShare, onUnshare,
   scenario, onScenarioChange, gspFilter, onGspFilterChange,
-  solveMw = null,
+  solveMw = null, onSolveMwChange,
 }: Props) {
   const [shareOpen, setShareOpen] = useState(false)
   const [scenarioOpen, setScenarioOpen] = useState(false)
@@ -325,6 +326,31 @@ export default function DraftDetails({
               ))}
             </select>
           </label>
+          {solveMw !== null && solveMw !== undefined && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <button
+                style={{ width: 22, height: 22, border: '1px solid rgba(239,68,68,0.4)', borderRadius: '4px 0 0 4px', background: 'rgba(239,68,68,0.08)', color: '#ef4444', fontSize: 14, lineHeight: 1, cursor: 'pointer', padding: 0 }}
+                onClick={() => onSolveMwChange?.(solveMw - 50)}
+              >−</button>
+              <input
+                type="number"
+                value={Math.round(solveMw)}
+                min={1}
+                onChange={e => { const v = parseInt(e.target.value, 10); if (!isNaN(v)) onSolveMwChange?.(v) }}
+                style={{
+                  width: 72, height: 22, textAlign: 'center', fontSize: 12,
+                  fontFamily: 'monospace', fontWeight: 700, color: '#ef4444',
+                  background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)',
+                  borderLeft: 'none', borderRight: 'none', outline: 'none',
+                  MozAppearance: 'textfield',
+                }}
+              />
+              <button
+                style={{ width: 22, height: 22, border: '1px solid rgba(239,68,68,0.4)', borderRadius: '0 4px 4px 0', background: 'rgba(239,68,68,0.08)', color: '#ef4444', fontSize: 14, lineHeight: 1, cursor: 'pointer', padding: 0 }}
+                onClick={() => onSolveMwChange?.(solveMw + 50)}
+              >+</button>
+            </div>
+          )}
           <span style={{ width: 1, background: 'var(--border)', alignSelf: 'stretch', margin: '0 4px' }} />
           {/* Scenario */}
           {(() => {
@@ -371,21 +397,8 @@ export default function DraftDetails({
         </div>
       </div>
 
-      {solveMw !== null && solveMw !== undefined && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0' }}>
-          <span style={{ fontSize: 11, color: 'var(--text-faint)' }}>MW to solve:</span>
-          <span style={{
-            fontSize: 12, fontFamily: 'monospace', fontWeight: 700, color: '#ef4444',
-            background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)',
-            borderRadius: 4, padding: '1px 8px',
-          }}>
-            {Math.round(solveMw).toLocaleString('en-GB')} MW
-          </span>
-          <span style={{ fontSize: 10, color: 'var(--text-faint)', fontStyle: 'italic' }}>deficit — adjust chart range to change</span>
-        </div>
-      )}
 
-      <div className="dd-right">
+<div className="dd-right">
         <div className="dd-actions">
           {/* Owner actions */}
           {isOwner && draft.status === 'draft' && (
