@@ -608,7 +608,7 @@ export default function Home() {
               <div className="loading-banner">Loading data…</div>
             )}
 
-            <div>
+            <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
               {/* Area subtab row */}
               <div style={{
                 display: 'flex', gap: 0, borderBottom: '1px solid var(--border)',
