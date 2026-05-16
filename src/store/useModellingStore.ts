@@ -64,6 +64,7 @@ interface ModellingState {
   areaRequirements: Record<string, AreaRequirementRow[]>
   setAreaRequirement: (area: string, sp: number, field: 'requirement' | 'contracted' | 'constrained', value: number) => void
   fillAreaRequirements: (area: string, requirement?: number, contracted?: number) => void
+  setAllAreaRequirements: (reqs: Record<string, AreaRequirementRow[]>) => void
 
   setUnits: (units: BMUnit[]) => void
   setSettlementPeriods: (periods: SettlementPeriodData[]) => void
@@ -165,6 +166,15 @@ export const useModellingStore = create<ModellingState>((set, get) => ({
       return {
         areaRequirements: newReqs,
         settlementPeriods: computeAreaAvailabilities(state.settlementPeriods, committedActions, state.units, newReqs),
+      }
+    }),
+
+  setAllAreaRequirements: (reqs) =>
+    set(state => {
+      const committedActions = state.drafts.filter(d => d.status === 'committed').flatMap(d => d.actions)
+      return {
+        areaRequirements: reqs,
+        settlementPeriods: computeAreaAvailabilities(state.settlementPeriods, committedActions, state.units, reqs),
       }
     }),
 

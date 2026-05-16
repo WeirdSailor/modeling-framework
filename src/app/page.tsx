@@ -1,9 +1,10 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useModellingStore } from '@/store/useModellingStore'
 import type { ModellingAction, OperationType, UserId } from '@/models/types'
 import { fetchAllData, fetchHistoricalData } from '@/services/elexon'
+import { loadAreaRequirements, saveAreaRequirements } from '@/services/requirementsSync'
 import { dateToSp, dateToSettlementDate } from '@/utils/settlements'
 import { isUnitPnCommitted } from '@/utils/margin'
 import { EXCLUDED_FUEL_TYPES, PULLBACK_FUEL_TYPES } from '@/utils/fuelTypes'
@@ -130,7 +131,24 @@ export default function Home() {
   const clearAllDataOverrides = useModellingStore(s => s.clearAllDataOverrides)
   const unitServices      = useModellingStore(s => s.unitServices)
   const setUnitService    = useModellingStore(s => s.setUnitService)
-  const areaRequirements  = useModellingStore(s => s.areaRequirements)
+  const areaRequirements      = useModellingStore(s => s.areaRequirements)
+  const setAllAreaRequirements = useModellingStore(s => s.setAllAreaRequirements)
+
+  // ── requirements sync ──
+  const requirementsReady = useRef(false)
+
+  useEffect(() => {
+    loadAreaRequirements().then(reqs => {
+      if (reqs) setAllAreaRequirements(reqs)
+      requirementsReady.current = true
+    })
+  }, [setAllAreaRequirements])
+
+  useEffect(() => {
+    if (!requirementsReady.current) return
+    const timer = setTimeout(() => { void saveAreaRequirements(areaRequirements) }, 500)
+    return () => clearTimeout(timer)
+  }, [areaRequirements])
 
   // ── data fetch ──
   const loadData = useCallback(async () => {
