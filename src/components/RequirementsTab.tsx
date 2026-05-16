@@ -5,39 +5,93 @@ import { useModellingStore } from '@/store/useModellingStore'
 import { NON_MARGIN_AREAS } from '@/config/areas'
 import { spToStartTime } from '@/utils/settlements'
 
+const INPUT_STYLE: React.CSSProperties = {
+  width: 80,
+  padding: '2px 5px',
+  fontSize: 11,
+  background: 'var(--bg)',
+  border: '1px solid var(--border)',
+  borderRadius: 3,
+  color: 'var(--text)',
+}
+
+const FILL_INPUT_STYLE: React.CSSProperties = {
+  width: 72,
+  padding: '2px 5px',
+  fontSize: 10,
+  background: 'var(--bg)',
+  border: '1px solid var(--border)',
+  borderRadius: 3,
+  color: 'var(--text)',
+}
+
+interface FillHeaderProps {
+  label: string
+  unit: string
+  onFill: (value: number) => void
+}
+
+function FillHeader({ label, unit, onFill }: FillHeaderProps) {
+  const [draft, setDraft] = useState('')
+
+  function apply() {
+    const v = parseFloat(draft)
+    if (!isNaN(v)) { onFill(v); setDraft('') }
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
+      <span>{label} ({unit})</span>
+      <div style={{ display: 'flex', gap: 3 }}>
+        <input
+          type="number"
+          placeholder="value"
+          value={draft}
+          onChange={e => setDraft(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && apply()}
+          style={FILL_INPUT_STYLE}
+        />
+        <button
+          onClick={apply}
+          title={`Fill all 48 SPs with this value`}
+          style={{
+            padding: '2px 6px',
+            fontSize: 10,
+            background: draft !== '' && !isNaN(parseFloat(draft)) ? 'var(--accent)' : 'var(--surface)',
+            color: draft !== '' && !isNaN(parseFloat(draft)) ? '#fff' : 'var(--text-muted)',
+            border: '1px solid var(--border)',
+            borderRadius: 3,
+            cursor: 'pointer',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          Fill ↓
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export default function RequirementsTab() {
-  const areaRequirements = useModellingStore(s => s.areaRequirements)
+  const areaRequirements   = useModellingStore(s => s.areaRequirements)
   const setAreaRequirement = useModellingStore(s => s.setAreaRequirement)
   const fillAreaRequirements = useModellingStore(s => s.fillAreaRequirements)
-  const settlementPeriods = useModellingStore(s => s.settlementPeriods)
+  const settlementPeriods  = useModellingStore(s => s.settlementPeriods)
 
   const [activeArea, setActiveArea] = useState(NON_MARGIN_AREAS[0].id)
-  const [fillReq, setFillReq] = useState('')
-  const [fillCon, setFillCon] = useState('')
 
   const area = NON_MARGIN_AREAS.find(a => a.id === activeArea)!
   const rows = areaRequirements[activeArea] ?? []
 
-  // Build a map of sp -> settlementDate for time display
   const spDateMap = useMemo(() => {
     const map: Record<number, string> = {}
-    settlementPeriods.forEach(sp => {
-      map[sp.settlementPeriod] = sp.settlementDate
-    })
+    settlementPeriods.forEach(sp => { map[sp.settlementPeriod] = sp.settlementDate })
     return map
   }, [settlementPeriods])
 
-  function handleFillApply() {
-    const req = fillReq !== '' ? parseFloat(fillReq) : undefined
-    const con = fillCon !== '' ? parseFloat(fillCon) : undefined
-    if (req !== undefined || con !== undefined) {
-      fillAreaRequirements(activeArea, req, con)
-    }
-  }
-
   return (
     <div className="redeclare-tab">
-      {/* Area chip selector + fill toolbar */}
+      {/* Area chip selector */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
         <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Area:</span>
         {NON_MARGIN_AREAS.map(a => (
@@ -57,54 +111,6 @@ export default function RequirementsTab() {
             {a.shortName}
           </button>
         ))}
-
-        <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text-muted)' }}>
-          Fill all SPs:
-        </span>
-        <input
-          type="number"
-          placeholder={`Req (${area.unit})`}
-          value={fillReq}
-          onChange={e => setFillReq(e.target.value)}
-          style={{
-            width: 90,
-            padding: '3px 6px',
-            fontSize: 11,
-            background: 'var(--bg)',
-            border: '1px solid var(--border)',
-            borderRadius: 3,
-            color: 'var(--text)',
-          }}
-        />
-        <input
-          type="number"
-          placeholder={`Contracted (${area.unit})`}
-          value={fillCon}
-          onChange={e => setFillCon(e.target.value)}
-          style={{
-            width: 110,
-            padding: '3px 6px',
-            fontSize: 11,
-            background: 'var(--bg)',
-            border: '1px solid var(--border)',
-            borderRadius: 3,
-            color: 'var(--text)',
-          }}
-        />
-        <button
-          onClick={handleFillApply}
-          style={{
-            padding: '3px 10px',
-            background: 'var(--accent)',
-            color: '#fff',
-            border: 'none',
-            borderRadius: 4,
-            fontSize: 11,
-            cursor: 'pointer',
-          }}
-        >
-          Apply
-        </button>
       </div>
 
       {/* 48-row table */}
@@ -114,9 +120,27 @@ export default function RequirementsTab() {
             <tr>
               <th>SP</th>
               <th>Time (UTC)</th>
-              <th>Requirement ({area.unit})</th>
-              <th>Contracted ({area.unit})</th>
-              <th>Constrained ({area.unit})</th>
+              <th>
+                <FillHeader
+                  label="Requirement"
+                  unit={area.unit}
+                  onFill={v => fillAreaRequirements(activeArea, v, undefined, undefined)}
+                />
+              </th>
+              <th>
+                <FillHeader
+                  label="Contracted"
+                  unit={area.unit}
+                  onFill={v => fillAreaRequirements(activeArea, undefined, v, undefined)}
+                />
+              </th>
+              <th>
+                <FillHeader
+                  label="Constrained"
+                  unit={area.unit}
+                  onFill={v => fillAreaRequirements(activeArea, undefined, undefined, v)}
+                />
+              </th>
               <th>Net Available</th>
               <th>Gap</th>
             </tr>
@@ -137,54 +161,24 @@ export default function RequirementsTab() {
                     <input
                       type="number"
                       value={row.requirement}
-                      onChange={e =>
-                        setAreaRequirement(activeArea, row.sp, 'requirement', parseFloat(e.target.value) || 0)
-                      }
-                      style={{
-                        width: 80,
-                        padding: '2px 5px',
-                        fontSize: 11,
-                        background: 'var(--bg)',
-                        border: '1px solid var(--border)',
-                        borderRadius: 3,
-                        color: 'var(--text)',
-                      }}
+                      onChange={e => setAreaRequirement(activeArea, row.sp, 'requirement', parseFloat(e.target.value) || 0)}
+                      style={INPUT_STYLE}
                     />
                   </td>
                   <td>
                     <input
                       type="number"
                       value={row.contracted}
-                      onChange={e =>
-                        setAreaRequirement(activeArea, row.sp, 'contracted', parseFloat(e.target.value) || 0)
-                      }
-                      style={{
-                        width: 80,
-                        padding: '2px 5px',
-                        fontSize: 11,
-                        background: 'var(--bg)',
-                        border: '1px solid var(--border)',
-                        borderRadius: 3,
-                        color: 'var(--text)',
-                      }}
+                      onChange={e => setAreaRequirement(activeArea, row.sp, 'contracted', parseFloat(e.target.value) || 0)}
+                      style={INPUT_STYLE}
                     />
                   </td>
                   <td>
                     <input
                       type="number"
                       value={row.constrained}
-                      onChange={e =>
-                        setAreaRequirement(activeArea, row.sp, 'constrained', parseFloat(e.target.value) || 0)
-                      }
-                      style={{
-                        width: 80,
-                        padding: '2px 5px',
-                        fontSize: 11,
-                        background: 'var(--bg)',
-                        border: '1px solid var(--border)',
-                        borderRadius: 3,
-                        color: 'var(--text)',
-                      }}
+                      onChange={e => setAreaRequirement(activeArea, row.sp, 'constrained', parseFloat(e.target.value) || 0)}
+                      style={INPUT_STYLE}
                     />
                   </td>
                   <td style={{ color: netAvail >= row.requirement ? 'var(--green)' : 'var(--red)' }}>

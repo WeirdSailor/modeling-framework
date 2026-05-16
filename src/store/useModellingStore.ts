@@ -63,7 +63,7 @@ interface ModellingState {
   unitServices: Record<string, ServiceType>
   areaRequirements: Record<string, AreaRequirementRow[]>
   setAreaRequirement: (area: string, sp: number, field: 'requirement' | 'contracted' | 'constrained', value: number) => void
-  fillAreaRequirements: (area: string, requirement?: number, contracted?: number) => void
+  fillAreaRequirements: (area: string, requirement?: number, contracted?: number, constrained?: number) => void
   setAllAreaRequirements: (reqs: Record<string, AreaRequirementRow[]>) => void
 
   setUnits: (units: BMUnit[]) => void
@@ -154,12 +154,13 @@ export const useModellingStore = create<ModellingState>((set, get) => ({
       }
     }),
 
-  fillAreaRequirements: (area, requirement, contracted) =>
+  fillAreaRequirements: (area, requirement, contracted, constrained) =>
     set(state => {
       const rows = (state.areaRequirements[area] ?? []).map(r => ({
         ...r,
-        ...(requirement !== undefined ? { requirement } : {}),
-        ...(contracted  !== undefined ? { contracted  } : {}),
+        ...(requirement  !== undefined ? { requirement  } : {}),
+        ...(contracted   !== undefined ? { contracted   } : {}),
+        ...(constrained  !== undefined ? { constrained  } : {}),
       }))
       const newReqs = { ...state.areaRequirements, [area]: rows }
       const committedActions = state.drafts.filter(d => d.status === 'committed').flatMap(d => d.actions)
