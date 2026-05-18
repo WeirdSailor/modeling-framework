@@ -55,7 +55,7 @@ export default function Dashboard({ settlementPeriods, areaRequirements, areaThr
       {/* Toolbar */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: '.06em', color: 'var(--text)' }}>
-          SYSTEM BALANCE DASHBOARD
+          System Dashboard — {TIMEFRAME_OPTIONS[tfIndex].label}
         </span>
         <div style={{ display: 'flex', gap: 4, marginLeft: 'auto' }}>
           {TIMEFRAME_OPTIONS.map((opt, i) => (
