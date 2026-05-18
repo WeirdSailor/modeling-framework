@@ -15,6 +15,7 @@ import AvailableTable from '@/components/AvailableTable'
 import SelectedTable from '@/components/SelectedTable'
 import ConfigPanel, { type TweakState } from '@/components/ConfigPanel'
 import ConfirmModal from '@/components/ConfirmModal'
+import FeedbackModal from '@/components/FeedbackModal'
 import CommittedTab from '@/components/CommittedTab'
 import RedeclareTab from '@/components/RedeclareTab'
 import GraphTab from '@/components/GraphTab'
@@ -71,6 +72,7 @@ export default function Home() {
     })
   }, [])
   const [showConfig, setShowConfig] = useState(false)
+  const [showFeedback, setShowFeedback] = useState(false)
   const [showArchive, setShowArchive] = useState(true)
   const [toast, setToast] = useState<string | null>(null)
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null)
@@ -524,6 +526,13 @@ export default function Home() {
           >
             ⚙ Config
           </button>
+          <button
+            className="tweaks-trigger"
+            onClick={() => setShowFeedback(true)}
+            style={{ margin: '0 0 0 6px' }}
+          >
+            💬 Feedback
+          </button>
         </div>
 
         {/* Dashboard tab */}
@@ -803,6 +812,10 @@ export default function Home() {
           onHistoricalStartSpChange={setHistoricalStartSp}
           onLoadHistorical={loadHistoricalData}
         />
+      )}
+
+      {showFeedback && (
+        <FeedbackModal onClose={() => setShowFeedback(false)} />
       )}
 
       {confirmState && (
