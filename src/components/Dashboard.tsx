@@ -220,23 +220,35 @@ function Sparkline({ area, settlementPeriods, areaRequirements, reservePct }: {
   const toY = (v: number) => H - ((v - min) / range) * H
 
   const n = points.length
-  const availPts = points.map((p, i) => `${(i / (n - 1)) * W},${toY(p.avail)}`).join(' ')
-  const hasReq   = points.some(p => p.req > 0)
-  const reqPts   = hasReq
+  const hasReq = points.some(p => p.req > 0)
+  const reqPts = hasReq
     ? points.map((p, i) => `${(i / (n - 1)) * W},${toY(p.req)}`).join(' ')
     : null
 
-  const hasDeficit = hasReq && points.some(p => p.avail < p.req)
-  const fillColor = hasDeficit ? '#ef444420' : '#22c55e18'
-  const lineColor = hasDeficit ? '#ef4444' : '#22c55e'
+  const xOf = (i: number) => (i / (n - 1)) * W
+  const closedPts = [
+    ...points.map((p, i) => `${xOf(i)},${toY(p.avail)}`),
+    `${W},${H}`, `0,${H}`,
+  ].join(' ')
 
-  const closedPts = `${availPts} ${W},${H} 0,${H}`
+  // one <line> segment per adjacent pair, coloured independently
+  const segments = points.slice(0, -1).map((p, i) => {
+    const next = points[i + 1]
+    const deficit = p.avail < p.req || next.avail < next.req
+    return {
+      x1: xOf(i),     y1: toY(p.avail),
+      x2: xOf(i + 1), y2: toY(next.avail),
+      color: deficit ? '#ef4444' : '#22c55e',
+    }
+  })
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: H, display: 'block' }} preserveAspectRatio="none">
-      <polygon points={closedPts} fill={fillColor} />
+      <polygon points={closedPts} fill="#64748b14" />
       {reqPts && <polyline points={reqPts} fill="none" stroke="#64748b" strokeWidth=".8" strokeDasharray="2,2" />}
-      <polyline points={availPts} fill="none" stroke={lineColor} strokeWidth="1.2" />
+      {segments.map((s, i) => (
+        <line key={i} x1={s.x1} y1={s.y1} x2={s.x2} y2={s.y2} stroke={s.color} strokeWidth="1.5" />
+      ))}
     </svg>
   )
 }
