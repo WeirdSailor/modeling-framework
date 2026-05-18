@@ -96,7 +96,6 @@ const STATUS_LABELS: Record<AreaStatus, string> = {
 
 export default function Dashboard({ settlementPeriods, areaRequirements, areaThresholds, reservePct, drafts, dataOverrides, onTileClick }: DashboardProps) {
   const [tfIndex, setTfIndex] = useState(1)  // default Next 4h
-  const [view, setView]       = useState<'A' | 'B'>('A')
 
   const { spCount } = TIMEFRAME_OPTIONS[tfIndex]
 
@@ -131,21 +130,6 @@ export default function Dashboard({ settlementPeriods, areaRequirements, areaThr
               }}
             >
               {opt.label}
-            </button>
-          ))}
-        </div>
-        <div style={{ display: 'flex', gap: 2, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 5, padding: 2 }}>
-          {(['A', 'B'] as const).map(v => (
-            <button
-              key={v}
-              onClick={() => setView(v)}
-              style={{
-                padding: '2px 10px', borderRadius: 4, fontSize: 10, cursor: 'pointer', border: 'none',
-                background: view === v ? 'var(--accent,#6366f1)' : 'transparent',
-                color: view === v ? '#fff' : 'var(--text-muted)',
-              }}
-            >
-              {v}
             </button>
           ))}
         </div>
@@ -196,11 +180,7 @@ export default function Dashboard({ settlementPeriods, areaRequirements, areaThr
                   </div>
                 ) : null
               })()}
-              {view === 'A' ? (
-                <TileViewA area={area} status={status} color={color} />
-              ) : (
-                <TileViewB area={area} status={status} color={color} />
-              )}
+              <TileViewA area={area} status={status} color={color} />
               <Sparkline
                 area={area.id}
                 settlementPeriods={settlementPeriods}
@@ -237,36 +217,6 @@ function TileViewA({ area, status, color }: {
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'var(--text-muted)', marginBottom: 6 }}>
         <span>Req: {Math.round(status.worstReq).toLocaleString()}</span>
         <span>Avail: {Math.round(status.worstAvail).toLocaleString()}</span>
-      </div>
-    </>
-  )
-}
-
-// ── View B: numbers-first ─────────────────────────────────────────────────────
-
-function TileViewB({ area, status, color }: {
-  area: ReturnType<typeof getArea>
-  status: AreaStatusResult
-  color: string
-}) {
-  const sign = status.worstGap >= 0 ? '+' : ''
-  return (
-    <>
-      <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text)', marginBottom: 8 }}>{area.name}</div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginBottom: 6 }}>
-        {[['Required', status.worstReq], ['Available', status.worstAvail]].map(([label, val]) => (
-          <div key={label as string} style={{ background: 'var(--bg)', borderRadius: 4, padding: '5px 6px' }}>
-            <div style={{ fontSize: 8, color: 'var(--text-muted)' }}>{label}</div>
-            <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{Math.round(val as number).toLocaleString()}</div>
-            <div style={{ fontSize: 8, color: 'var(--text-muted)' }}>{area.unit}</div>
-          </div>
-        ))}
-      </div>
-      <div style={{
-        background: `${color}18`, border: `1px solid ${color}`, borderRadius: 3,
-        padding: '3px 6px', textAlign: 'center', fontSize: 10, fontWeight: 700, color, marginBottom: 6,
-      }}>
-        {STATUS_LABELS[status.status].toUpperCase()} &nbsp; {sign}{Math.round(status.worstGap).toLocaleString()} {area.unit}
       </div>
     </>
   )
