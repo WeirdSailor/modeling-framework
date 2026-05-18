@@ -542,6 +542,8 @@ export default function Home() {
             areaRequirements={areaRequirements}
             areaThresholds={areaThresholds}
             reservePct={tweaks.reservePct}
+            drafts={drafts}
+            dataOverrides={dataOverrides}
             onTileClick={handleDashboardTileClick}
           />
         )}

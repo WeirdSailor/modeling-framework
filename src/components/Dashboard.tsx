@@ -3,13 +3,74 @@
 import { useMemo, useState } from 'react'
 import { AREAS, getArea, type AreaId } from '@/config/areas'
 import { computeAreaStatus, type AreaStatus, type AreaStatusResult } from '@/utils/areaAggregates'
-import type { SettlementPeriodData, AreaRequirementRow } from '@/models/types'
+import type { SettlementPeriodData, AreaRequirementRow, DraftPlan, UnitSnapshot } from '@/models/types'
+
+const CHANGE_THRESHOLD = 10 // percent — must match CommittedTab
+
+interface TileAlert {
+  dataArrow: '↑' | '↓' | null
+  dataColor: string
+  priceArrow: '↑' | '↓' | null
+  priceColor: string
+}
+
+function computeTileAlert(
+  areaId: string,
+  drafts: DraftPlan[],
+  dataOverrides: Record<string, Partial<UnitSnapshot>>,
+): TileAlert {
+  const reasonCode = areaId.toUpperCase()
+  const DATA_FIELDS: (keyof UnitSnapshot)[] = ['mel', 'sel', 'ndz', 'mzt', 'mnzt']
+  const PRICE_FIELDS: (keyof UnitSnapshot)[] = ['priceToSel', 'priceToMel']
+
+  let dataHasUp = false, dataHasDown = false
+  let priceHasUp = false, priceHasDown = false
+
+  for (const draft of drafts) {
+    if (draft.status !== 'committed') continue
+    for (const action of draft.actions) {
+      if (action.reasonCode !== reasonCode) continue
+      const snap = draft.dataSnapshot?.[action.bmUnitId]
+      if (!snap) continue
+      const ov = dataOverrides[action.bmUnitId] ?? {}
+
+      for (const field of DATA_FIELDS) {
+        const snapVal = snap[field] as number
+        const curr    = (ov[field] as number | undefined) ?? snapVal
+        if (snapVal === 0) continue
+        const pct = (curr - snapVal) / snapVal * 100
+        if (Math.abs(pct) < CHANGE_THRESHOLD) continue
+        if (pct > 0) dataHasUp = true; else dataHasDown = true
+      }
+
+      for (const field of PRICE_FIELDS) {
+        const snapVal = snap[field] as number
+        const curr    = (ov[field] as number | undefined) ?? snapVal
+        if (snapVal === 0) continue
+        const pct = (curr - snapVal) / snapVal * 100
+        if (Math.abs(pct) < CHANGE_THRESHOLD) continue
+        if (pct > 0) priceHasUp = true; else priceHasDown = true
+      }
+    }
+  }
+
+  // Worst data position: any down beats all up (down = capacity lost = bad)
+  const dataArrow  = dataHasDown  ? '↓' : dataHasUp  ? '↑' : null
+  const dataColor  = dataHasDown  ? '#ef4444' : '#22c55e'
+  // Worst price position: any up beats all down (up = more expensive = bad, inverted)
+  const priceArrow = priceHasUp   ? '↑' : priceHasDown ? '↓' : null
+  const priceColor = priceHasUp   ? '#ef4444' : '#22c55e'
+
+  return { dataArrow, dataColor, priceArrow, priceColor }
+}
 
 interface DashboardProps {
   settlementPeriods: SettlementPeriodData[]
   areaRequirements: Record<string, AreaRequirementRow[]>
   areaThresholds: Record<string, number>
   reservePct: number
+  drafts: DraftPlan[]
+  dataOverrides: Record<string, Partial<UnitSnapshot>>
   onTileClick: (area: AreaId) => void
 }
 
@@ -33,7 +94,7 @@ const STATUS_LABELS: Record<AreaStatus, string> = {
   ok:        'OK',
 }
 
-export default function Dashboard({ settlementPeriods, areaRequirements, areaThresholds, reservePct, onTileClick }: DashboardProps) {
+export default function Dashboard({ settlementPeriods, areaRequirements, areaThresholds, reservePct, drafts, dataOverrides, onTileClick }: DashboardProps) {
   const [tfIndex, setTfIndex] = useState(1)  // default Next 4h
   const [view, setView]       = useState<'A' | 'B'>('A')
 
@@ -108,10 +169,33 @@ export default function Dashboard({ settlementPeriods, areaRequirements, areaThr
                 borderLeft: borderSide,
                 cursor: 'pointer',
                 transition: 'filter .15s',
+                position: 'relative',
               }}
               onMouseEnter={e => (e.currentTarget.style.filter = 'brightness(1.1)')}
               onMouseLeave={e => (e.currentTarget.style.filter = '')}
             >
+              {(() => {
+                const alert = computeTileAlert(area.id, drafts, dataOverrides)
+                const hasAlert = alert.dataArrow !== null || alert.priceArrow !== null
+                return hasAlert ? (
+                  <div style={{
+                    position: 'absolute', top: 8, right: 8,
+                    display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1,
+                    pointerEvents: 'none',
+                  }}>
+                    {alert.dataArrow !== null && (
+                      <span style={{ fontSize: 9, fontWeight: 700, color: alert.dataColor, letterSpacing: '.02em' }}>
+                        DATA {alert.dataArrow}
+                      </span>
+                    )}
+                    {alert.priceArrow !== null && (
+                      <span style={{ fontSize: 9, fontWeight: 700, color: alert.priceColor, letterSpacing: '.02em' }}>
+                        £ {alert.priceArrow}
+                      </span>
+                    )}
+                  </div>
+                ) : null
+              })()}
               {view === 'A' ? (
                 <TileViewA area={area} status={status} color={color} />
               ) : (
