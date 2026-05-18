@@ -187,12 +187,7 @@ export default function GraphTab({ settlementPeriods, units, drafts }: Props) {
             )}
             {sorted.map(row => (
               <tr key={row.bmUnitId}>
-                <td className="mono">
-                  <div className="bmu-cell-inner">
-                    <span>{row.nationalGridBmUnit}</span>
-                    <span className="site-sub">{row.gspGroup}</span>
-                  </div>
-                </td>
+                <td className="mono">{row.nationalGridBmUnit}</td>
                 <td><TypeChip fuelType={row.fuelType} /></td>
                 <td className="mono num">{row.mel != null ? row.mel.toFixed(0) : '—'}</td>
                 <td className="mono num">{row.pn > 0 ? row.pn.toFixed(0) : '—'}</td>
