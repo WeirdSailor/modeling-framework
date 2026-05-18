@@ -155,7 +155,7 @@ export default function AreaChart({
       const start = dragStartRef.current
       dragStartRef.current = null
       if (start !== null && dragEnd !== null && start !== dragEnd) {
-        fireIfDeficit(start, dragEnd)
+        fireSelection(start, dragEnd)
       } else {
         setDragStart(null); setDragEnd(null)
       }
@@ -269,13 +269,12 @@ export default function AreaChart({
     return isNaN(idx) ? null : idx
   }
 
-  function fireIfDeficit(idxA: number, idxB: number) {
+  function fireSelection(idxA: number, idxB: number) {
     const lo = Math.min(idxA, idxB)
     const hi = Math.max(idxA, idxB)
     const slice = (chartData as { gap: number }[]).slice(lo, hi + 1)
-    const deficits = slice.filter(d => d.gap < 0)
-    if (deficits.length === 0) return
-    const worst = Math.min(...deficits.map(d => d.gap))
+    if (slice.length === 0) return
+    const worst = Math.min(...slice.map(d => d.gap))
     onSolveSelect(lo + 1, hi + 1, worst)
   }
 
@@ -306,7 +305,7 @@ export default function AreaChart({
     const idx    = rawIdx ?? dragEnd
     const start  = dragStartRef.current; dragStartRef.current = null
     if (start !== null && idx !== null && start !== idx) {
-      setDragEnd(idx); fireIfDeficit(start, idx)
+      setDragEnd(idx); fireSelection(start, idx)
     } else {
       setDragStart(null); setDragEnd(null)
     }
@@ -315,17 +314,27 @@ export default function AreaChart({
   function handleClick(e: { activeTooltipIndex?: unknown } | null) {
     const idx = idxFromEvent(e); if (idx == null) return
     if (chartInteractionMode === 'twoClick') {
-      if (clickPhase === 0) { setClickStart(idx); setClickPhase(1) }
-      else {
-        if (clickStart != null) fireIfDeficit(clickStart, idx)
+      if (clickPhase === 0) {
+        setClickStart(idx)
+        setDragStart(idx)
+        setDragEnd(idx)
+        setClickPhase(1)
+      } else {
+        const start = clickStart!
         setClickPhase(0); setClickStart(null)
+        if (start !== idx) {
+          setDragEnd(idx)
+          fireSelection(start, idx)
+        } else {
+          setDragStart(null); setDragEnd(null)
+        }
       }
       return
     }
     if (chartInteractionMode === 'deficit') {
       const range = deficitRanges.find(r => r.lo <= idx && idx <= r.hi)
       if (!range) return
-      fireIfDeficit(range.lo, range.hi)
+      fireSelection(range.lo, range.hi)
     }
   }
 
