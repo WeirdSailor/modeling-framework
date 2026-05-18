@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { loadFeedbackItems, saveFeedbackItem } from '@/services/feedbackSync'
 
 export interface FeedbackItem {
   id: string
@@ -11,21 +12,6 @@ export interface FeedbackItem {
   date: string
 }
 
-const STORAGE_KEY = 'so:feedback'
-
-function loadFeedback(): FeedbackItem[] {
-  if (typeof window === 'undefined') return []
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '[]')
-  } catch {
-    return []
-  }
-}
-
-function saveFeedback(items: FeedbackItem[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(items))
-}
-
 interface Props {
   onClose: () => void
 }
@@ -33,6 +19,7 @@ interface Props {
 export default function FeedbackModal({ onClose }: Props) {
   const [view, setView] = useState<'form' | 'table'>('form')
   const [items, setItems] = useState<FeedbackItem[]>([])
+  const [loading, setLoading] = useState(false)
   const [name, setName] = useState('')
   const [observation, setObservation] = useState('')
   const [desiredFunctionality, setDesiredFunctionality] = useState('')
@@ -40,7 +27,11 @@ export default function FeedbackModal({ onClose }: Props) {
   const [submitted, setSubmitted] = useState(false)
 
   useEffect(() => {
-    setItems(loadFeedback())
+    setLoading(true)
+    loadFeedbackItems().then(data => {
+      setItems(data)
+      setLoading(false)
+    })
   }, [])
 
   useEffect(() => {
@@ -49,19 +40,18 @@ export default function FeedbackModal({ onClose }: Props) {
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!observation.trim()) return
-    const item: FeedbackItem = {
-      id: Date.now().toString(),
+    const payload = {
       name: name.trim() || 'Anonymous',
       observation: observation.trim(),
       desiredFunctionality: desiredFunctionality.trim(),
       businessValue,
       date: new Date().toISOString().slice(0, 10),
     }
-    const updated = [item, ...items]
-    saveFeedback(updated)
-    setItems(updated)
+    const id = await saveFeedbackItem(payload)
+    const item: FeedbackItem = { id: id ?? Date.now().toString(), ...payload }
+    setItems(prev => [item, ...prev])
     setName('')
     setObservation('')
     setDesiredFunctionality('')
@@ -242,7 +232,11 @@ export default function FeedbackModal({ onClose }: Props) {
         {/* Table view */}
         {view === 'table' && (
           <div style={{ overflowY: 'auto', flex: 1 }}>
-            {items.length === 0 ? (
+            {loading ? (
+              <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
+                Loading…
+              </div>
+            ) : items.length === 0 ? (
               <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
                 No feedback submitted yet.
               </div>
