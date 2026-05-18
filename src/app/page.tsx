@@ -642,33 +642,45 @@ export default function Home() {
             )}
 
             <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-              {/* Area subtab row */}
-              <div style={{
-                display: 'flex', gap: 0, borderBottom: '1px solid var(--border)',
-                background: 'var(--surface)', overflowX: 'auto', padding: '0 12px',
-              }}>
-                {AREAS.map(a => {
-                  const st = areaStatusMap[a.id]
-                  const dotColor = STATUS_DOT_COLOR[st?.status ?? 'ok']
-                  const isActive = activeAreaTab === a.id
-                  return (
-                    <button
-                      key={a.id}
-                      onClick={() => setActiveAreaTab(a.id)}
+              {/* Area selector */}
+              {(() => {
+                const st = areaStatusMap[activeAreaTab]
+                const dotColor = STATUS_DOT_COLOR[st?.status ?? 'ok']
+                const activeArea = AREAS.find(a => a.id === activeAreaTab)
+                return (
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    padding: '6px 14px', borderBottom: '1px solid var(--border)',
+                    background: 'var(--surface)', flexShrink: 0,
+                  }}>
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 500 }}>Area:</span>
+                    <select
+                      value={activeAreaTab}
+                      onChange={e => setActiveAreaTab(e.target.value as AreaId)}
                       style={{
-                        padding: '6px 12px', fontSize: 10, whiteSpace: 'nowrap',
-                        background: 'transparent', border: 'none', cursor: 'pointer',
-                        borderBottom: isActive ? `2px solid ${dotColor}` : '2px solid transparent',
-                        color: isActive ? dotColor : 'var(--text-muted)',
-                        display: 'flex', alignItems: 'center', gap: 4,
+                        fontSize: 11, padding: '3px 8px',
+                        border: '1px solid var(--border)', borderRadius: 4,
+                        background: 'var(--bg)', color: 'var(--text)', cursor: 'pointer',
                       }}
                     >
-                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: dotColor, display: 'inline-block' }} />
-                      {a.shortName}
-                    </button>
-                  )
-                })}
-              </div>
+                      {AREAS.map(a => {
+                        const s = areaStatusMap[a.id]
+                        const label = s?.status === 'shortfall' ? ` ⚠ ${a.name}` : a.name
+                        return <option key={a.id} value={a.id}>{label}</option>
+                      })}
+                    </select>
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: dotColor, display: 'inline-block', flexShrink: 0 }} />
+                    <span style={{ fontSize: 11, color: dotColor, fontWeight: 600 }}>
+                      {st?.status === 'shortfall' ? 'Shortfall' : st?.status === 'tight' ? 'Tight' : 'OK'}
+                    </span>
+                    {st && (
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 4 }}>
+                        {st.worstGap >= 0 ? '+' : ''}{Math.round(st.worstGap).toLocaleString()} {activeArea?.unit}
+                      </span>
+                    )}
+                  </div>
+                )
+              })()}
 
               {/* Margin chart */}
               {activeAreaTab === 'margin' && (

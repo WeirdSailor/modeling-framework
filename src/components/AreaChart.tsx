@@ -134,7 +134,15 @@ export default function AreaChart({
   }, [settlementPeriods])
 
   if (isLoading || settlementPeriods.length === 0) {
-    return <div style={{ height: 260, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>Loading…</div>
+    return (
+      <div style={{
+        flex: 1, minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        color: 'var(--text-muted)', background: 'var(--bg-panel)',
+        borderRadius: 12, margin: '0 0 0 0', border: '1px solid var(--border)',
+      }}>
+        Loading…
+      </div>
+    )
   }
 
   // ── Event helpers ────────────────────────────────────────────────────────
@@ -217,8 +225,38 @@ export default function AreaChart({
   const selHi = dragStart != null && dragEnd != null ? Math.max(dragStart, dragEnd) : null
 
   return (
-    <div style={{ userSelect: 'none' }}>
-      <ResponsiveContainer width="100%" height={260}>
+    <div style={{
+      flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column',
+      background: 'var(--bg-panel)', borderRadius: 12,
+      border: '1px solid var(--border)', padding: '14px 16px',
+      userSelect: 'none',
+    }}>
+      {/* Header row */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, flexShrink: 0 }}>
+        <h2 style={{ margin: 0, fontSize: 13, fontWeight: 500, color: 'var(--text-soft)' }}>
+          {area.name} — {chartData.length} Settlement Periods
+        </h2>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, fontSize: 11.5, color: 'var(--text-muted)' }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            <span style={{ display: 'inline-block', width: 12, height: 3, borderRadius: 2, background: '#64748b', opacity: .7 }} />
+            Requirement
+          </span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            <span style={{ display: 'inline-block', width: 12, height: 3, borderRadius: 2, background: area.color }} />
+            Available
+          </span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            <span style={{ display: 'inline-block', width: 12, height: 12, borderRadius: 3, background: '#22c55e', opacity: .7 }} />
+            Surplus
+          </span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            <span style={{ display: 'inline-block', width: 12, height: 12, borderRadius: 3, background: '#ef4444', opacity: .7 }} />
+            Shortfall
+          </span>
+        </div>
+      </div>
+      <div style={{ flex: 1, minHeight: 0, cursor: 'crosshair' }}>
+      <ResponsiveContainer width="100%" height="100%">
         <ComposedChart
           data={chartData}
           onMouseDown={handleMouseDown as never}
@@ -312,6 +350,7 @@ export default function AreaChart({
           ))}
         </ComposedChart>
       </ResponsiveContainer>
+      </div>
     </div>
   )
 }
