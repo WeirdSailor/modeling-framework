@@ -122,7 +122,6 @@ export default function Dashboard({ settlementPeriods, areaRequirements, areaThr
                 settlementPeriods={settlementPeriods}
                 areaRequirements={rows}
                 reservePct={reservePct}
-                threshold={areaThresholds[area.id] ?? 0}
               />
             </div>
           )
@@ -191,14 +190,13 @@ function TileViewB({ area, status, color }: {
 
 // ── Sparkline ─────────────────────────────────────────────────────────────────
 
-function Sparkline({ area, settlementPeriods, areaRequirements, reservePct, threshold }: {
+function Sparkline({ area, settlementPeriods, areaRequirements, reservePct }: {
   area: string
   settlementPeriods: SettlementPeriodData[]
   areaRequirements: AreaRequirementRow[]
   reservePct: number
-  threshold: number
 }) {
-  const points = settlementPeriods.map((sp) => {
+  const points = settlementPeriods.map((sp, i) => {
     let avail: number
     let req: number
     if (area === 'margin') {
@@ -206,7 +204,7 @@ function Sparkline({ area, settlementPeriods, areaRequirements, reservePct, thre
       req = sp.demand * (1 + reservePct / 100)
     } else {
       avail = sp.areaAvailability?.[area] ?? 0
-      req = threshold
+      req = areaRequirements[i]?.requirement ?? 0
     }
     return { avail, req }
   })
@@ -223,11 +221,12 @@ function Sparkline({ area, settlementPeriods, areaRequirements, reservePct, thre
 
   const n = points.length
   const availPts = points.map((p, i) => `${(i / (n - 1)) * W},${toY(p.avail)}`).join(' ')
-  const reqPts   = threshold > 0
+  const hasReq   = points.some(p => p.req > 0)
+  const reqPts   = hasReq
     ? points.map((p, i) => `${(i / (n - 1)) * W},${toY(p.req)}`).join(' ')
     : null
 
-  const hasDeficit = threshold > 0 && points.some(p => p.avail < p.req)
+  const hasDeficit = hasReq && points.some(p => p.avail < p.req)
   const fillColor = hasDeficit ? '#ef444420' : '#22c55e18'
   const lineColor = hasDeficit ? '#ef4444' : '#22c55e'
 
