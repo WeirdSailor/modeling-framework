@@ -11,7 +11,8 @@ export async function loadAreaRequirements(): Promise<Record<string, AreaRequire
     const snap = await getDoc(doc(db, COLLECTION, DOCUMENT))
     if (!snap.exists()) return null
     return snap.data() as Record<string, AreaRequirementRow[]>
-  } catch {
+  } catch (e) {
+    console.error('[requirementsSync] load failed:', e)
     return null
   }
 }
@@ -20,7 +21,7 @@ export async function saveAreaRequirements(reqs: Record<string, AreaRequirementR
   if (!db) return
   try {
     await setDoc(doc(db, COLLECTION, DOCUMENT), reqs)
-  } catch {
-    // silent — local state is still correct, save will retry on next change
+  } catch (e) {
+    console.error('[requirementsSync] save failed:', e)
   }
 }
