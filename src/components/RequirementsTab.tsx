@@ -92,9 +92,9 @@ export default function RequirementsTab() {
   }, [settlementPeriods])
 
   return (
-    <div className="redeclare-tab">
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden', padding: '10px 16px 0' }}>
       {/* Area chip selector */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 8, flexShrink: 0 }}>
         <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Area:</span>
         {NON_MARGIN_AREAS.map(a => (
           <button
@@ -116,7 +116,7 @@ export default function RequirementsTab() {
       </div>
 
       {/* Sparkline threshold */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexShrink: 0 }}>
         <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Dashboard sparkline threshold:</span>
         <input
           type="number"
