@@ -43,6 +43,7 @@
 }
 
 :root[data-theme="dark"] {
+  color-scheme: dark;
   --bg-canvas:  #07090d;
   --bg-panel:   #0f1218;
   --bg-sidebar: #0a0d12;
@@ -87,6 +88,17 @@
 :root[data-theme="dark"] .chip-interconn { background: rgba(148,163,184,.16); color: #cbd5e1; }
 :root[data-theme="dark"] .chip-sr        { background: rgba(14,165,233,.16);  color: #7dd3fc; }
 :root[data-theme="dark"] .chip-qr        { background: rgba(139,92,246,.16);  color: #c4b5fd; }
+
+/* Explicit dark-mode select colours — needed on Windows where native controls ignore CSS vars */
+:root[data-theme="dark"] select {
+  background-color: #161a22;
+  color: #f1f5f9;
+  border-color: #1f2530;
+}
+:root[data-theme="dark"] option {
+  background-color: #161a22;
+  color: #f1f5f9;
+}
 
 :root[data-theme="dark"] .btn-primary { color: #0b0f15; }
 :root[data-theme="dark"] .row-add-btn:hover:not(:disabled) { color: #0b0f15; }
