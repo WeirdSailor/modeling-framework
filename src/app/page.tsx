@@ -794,7 +794,10 @@ export default function Home() {
 
         {/* Requirements tab */}
         {activeTab === 'requirements' && (
-          <RequirementsTab />
+          <RequirementsTab
+            reservePct={tweaks.reservePct}
+            onReservePctChange={v => setTweak('reservePct', v)}
+          />
         )}
 
         {/* Graph tab */}

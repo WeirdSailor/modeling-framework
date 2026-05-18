@@ -72,7 +72,12 @@ function FillHeader({ label, unit, onFill }: FillHeaderProps) {
   )
 }
 
-export default function RequirementsTab() {
+interface Props {
+  reservePct: number
+  onReservePctChange: (v: number) => void
+}
+
+export default function RequirementsTab({ reservePct, onReservePctChange }: Props) {
   const areaRequirements   = useModellingStore(s => s.areaRequirements)
   const setAreaRequirement = useModellingStore(s => s.setAreaRequirement)
   const fillAreaRequirements = useModellingStore(s => s.fillAreaRequirements)
@@ -115,18 +120,36 @@ export default function RequirementsTab() {
         ))}
       </div>
 
-      {/* Sparkline threshold */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexShrink: 0 }}>
-        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Dashboard sparkline threshold:</span>
-        <input
-          type="number"
-          min={0}
-          value={areaThresholds[activeArea] ?? 0}
-          onChange={e => setAreaThreshold(activeArea, parseFloat(e.target.value) || 0)}
-          style={{ ...INPUT_STYLE, width: 90 }}
-        />
-        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{area.unit}</span>
-        <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>— sparkline turns red below this value</span>
+      {/* Sparkline threshold + reserve % (General Reserve only) */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 12, flexShrink: 0, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Dashboard sparkline threshold:</span>
+          <input
+            type="number"
+            min={0}
+            value={areaThresholds[activeArea] ?? 0}
+            onChange={e => setAreaThreshold(activeArea, parseFloat(e.target.value) || 0)}
+            style={{ ...INPUT_STYLE, width: 90 }}
+          />
+          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{area.unit}</span>
+          <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>— sparkline turns red below this value</span>
+        </div>
+
+        {activeArea === 'general_reserve' && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingLeft: 16, borderLeft: '1px solid var(--border)' }}>
+            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Margin reserve requirement (TR2):</span>
+            <input
+              type="number"
+              min={0}
+              max={50}
+              step={1}
+              value={reservePct}
+              onChange={e => onReservePctChange(Math.min(50, Math.max(0, Number(e.target.value))))}
+              style={{ ...INPUT_STYLE, width: 60, textAlign: 'right' }}
+            />
+            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>% — TR2 line on Margin chart</span>
+          </div>
+        )}
       </div>
 
       {/* 48-row table */}

@@ -112,30 +112,6 @@ function TweaksTab({
       />
 
       <div className="twk-sect">Chart</div>
-      <div className="twk-row twk-row-h">
-        <div className="twk-lbl"><span>Reserve requirement (TR2)</span></div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <input
-            type="number"
-            min={0}
-            max={50}
-            step={1}
-            value={tweaks.reservePct}
-            onChange={e => onChangeTweak('reservePct', Math.min(50, Math.max(0, Number(e.target.value))))}
-            style={{
-              width: 48,
-              fontSize: 12,
-              padding: '3px 6px',
-              borderRadius: 'var(--radius)',
-              border: '1px solid var(--border)',
-              background: 'var(--bg-input)',
-              color: 'var(--text)',
-              textAlign: 'right',
-            }}
-          />
-          <span style={{ fontSize: 12, color: 'var(--text-soft)' }}>%</span>
-        </div>
-      </div>
       <SegControl
         value={tweaks.chartInteractionMode}
         options={[
