@@ -473,28 +473,28 @@ export default function Home() {
             Dashboard
           </button>
           <button
-            className={`tab-btn${activeTab === 'workspace' ? ' active' : ''}`}
-            onClick={() => setActiveTab('workspace')}
-          >
-            Workspace
-          </button>
-          <button
             className={`tab-btn${activeTab === 'chart' ? ' active' : ''}`}
             onClick={() => setActiveTab('chart')}
           >
             Chart
           </button>
           <button
-            className={`tab-btn${activeTab === 'graph' ? ' active' : ''}`}
-            onClick={() => setActiveTab('graph')}
+            className={`tab-btn${activeTab === 'workspace' ? ' active' : ''}`}
+            onClick={() => setActiveTab('workspace')}
           >
-            BMU Summary
+            Workspace
           </button>
           <button
             className={`tab-btn${activeTab === 'committed' ? ' active' : ''}`}
             onClick={() => setActiveTab('committed')}
           >
             Committed
+          </button>
+          <button
+            className={`tab-btn${activeTab === 'graph' ? ' active' : ''}`}
+            onClick={() => setActiveTab('graph')}
+          >
+            BMU Summary
           </button>
           <div className="tab-spacer" />
           {!tweaks.showSidebar && (
