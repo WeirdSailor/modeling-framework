@@ -137,7 +137,7 @@ function ScenariosTab({
   const [expanded, setExpanded] = useState<ScenarioId | null>(null)
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '10px 12px', overflowY: 'auto', maxHeight: 560 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '10px 12px', overflowY: 'auto', flex: 1, minHeight: 0 }}>
       {SCENARIOS.map(sc => {
         const isOpen = expanded === sc.id
         return (
@@ -434,7 +434,7 @@ export default function ConfigPanel({
     <div
       ref={panelRef}
       className="twk-panel"
-      style={{ right: offsetRef.current.x, bottom: offsetRef.current.y, width: 480 }}
+      style={{ right: offsetRef.current.x, bottom: offsetRef.current.y, width: 480, height: 500 }}
     >
       {/* Drag handle / header */}
       <div className="twk-hd" onMouseDown={onDragStart}>
