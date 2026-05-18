@@ -65,6 +65,9 @@ interface ModellingState {
   setAreaRequirement: (area: string, sp: number, field: 'requirement' | 'contracted' | 'constrained', value: number) => void
   fillAreaRequirements: (area: string, requirement?: number, contracted?: number, constrained?: number) => void
   setAllAreaRequirements: (reqs: Record<string, AreaRequirementRow[]>) => void
+  areaThresholds: Record<string, number>
+  setAreaThreshold: (area: string, value: number) => void
+  setAllAreaThresholds: (thresholds: Record<string, number>) => void
 
   setUnits: (units: BMUnit[]) => void
   setSettlementPeriods: (periods: SettlementPeriodData[]) => void
@@ -115,6 +118,7 @@ export const useModellingStore = create<ModellingState>((set, get) => ({
   dataOverrides: {},
   unitServices: {},
   areaRequirements: initialAreaRequirements(),
+  areaThresholds: Object.fromEntries(NON_MARGIN_AREA_IDS.map(id => [id, 0])),
 
   setDataOverride: (bmUnitId, field, value) =>
     set(state => ({
@@ -178,6 +182,11 @@ export const useModellingStore = create<ModellingState>((set, get) => ({
         settlementPeriods: computeAreaAvailabilities(state.settlementPeriods, committedActions, state.units, reqs),
       }
     }),
+
+  setAreaThreshold: (area, value) =>
+    set(state => ({ areaThresholds: { ...state.areaThresholds, [area]: value } })),
+
+  setAllAreaThresholds: (thresholds) => set({ areaThresholds: thresholds }),
 
   setUnits: (units) => set({ units }),
 

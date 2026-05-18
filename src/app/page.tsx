@@ -131,24 +131,29 @@ export default function Home() {
   const clearAllDataOverrides = useModellingStore(s => s.clearAllDataOverrides)
   const unitServices      = useModellingStore(s => s.unitServices)
   const setUnitService    = useModellingStore(s => s.setUnitService)
-  const areaRequirements      = useModellingStore(s => s.areaRequirements)
+  const areaRequirements       = useModellingStore(s => s.areaRequirements)
   const setAllAreaRequirements = useModellingStore(s => s.setAllAreaRequirements)
+  const areaThresholds         = useModellingStore(s => s.areaThresholds)
+  const setAllAreaThresholds   = useModellingStore(s => s.setAllAreaThresholds)
 
   // ── requirements sync ──
   const requirementsReady = useRef(false)
 
   useEffect(() => {
-    loadAreaRequirements().then(reqs => {
-      if (reqs) setAllAreaRequirements(reqs)
+    loadAreaRequirements().then(result => {
+      if (result) {
+        setAllAreaRequirements(result.requirements)
+        setAllAreaThresholds(result.thresholds)
+      }
       requirementsReady.current = true
     })
-  }, [setAllAreaRequirements])
+  }, [setAllAreaRequirements, setAllAreaThresholds])
 
   useEffect(() => {
     if (!requirementsReady.current) return
-    const timer = setTimeout(() => { void saveAreaRequirements(areaRequirements) }, 500)
+    const timer = setTimeout(() => { void saveAreaRequirements(areaRequirements, areaThresholds) }, 500)
     return () => clearTimeout(timer)
-  }, [areaRequirements])
+  }, [areaRequirements, areaThresholds])
 
   // ── data fetch ──
   const loadData = useCallback(async () => {
@@ -526,6 +531,7 @@ export default function Home() {
           <Dashboard
             settlementPeriods={settlementPeriods}
             areaRequirements={areaRequirements}
+            areaThresholds={areaThresholds}
             reservePct={tweaks.reservePct}
             onTileClick={handleDashboardTileClick}
           />

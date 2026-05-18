@@ -8,6 +8,7 @@ import type { SettlementPeriodData, AreaRequirementRow } from '@/models/types'
 interface DashboardProps {
   settlementPeriods: SettlementPeriodData[]
   areaRequirements: Record<string, AreaRequirementRow[]>
+  areaThresholds: Record<string, number>
   reservePct: number
   onTileClick: (area: AreaId) => void
 }
@@ -32,7 +33,7 @@ const STATUS_LABELS: Record<AreaStatus, string> = {
   ok:        'OK',
 }
 
-export default function Dashboard({ settlementPeriods, areaRequirements, reservePct, onTileClick }: DashboardProps) {
+export default function Dashboard({ settlementPeriods, areaRequirements, areaThresholds, reservePct, onTileClick }: DashboardProps) {
   const [tfIndex, setTfIndex] = useState(1)  // default Next 4h
   const [view, setView]       = useState<'A' | 'B'>('A')
 
@@ -121,6 +122,7 @@ export default function Dashboard({ settlementPeriods, areaRequirements, reserve
                 settlementPeriods={settlementPeriods}
                 areaRequirements={rows}
                 reservePct={reservePct}
+                threshold={areaThresholds[area.id] ?? 0}
               />
             </div>
           )
@@ -140,14 +142,14 @@ function TileViewA({ area, status, color }: {
   const sign = status.worstGap >= 0 ? '+' : ''
   return (
     <>
+      <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>
+        {area.name}
+      </div>
       <div style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: '.08em', color, marginBottom: 1 }}>
         {STATUS_LABELS[status.status]}
       </div>
       <div style={{ fontSize: 20, fontWeight: 800, color, lineHeight: 1.1 }}>
         {sign}{Math.round(status.worstGap).toLocaleString()} {area.unit}
-      </div>
-      <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text)', margin: '3px 0 6px' }}>
-        {area.name}
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'var(--text-muted)', marginBottom: 6 }}>
         <span>Req: {Math.round(status.worstReq).toLocaleString()}</span>
@@ -189,11 +191,12 @@ function TileViewB({ area, status, color }: {
 
 // ── Sparkline ─────────────────────────────────────────────────────────────────
 
-function Sparkline({ area, settlementPeriods, areaRequirements, reservePct }: {
+function Sparkline({ area, settlementPeriods, areaRequirements, reservePct, threshold }: {
   area: string
   settlementPeriods: SettlementPeriodData[]
   areaRequirements: AreaRequirementRow[]
   reservePct: number
+  threshold: number
 }) {
   const points = settlementPeriods.map((sp) => {
     let avail: number
@@ -203,7 +206,7 @@ function Sparkline({ area, settlementPeriods, areaRequirements, reservePct }: {
       req = sp.demand * (1 + reservePct / 100)
     } else {
       avail = sp.areaAvailability?.[area] ?? 0
-      req = areaRequirements.find(r => r.sp === sp.settlementPeriod)?.requirement ?? 0
+      req = threshold
     }
     return { avail, req }
   })
@@ -220,9 +223,11 @@ function Sparkline({ area, settlementPeriods, areaRequirements, reservePct }: {
 
   const n = points.length
   const availPts = points.map((p, i) => `${(i / (n - 1)) * W},${toY(p.avail)}`).join(' ')
-  const reqPts   = points.map((p, i) => `${(i / (n - 1)) * W},${toY(p.req)}`).join(' ')
+  const reqPts   = threshold > 0
+    ? points.map((p, i) => `${(i / (n - 1)) * W},${toY(p.req)}`).join(' ')
+    : null
 
-  const hasDeficit = points.some(p => p.avail < p.req)
+  const hasDeficit = threshold > 0 && points.some(p => p.avail < p.req)
   const fillColor = hasDeficit ? '#ef444420' : '#22c55e18'
   const lineColor = hasDeficit ? '#ef4444' : '#22c55e'
 
@@ -231,7 +236,7 @@ function Sparkline({ area, settlementPeriods, areaRequirements, reservePct }: {
   return (
     <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: H, display: 'block' }} preserveAspectRatio="none">
       <polygon points={closedPts} fill={fillColor} />
-      <polyline points={reqPts}   fill="none" stroke="#64748b" strokeWidth=".8" strokeDasharray="2,2" />
+      {reqPts && <polyline points={reqPts} fill="none" stroke="#64748b" strokeWidth=".8" strokeDasharray="2,2" />}
       <polyline points={availPts} fill="none" stroke={lineColor} strokeWidth="1.2" />
     </svg>
   )

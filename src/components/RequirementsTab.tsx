@@ -77,6 +77,8 @@ export default function RequirementsTab() {
   const setAreaRequirement = useModellingStore(s => s.setAreaRequirement)
   const fillAreaRequirements = useModellingStore(s => s.fillAreaRequirements)
   const settlementPeriods  = useModellingStore(s => s.settlementPeriods)
+  const areaThresholds     = useModellingStore(s => s.areaThresholds)
+  const setAreaThreshold   = useModellingStore(s => s.setAreaThreshold)
 
   const [activeArea, setActiveArea] = useState(NON_MARGIN_AREAS[0].id)
 
@@ -92,7 +94,7 @@ export default function RequirementsTab() {
   return (
     <div className="redeclare-tab">
       {/* Area chip selector */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
         <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Area:</span>
         {NON_MARGIN_AREAS.map(a => (
           <button
@@ -111,6 +113,20 @@ export default function RequirementsTab() {
             {a.shortName}
           </button>
         ))}
+      </div>
+
+      {/* Sparkline threshold */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Dashboard sparkline threshold:</span>
+        <input
+          type="number"
+          min={0}
+          value={areaThresholds[activeArea] ?? 0}
+          onChange={e => setAreaThreshold(activeArea, parseFloat(e.target.value) || 0)}
+          style={{ ...INPUT_STYLE, width: 90 }}
+        />
+        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{area.unit}</span>
+        <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>— sparkline turns red below this value</span>
       </div>
 
       {/* 48-row table */}
