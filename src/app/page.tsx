@@ -816,7 +816,6 @@ export default function Home() {
             settlementPeriods={settlementPeriods}
             units={units}
             drafts={drafts}
-            unitServices={unitServices}
           />
         )}
 

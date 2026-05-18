@@ -1,13 +1,12 @@
 'use client'
 
 import { useMemo, useState, useCallback } from 'react'
-import type { BMUnit, DraftPlan, ServiceType, SettlementPeriodData } from '@/models/types'
+import type { BMUnit, DraftPlan, SettlementPeriodData } from '@/models/types'
 
 interface Props {
   settlementPeriods: SettlementPeriodData[]
   units: BMUnit[]
   drafts: DraftPlan[]
-  unitServices: Record<string, ServiceType>
 }
 
 type SortKey = 'bmu' | 'fuelType' | 'pn' | 'mel' | 'sel' | 'source'
@@ -40,11 +39,6 @@ function TypeChip({ fuelType }: { fuelType: string | null }) {
   if (!fuelType) return <span style={{ color: 'var(--text-faint)', fontSize: 11 }}>—</span>
   const { label, chipClass } = FUEL_CHIPS[fuelType] ?? { label: fuelType, chipClass: '' }
   return <span className={`chip ${chipClass}`}>{label}</span>
-}
-
-function ServiceChip({ service }: { service: ServiceType | undefined }) {
-  if (!service) return <span style={{ color: 'var(--text-faint)', fontSize: 11 }}>—</span>
-  return <span className={`chip chip-${service.toLowerCase()}`}>{service}</span>
 }
 
 function SourceBadge({ source }: { source: GraphRow['source'] }) {
@@ -81,8 +75,10 @@ function SortTh({ col, sort, onSort, children, numeric }: {
   )
 }
 
-export default function GraphTab({ settlementPeriods, units, drafts, unitServices }: Props) {
-  const [sort, setSort] = useState<{ key: SortKey; dir: 'asc' | 'desc' }>({ key: 'pn', dir: 'desc' })
+const SOURCE_WEIGHT: Record<GraphRow['source'], number> = { committed: 0, both: 1, pn: 2 }
+
+export default function GraphTab({ settlementPeriods, units, drafts }: Props) {
+  const [sort, setSort] = useState<{ key: SortKey; dir: 'asc' | 'desc' }>({ key: 'source', dir: 'asc' })
 
   const toggleSort = useCallback((key: SortKey) => {
     setSort(s => ({ key, dir: s.key === key && s.dir === 'asc' ? 'desc' : 'asc' }))
@@ -155,7 +151,7 @@ export default function GraphTab({ settlementPeriods, units, drafts, unitService
         case 'pn':         cmp = a.pn - b.pn; break
         case 'mel':        cmp = (a.mel ?? -1) - (b.mel ?? -1); break
         case 'sel':        cmp = (a.sel ?? -1) - (b.sel ?? -1); break
-        case 'source':     cmp = a.source.localeCompare(b.source); break
+        case 'source':     cmp = SOURCE_WEIGHT[a.source] - SOURCE_WEIGHT[b.source]; break
       }
       return sort.dir === 'asc' ? cmp : -cmp
     })
@@ -179,16 +175,15 @@ export default function GraphTab({ settlementPeriods, units, drafts, unitService
             <tr>
               <SortTh col="bmu"      sort={sort} onSort={toggleSort}>BMU</SortTh>
               <SortTh col="fuelType" sort={sort} onSort={toggleSort}>Type</SortTh>
-              <th>Service</th>
+              <SortTh col="mel"      sort={sort} onSort={toggleSort} numeric>EMX</SortTh>
               <SortTh col="pn"       sort={sort} onSort={toggleSort} numeric>EOL</SortTh>
               <SortTh col="sel"      sort={sort} onSort={toggleSort} numeric>EMI</SortTh>
-              <SortTh col="mel"      sort={sort} onSort={toggleSort} numeric>EMX</SortTh>
               <SortTh col="source"   sort={sort} onSort={toggleSort}>Source</SortTh>
             </tr>
           </thead>
           <tbody>
             {sorted.length === 0 && (
-              <tr><td colSpan={7} className="empty">No units contributing to the graph.</td></tr>
+              <tr><td colSpan={6} className="empty">No units contributing to the graph.</td></tr>
             )}
             {sorted.map(row => (
               <tr key={row.bmUnitId}>
@@ -199,10 +194,9 @@ export default function GraphTab({ settlementPeriods, units, drafts, unitService
                   </div>
                 </td>
                 <td><TypeChip fuelType={row.fuelType} /></td>
-                <td><ServiceChip service={unitServices[row.bmUnitId]} /></td>
+                <td className="mono num">{row.mel != null ? row.mel.toFixed(0) : '—'}</td>
                 <td className="mono num">{row.pn > 0 ? row.pn.toFixed(0) : '—'}</td>
                 <td className="mono num">{row.sel != null && row.sel > 0 ? row.sel.toFixed(0) : '—'}</td>
-                <td className="mono num">{row.mel != null ? row.mel.toFixed(0) : '—'}</td>
                 <td><SourceBadge source={row.source} /></td>
               </tr>
             ))}
