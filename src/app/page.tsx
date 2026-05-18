@@ -496,18 +496,6 @@ export default function Home() {
           >
             Committed
           </button>
-          <button
-            className={`tab-btn${activeTab === 'redeclare' ? ' active' : ''}`}
-            onClick={() => setActiveTab('redeclare')}
-          >
-            Redeclare
-          </button>
-          <button
-            className={`tab-btn${activeTab === 'requirements' ? ' active' : ''}`}
-            onClick={() => setActiveTab('requirements')}
-          >
-            Requirements
-          </button>
           <div className="tab-spacer" />
           {!tweaks.showSidebar && (
             <button
@@ -521,8 +509,28 @@ export default function Home() {
           )}
           <button
             className="tweaks-trigger"
+            onClick={() => setActiveTab('redeclare')}
+            style={{
+              margin: '0 0 0 8px',
+              ...(activeTab === 'redeclare' ? { borderColor: 'var(--accent)', color: 'var(--text)' } : {}),
+            }}
+          >
+            Redeclare
+          </button>
+          <button
+            className="tweaks-trigger"
+            onClick={() => setActiveTab('requirements')}
+            style={{
+              margin: '0 0 0 6px',
+              ...(activeTab === 'requirements' ? { borderColor: 'var(--accent)', color: 'var(--text)' } : {}),
+            }}
+          >
+            Requirements
+          </button>
+          <button
+            className="tweaks-trigger"
             onClick={() => setShowConfig(v => !v)}
-            style={{ margin: '0 0 0 8px' }}
+            style={{ margin: '0 0 0 6px' }}
           >
             ⚙ Config
           </button>
