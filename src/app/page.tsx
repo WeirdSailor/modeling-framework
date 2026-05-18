@@ -50,7 +50,7 @@ export default function Home() {
     showSidebar: true,
     selectionPattern: 'buttons',
     reservePct: 10,
-    chartInteractionMode: 'drag',
+    chartInteractionMode: 'twoClick',
   })
   const setTweak = useCallback(<K extends keyof TweakState>(key: K, value: TweakState[K]) => {
     setTweaksState(prev => ({ ...prev, [key]: value }))
