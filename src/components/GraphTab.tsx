@@ -171,6 +171,14 @@ export default function GraphTab({ settlementPeriods, units, drafts }: Props) {
 
       <div className="table-scroll">
         <table className="data-table" style={{ width: '100%', tableLayout: 'fixed' }}>
+          <colgroup>
+            <col style={{ width: '28%' }} />
+            <col style={{ width: '14%' }} />
+            <col style={{ width: '16%' }} />
+            <col style={{ width: '16%' }} />
+            <col style={{ width: '16%' }} />
+            <col style={{ width: '10%' }} />
+          </colgroup>
           <thead>
             <tr>
               <SortTh col="bmu"      sort={sort} onSort={toggleSort}>BMU</SortTh>
