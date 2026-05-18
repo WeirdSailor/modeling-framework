@@ -10,21 +10,16 @@ interface Props {
   unitServices: Record<string, ServiceType>
 }
 
-type SortKey = 'bmu' | 'fuelType' | 'pn' | 'mel' | 'sel' | 'ndz' | 'mnzt' | 'mzt' | 'priceToSel' | 'priceToMel' | 'source'
+type SortKey = 'bmu' | 'fuelType' | 'pn' | 'mel' | 'sel' | 'source'
 
 interface GraphRow {
   bmUnitId: string
   nationalGridBmUnit: string
   gspGroup: string
   fuelType: string | null   // null = unit outside the reference list
-  pn: number                // max PN across all SPs
-  mel: number | null
-  sel: number | null
-  ndz: number | null
-  mnzt: number | null
-  mzt: number | null
-  priceToSel: number | null
-  priceToMel: number | null
+  pn: number                // max PN across all SPs (EOL)
+  mel: number | null        // EMX
+  sel: number | null        // EMI
   source: 'pn' | 'committed' | 'both'
 }
 
@@ -121,11 +116,6 @@ export default function GraphTab({ settlementPeriods, units, drafts, unitService
         pn: maxPn,
         mel: unit?.registeredCapacity ?? null,
         sel: unit?.sel ?? null,
-        ndz: unit?.ndz ?? null,
-        mnzt: unit?.mnzt ?? null,
-        mzt: unit?.mzt ?? null,
-        priceToSel: unit?.priceToSel ?? null,
-        priceToMel: unit?.priceToMel ?? null,
         source: 'pn',
       })
     }
@@ -147,11 +137,6 @@ export default function GraphTab({ settlementPeriods, units, drafts, unitService
             pn: allPnByBmUnit[action.bmUnitId] ?? 0,
             mel: unit?.registeredCapacity ?? null,
             sel: unit?.sel ?? null,
-            ndz: unit?.ndz ?? null,
-            mnzt: unit?.mnzt ?? null,
-            mzt: unit?.mzt ?? null,
-            priceToSel: unit?.priceToSel ?? null,
-            priceToMel: unit?.priceToMel ?? null,
             source: 'committed',
           })
         }
@@ -170,11 +155,6 @@ export default function GraphTab({ settlementPeriods, units, drafts, unitService
         case 'pn':         cmp = a.pn - b.pn; break
         case 'mel':        cmp = (a.mel ?? -1) - (b.mel ?? -1); break
         case 'sel':        cmp = (a.sel ?? -1) - (b.sel ?? -1); break
-        case 'ndz':        cmp = (a.ndz ?? -1) - (b.ndz ?? -1); break
-        case 'mnzt':       cmp = (a.mnzt ?? -1) - (b.mnzt ?? -1); break
-        case 'mzt':        cmp = (a.mzt ?? -1) - (b.mzt ?? -1); break
-        case 'priceToSel': cmp = (a.priceToSel ?? -1) - (b.priceToSel ?? -1); break
-        case 'priceToMel': cmp = (a.priceToMel ?? -1) - (b.priceToMel ?? -1); break
         case 'source':     cmp = a.source.localeCompare(b.source); break
       }
       return sort.dir === 'asc' ? cmp : -cmp
@@ -197,23 +177,18 @@ export default function GraphTab({ settlementPeriods, units, drafts, unitService
         <table className="data-table">
           <thead>
             <tr>
-              <SortTh col="bmu"        sort={sort} onSort={toggleSort}>BMU</SortTh>
-              <SortTh col="fuelType"   sort={sort} onSort={toggleSort}>Type</SortTh>
+              <SortTh col="bmu"      sort={sort} onSort={toggleSort}>BMU</SortTh>
+              <SortTh col="fuelType" sort={sort} onSort={toggleSort}>Type</SortTh>
               <th>Service</th>
-              <SortTh col="ndz"        sort={sort} onSort={toggleSort} numeric>NDZ</SortTh>
-              <SortTh col="mzt"        sort={sort} onSort={toggleSort} numeric>MZT</SortTh>
-              <SortTh col="mnzt"       sort={sort} onSort={toggleSort} numeric>MNZT</SortTh>
-              <SortTh col="pn"         sort={sort} onSort={toggleSort} numeric>PN</SortTh>
-              <SortTh col="sel"        sort={sort} onSort={toggleSort} numeric>SEL</SortTh>
-              <SortTh col="mel"        sort={sort} onSort={toggleSort} numeric>MEL</SortTh>
-              <SortTh col="priceToSel" sort={sort} onSort={toggleSort} numeric>£ SEL</SortTh>
-              <SortTh col="priceToMel" sort={sort} onSort={toggleSort} numeric>£ MEL</SortTh>
-              <SortTh col="source"     sort={sort} onSort={toggleSort}>Source</SortTh>
+              <SortTh col="pn"       sort={sort} onSort={toggleSort} numeric>EOL</SortTh>
+              <SortTh col="sel"      sort={sort} onSort={toggleSort} numeric>EMI</SortTh>
+              <SortTh col="mel"      sort={sort} onSort={toggleSort} numeric>EMX</SortTh>
+              <SortTh col="source"   sort={sort} onSort={toggleSort}>Source</SortTh>
             </tr>
           </thead>
           <tbody>
             {sorted.length === 0 && (
-              <tr><td colSpan={12} className="empty">No units contributing to the graph.</td></tr>
+              <tr><td colSpan={7} className="empty">No units contributing to the graph.</td></tr>
             )}
             {sorted.map(row => (
               <tr key={row.bmUnitId}>
@@ -225,14 +200,9 @@ export default function GraphTab({ settlementPeriods, units, drafts, unitService
                 </td>
                 <td><TypeChip fuelType={row.fuelType} /></td>
                 <td><ServiceChip service={unitServices[row.bmUnitId]} /></td>
-                <td className="mono num">{row.ndz  != null && row.ndz  > 0 ? row.ndz  : '—'}</td>
-                <td className="mono num">{row.mzt  != null && row.mzt  > 0 ? row.mzt  : '—'}</td>
-                <td className="mono num">{row.mnzt != null && row.mnzt > 0 ? row.mnzt : '—'}</td>
                 <td className="mono num">{row.pn > 0 ? row.pn.toFixed(0) : '—'}</td>
-                <td className="mono num">{row.sel  != null && row.sel  > 0 ? row.sel.toFixed(0)  : '—'}</td>
-                <td className="mono num">{row.mel  != null ? row.mel.toFixed(0) : '—'}</td>
-                <td className="mono num">{row.priceToSel != null && row.priceToSel > 0 ? `£${row.priceToSel}` : '—'}</td>
-                <td className="mono num">{row.priceToMel != null && row.priceToMel > 0 ? `£${row.priceToMel}` : '—'}</td>
+                <td className="mono num">{row.sel != null && row.sel > 0 ? row.sel.toFixed(0) : '—'}</td>
+                <td className="mono num">{row.mel != null ? row.mel.toFixed(0) : '—'}</td>
                 <td><SourceBadge source={row.source} /></td>
               </tr>
             ))}
