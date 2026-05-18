@@ -132,7 +132,6 @@ export default function RequirementsTab({ reservePct, onReservePctChange }: Prop
             style={{ ...INPUT_STYLE, width: 90 }}
           />
           <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{area.unit}</span>
-          <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>— sparkline turns red below this value</span>
         </div>
 
         {activeArea === 'general_reserve' && (
@@ -147,7 +146,7 @@ export default function RequirementsTab({ reservePct, onReservePctChange }: Prop
               onChange={e => onReservePctChange(Math.min(50, Math.max(0, Number(e.target.value))))}
               style={{ ...INPUT_STYLE, width: 60, textAlign: 'right' }}
             />
-            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>% — TR2 line on Margin chart</span>
+            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>%</span>
           </div>
         )}
       </div>
