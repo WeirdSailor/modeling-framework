@@ -18,6 +18,8 @@ import ConfirmModal from '@/components/ConfirmModal'
 import FeedbackModal from '@/components/FeedbackModal'
 import CommittedTab from '@/components/CommittedTab'
 import RedeclareTab from '@/components/RedeclareTab'
+import BatterySummaryTab from '@/components/BatterySummaryTab'
+import BatteryRedeclareTab from '@/components/BatteryRedeclareTab'
 import GraphTab from '@/components/GraphTab'
 import RequirementsTab from '@/components/RequirementsTab'
 import Dashboard from '@/components/Dashboard'
@@ -27,6 +29,7 @@ import { AREAS, getArea } from '@/config/areas'
 import { computeAreaStatus } from '@/utils/areaAggregates'
 
 type Tab = 'dashboard' | 'workspace' | 'chart' | 'committed' | 'redeclare' | 'graph' | 'requirements'
+type BatteryTab = 'summary' | 'redeclare'
 
 interface ConfirmState {
   message: string
@@ -63,9 +66,11 @@ export default function Home() {
 
   const [activeTab, setActiveTab] = useState<Tab>('dashboard')
   const [activeSection, setActiveSection] = useState<AppSection>('balancing')
+  const [activeBatteryTab, setActiveBatteryTab] = useState<BatteryTab>('summary')
   const handleSectionChange = useCallback((section: AppSection) => {
     setActiveSection(section)
     setActiveTab('dashboard')
+    setActiveBatteryTab('summary')
   }, [])
   const [activeAreaTab, setActiveAreaTab] = useState<AreaId>('margin')
   const [hiddenDraftIds, setHiddenDraftIds] = useState<Set<string>>(new Set())
@@ -308,6 +313,10 @@ export default function Home() {
 
   const unitById = useMemo(() => new Map(units.map(u => [u.bmUnitId, u])), [units])
 
+  const batteryUnits = useMemo(() =>
+    units.filter(u => u.fuelType === 'BATTERY')
+  , [units])
+
   const activeDraftUnitIds = useMemo(
     () => new Set(activeDraft?.actions.map(a => a.bmUnitId) ?? []),
     [activeDraft]
@@ -472,12 +481,38 @@ export default function Home() {
 
       {activeSection === 'battery' && (
         <main className="workspace">
-          <div style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            flex: 1, color: 'var(--text-faint)', fontSize: 14,
-          }}>
-            Battery Management — Coming soon
+          {/* Tab bar */}
+          <div className="tab-bar">
+            <button
+              className={`tab-btn${activeBatteryTab === 'summary' ? ' active' : ''}`}
+              onClick={() => setActiveBatteryTab('summary')}
+            >
+              Summary
+            </button>
+            <button
+              className={`tab-btn${activeBatteryTab === 'redeclare' ? ' active' : ''}`}
+              onClick={() => setActiveBatteryTab('redeclare')}
+            >
+              Redeclare
+            </button>
           </div>
+
+          {activeBatteryTab === 'summary' && (
+            <BatterySummaryTab
+              units={batteryUnits}
+              settlementPeriods={settlementPeriods}
+              unitServices={unitServices}
+            />
+          )}
+
+          {activeBatteryTab === 'redeclare' && (
+            <BatteryRedeclareTab
+              units={batteryUnits}
+              unitPnByBmUnit={unitPnByBmUnit}
+              unitServices={unitServices}
+              onSetService={setUnitService}
+            />
+          )}
         </main>
       )}
 

@@ -23,13 +23,55 @@ npx tsc --noEmit  # type check
 The app is split into top-level **sections** via `AppSection` (`'balancing' | 'battery'`, defined in `src/models/types.ts` alongside `APP_SECTIONS`). A `SegControl` ("Balancing | Battery") sits at the top of `DraftSidebar`, above the identity picker — `activeSection` state lives in `page.tsx` (default `'balancing'`, not in Zustand).
 
 - **Balancing** — everything described in this document: the full tab set (Dashboard, Chart, Workspace, Committed, BMU Summary, Redeclare, Requirements), Config/Feedback buttons, Deficit Solver, etc. This is the entire pre-existing app, now wrapped in `{activeSection === 'balancing' && <main className="workspace">...}`.
-- **Battery** — currently a placeholder (`{activeSection === 'battery' && <main className="workspace">...}` rendering "Battery Management — Coming soon"). Future battery-management tabs/components will be added inside this branch.
+- **Battery** — a two-tab workspace (Summary, Redeclare) for battery-fuel-type units. See "Battery Section" below for full detail.
 
 **Shared across both sections:**
 - The left sidebar (`DraftSidebar`) — identity picker, draft list, refresh, collapse — is always rendered regardless of `activeSection`.
-- All Zustand store state (`units`, `settlementPeriods`, `drafts`, etc.) — both sections read from the same store.
+- All Zustand store state (`units`, `settlementPeriods`, `drafts`, `unitServices`, etc.) — both sections read from the same store.
 
-**`handleSectionChange(section)`** in `page.tsx` sets `activeSection` and always resets `activeTab` to `'dashboard'` — sections do **not** remember each other's last-active tab independently. Do not add per-section tab memory without re-confirming this is still desired.
+**`handleSectionChange(section)`** in `page.tsx` sets `activeSection`, resets `activeTab` to `'dashboard'`, and resets `activeBatteryTab` to `'summary'` — sections do **not** remember each other's last-active tab independently. Do not add per-section tab memory without re-confirming this is still desired.
+
+---
+
+## Battery Section
+
+`activeBatteryTab: 'summary' | 'redeclare'` (`BatteryTab` type) is local state in `page.tsx`, default `'summary'`. A `tab-bar`/`tab-btn` row (same CSS classes as the Balancing tab bar) switches between the two tabs.
+
+`batteryUnits = units.filter(u => u.fuelType === 'BATTERY')` — computed once in `page.tsx` and passed to both tabs.
+
+### `'BATTERY'` fuel type handling
+
+- Added to `EXCLUDED_FUEL_TYPES` in `src/utils/fuelTypes.ts` — battery units are hidden from Balancing's `AvailableTable`/`SelectedTable` (display filter only).
+- **Not** added to `FETCH_EXCLUDED_FUEL_TYPES` — battery units are still fetched normally and still contribute to `sp.pn`/EMX/EOL/EMI via `computeAggregates` (which iterates `sp.pn` directly, unaffected by the display filter).
+
+### Summary tab (`src/components/BatterySummaryTab.tsx`)
+
+Props: `{ units: BMUnit[]; settlementPeriods: SettlementPeriodData[]; unitServices: Record<string, ServiceType> }`.
+
+- **Capacity formula** (the universal per-unit metric): `capacity = max(0, MEL − worstPn)`, where `MEL = unit.registeredCapacity` and `worstPn` is the **max PN over the selected timeframe window** (worst-case / minimum headroom).
+- **Timeframe selector** (segmented buttons, top-right of filter row): Next 30 min (1 SP) / Next 1 hour (2 SPs) / Next 1.5 hours (3 SPs) / Next 2 hours (4 SPs) — selects how many leading SPs (sorted by `settlementPeriod`) feed `worstPn`.
+- **GSP filter** — same `gspFilter: Record<string, 'include'|'exclude'>` pattern and `GspFilterPopover` UI as Balancing's DraftDetails. A unit is **constrained** if it fails the GSP include/exclude check (reuses the same logic as `AvailableTable`'s GSP visibility check — no separate "constrained" flag).
+- **AS Services filter** — popover with SR/QR checkboxes ("Treat as contracted"). When ticked, units with that `unitServices` assignment are reclassified from Usable → Contracted (not hidden).
+- **Classification per unit** (mutually exclusive): `constrained` (fails GSP filter) → `contracted` (matches a ticked AS Services checkbox) → `usable` (everything else).
+- **Cards** (Total / Contracted / Constrained / Usable, same visual style as CommittedTab's cost cards): each shows `Σ capacity` and unit count for its row set.
+  - Total = all units. Contracted = contracted units. Constrained = constrained units. Usable = `total − contracted − constrained`.
+  - Cards recompute live from `classified` as filters change. Empty cards render at 40% opacity.
+  - **Click-to-filter**: clicking a card sets `selectedCard` and filters the table to that card's row set; clicking the active card again resets. Default (no card selected) view = all non-constrained units (constrained units are hidden by default, but their summed capacity still shows on the Constrained card).
+- **Table columns**: BMU, Type (`chip chip-battery`), Service (`chip-sr`/`chip-qr`/`—`, read-only — set via Redeclare tab), NDZ, MZT, MNZT, SEL, MEL, £ SEL, £ MEL, PN, Capacity. Same `.data-table`/`.table-scroll`/`.bmu-cell-inner` styling as other tables.
+- Empty state (`units.length === 0`): `.workspace-empty` with "No battery units found".
+
+### Redeclare tab (`src/components/BatteryRedeclareTab.tsx`)
+
+Props: `{ units: BMUnit[]; unitPnByBmUnit: Record<string, number>; unitServices: Record<string, ServiceType>; onSetService: (bmUnitId, service|undefined) => void }`.
+
+- Lists **all** battery units (same set as Summary tab) with the same core columns minus Capacity, plus an editable **Service** `<select className="reason-select">` (—/SR/QR) per row.
+- Selecting SR/QR calls `onSetService` → `setUnitService(bmUnitId, service)` in the global store — the same `unitServices` map read by Balancing's RedeclareTab and by the Battery Summary tab's Service column / AS Services classification.
+- This is the **only** place battery units' `unitServices` can be set, since battery units never appear in Balancing drafts (excluded from `AvailableTable`).
+- Same empty state as Summary tab.
+
+### Shared GSP filter component (`src/components/GspFilterPopover.tsx`)
+
+`usePopoverDismiss` (mousedown-outside + Escape dismiss hook) and `GspFilterPopover` were extracted from `DraftDetails.tsx` into this new shared file (both exported) so `BatterySummaryTab` could reuse the identical GSP include/exclude UI. `DraftDetails.tsx` now imports both from here instead of defining them locally — no behavioural change to the Balancing GSP filter.
 
 `SegControl` was extracted from `ConfigPanel.tsx` into its own shared component (`src/components/SegControl.tsx`, exported) so `DraftSidebar` could reuse it. `ConfigPanel.tsx` now imports it instead of defining it locally. (`TweaksPanel.tsx` has its own unused copy — that file is dead code, not imported anywhere, and was left untouched.)
 
@@ -160,9 +202,12 @@ These values are also persisted in a **localStorage cache** (see Standing Data C
 
 | File | Role |
 |------|------|
-| `src/app/page.tsx` | Top-level: data loading, layout, tab switching, derived data, confirm modals, sharing actions; owns `activeSection: AppSection` (Balancing/Battery, default `'balancing'`) and `handleSectionChange`; owns `hiddenDraftIds` state for chart draft visibility; owns `solveTarget` state for the Deficit Solver; owns `activeAreaTab: AreaId` for Chart subtab; tab order (Balancing section): Dashboard \| Workspace \| Chart \| Committed \| Redeclare \| Requirements \| BMU Summary |
+| `src/app/page.tsx` | Top-level: data loading, layout, tab switching, derived data, confirm modals, sharing actions; owns `activeSection: AppSection` (Balancing/Battery, default `'balancing'`) and `handleSectionChange`; owns `activeBatteryTab: 'summary' \| 'redeclare'` (default `'summary'`) and `batteryUnits` (units filtered to `fuelType === 'BATTERY'`); owns `hiddenDraftIds` state for chart draft visibility; owns `solveTarget` state for the Deficit Solver; owns `activeAreaTab: AreaId` for Chart subtab; tab order (Balancing section): Dashboard \| Workspace \| Chart \| Committed \| Redeclare \| Requirements \| BMU Summary |
 | `src/components/DraftSidebar.tsx` | "Balancing \| Battery" `SegControl` section switcher at top, then identity picker ("You are: [NSE ▼]"), window time + Refresh, draft list filtered to current user, "Shared with me" collapsible section; coloured circle visibility toggle per active draft; collapse button (‹/›) at top; New Draft button pinned to bottom footer |
 | `src/components/SegControl.tsx` | Shared pill-style segmented control (`twk-seg`/`twk-seg-thumb` CSS); used by `ConfigPanel` and `DraftSidebar`'s section switcher |
+| `src/components/BatterySummaryTab.tsx` | Battery section "Summary" tab: GSP filter + AS Services filter + timeframe selector (30min/1h/1.5h/2h) above Total/Contracted/Constrained/Usable cost-card-style cards (Σ capacity = `max(0, MEL − worstPn)`), click-to-filter table of battery units (BMU, Type, Service, NDZ, MZT, MNZT, SEL, MEL, £SEL, £MEL, PN, Capacity) |
+| `src/components/BatteryRedeclareTab.tsx` | Battery section "Redeclare" tab: lists all battery units with an editable Service (SR/QR/—) select writing to the shared `unitServices` store — the only place battery units' service is assigned, feeding the Summary tab's AS Services classification |
+| `src/components/GspFilterPopover.tsx` | Shared `usePopoverDismiss` hook + `GspFilterPopover` component (GSP zone include/exclude UI), extracted from `DraftDetails.tsx` so `BatterySummaryTab` can reuse it |
 | `src/components/DraftDetails.tsx` | Draft header: share icon (left of name, opens sharing popover), name input, description field (truncated, hover tooltip), From/To SP pickers + Scenario/GSP filter buttons in same row, action buttons; no cost/meta row, no state badge; From/To options display as `DD\|HH:MM`; accepts `solveMw?: number \| null` prop — shows a red "N MW deficit" badge when set |
 | `src/components/AvailableTable.tsx` | Available units table: sort, checkbox or click selection, type + service chips; no toolbar — Scenario/GSP filters live in DraftDetails and are passed as props; Select button appears in header only when rows are checked; **Deficit Solver**: `solveMode` + `solveMw` props enable covering-set pre-check (highlighted rows) |
 | `src/components/SelectedTable.tsx` | Selected units in active draft: Σ PN / Σ MEL / Est. value totals, notes input, remove button, service chip; **From/To columns** (before Event) with inline selects for per-unit window editing; To can be cleared to undefined (open-ended) |
@@ -196,7 +241,7 @@ These values are also persisted in a **localStorage cache** (see Standing Data C
 - **`refreshAllAggregates` in the store** — must be called whenever committed draft actions change. Replaces all former `refreshAggregates(...)` call sites: `commitDraft`, `discardDraft`, `reopenDraft`, `clearAllDrafts`, `setSettlementPeriods`, `removeUnitFromDraft`, `updateDraftWindow`, `updateUnitWindow`. Do not call `refreshAggregates` directly from these actions — it would skip recomputing non-Margin area availabilities.
 - **`settlementPeriod` in `SettlementPeriodData`** is the slot index 1–48, not the real SP number. All `ModellingAction.fromPeriod`/`toPeriod` comparisons use this slot index.
 - **`ModellingAction.toPeriod` is `number | undefined`** — `undefined` means open-ended (the action covers all SPs from `fromPeriod` to the end of the window). Every check against `toPeriod` must handle the undefined case: `(action.toPeriod === undefined || action.toPeriod >= spNum)`. Do not revert to `number` — the SelectedTable UI exposes a "clear To" option that sets it to undefined.
-- **`src/utils/fuelTypes.ts`** — two separate exclusion sets. `FETCH_EXCLUDED_FUEL_TYPES` prevents units from being fetched at all (solar, interconnectors, COAL, COALB). `EXCLUDED_FUEL_TYPES` is the display-only filter applied in `AvailableTable` (adds WIND, NUCLEAR on top). Keep both in sync when adding fuel types. COAL and COALB are in both sets — they are fetched but never displayed, and never committed to the unit list.
+- **`src/utils/fuelTypes.ts`** — two separate exclusion sets. `FETCH_EXCLUDED_FUEL_TYPES` prevents units from being fetched at all (solar, interconnectors, COAL, COALB). `EXCLUDED_FUEL_TYPES` is the display-only filter applied in `AvailableTable` (adds WIND, NUCLEAR, BATTERY on top). Keep both in sync when adding fuel types. COAL and COALB are in both sets — they are fetched but never displayed, and never committed to the unit list. **BATTERY is in `EXCLUDED_FUEL_TYPES` only** (not `FETCH_EXCLUDED_FUEL_TYPES`) — battery units are fetched and still feed `sp.pn`/EMX baseline, just hidden from Balancing's tables; they surface instead in the Battery section's Summary/Redeclare tabs.
 - **Standing data cache** — uses `localStorage` (keys `so:standing_data`, `so:sync_metadata`). Keep it in localStorage — it's per-browser by design and doesn't need cross-user sharing. Firestore is used elsewhere (`areaRequirements`) and is configured with `experimentalForceLongPolling: true` to handle environments where WebSocket connections to `firestore.googleapis.com` are blocked. The cache persists across sessions; a one-time backfill is sufficient for a given browser profile.
 - **Auto-sync in `fetchBmUnits`** — silently calls `runIncrementalSync()` before the `Promise.all` if `backfillComplete` is true and `lastSyncedTo` is more than 23 hours ago. It is intentionally silent (no UI feedback, error swallowed). Do not add loading state or toast for this — it runs in the background of a normal Refresh.
 - **Decommissioned unit filter in `fetchBmUnits`** — units where all four of `sel`, `ndz`, `mnzt`, `mzt` are `undefined` after merging live API + localStorage cache are skipped entirely (`continue`). This removes units that have never submitted standing data (mothballed / decommissioned). Do not remove this filter — the raw reference API returns ~1000+ units including long-decommissioned plant.
