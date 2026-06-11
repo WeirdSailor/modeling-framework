@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useModellingStore } from '@/store/useModellingStore'
-import type { ModellingAction, OperationType, UserId } from '@/models/types'
+import type { AppSection, ModellingAction, OperationType, UserId } from '@/models/types'
 import { fetchAllData, fetchHistoricalData } from '@/services/elexon'
 import { loadAreaRequirements, saveAreaRequirements } from '@/services/requirementsSync'
 import { dateToSp, dateToSettlementDate } from '@/utils/settlements'
@@ -62,6 +62,11 @@ export default function Home() {
   }, [tweaks.theme])
 
   const [activeTab, setActiveTab] = useState<Tab>('dashboard')
+  const [activeSection, setActiveSection] = useState<AppSection>('balancing')
+  const handleSectionChange = useCallback((section: AppSection) => {
+    setActiveSection(section)
+    setActiveTab('dashboard')
+  }, [])
   const [activeAreaTab, setActiveAreaTab] = useState<AreaId>('margin')
   const [hiddenDraftIds, setHiddenDraftIds] = useState<Set<string>>(new Set())
   const toggleDraftChartVisibility = useCallback((id: string) => {
@@ -460,9 +465,23 @@ export default function Home() {
           onToggleChartVisibility={toggleDraftChartVisibility}
           sidebarOpen={sidebarOpen}
           onToggleSidebar={() => setSidebarOpen(v => !v)}
+          activeSection={activeSection}
+          onSectionChange={handleSectionChange}
         />
       )}
 
+      {activeSection === 'battery' && (
+        <main className="workspace">
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            flex: 1, color: 'var(--text-faint)', fontSize: 14,
+          }}>
+            Battery Management — Coming soon
+          </div>
+        </main>
+      )}
+
+      {activeSection === 'balancing' && (
       <main className="workspace">
         {/* Tab bar */}
         <div className="tab-bar">
@@ -820,6 +839,7 @@ export default function Home() {
         )}
 
       </main>
+      )}
 
       {showConfig && (
         <ConfigPanel

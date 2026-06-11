@@ -62,6 +62,12 @@ export interface ModellingAction {
 export const USERS = ['ANSE', 'NSE', 'OSM', 'OEM', 'NBE', 'TSM', 'TSE'] as const
 export type UserId = typeof USERS[number]
 
+export type AppSection = 'balancing' | 'battery'
+export const APP_SECTIONS: { id: AppSection; label: string }[] = [
+  { id: 'balancing', label: 'Balancing' },
+  { id: 'battery',   label: 'Battery' },
+]
+
 export interface UnitSnapshot {
   mel: number;
   sel: number;

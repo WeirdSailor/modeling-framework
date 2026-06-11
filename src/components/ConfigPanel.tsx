@@ -4,6 +4,7 @@ import { useRef, useState } from 'react'
 import { SCENARIOS, GSP_AREAS, type ScenarioId } from '@/config/scenarios'
 import { spToTime, dateToSettlementDate } from '@/utils/settlements'
 import StandingDataTab from '@/components/StandingDataTab'
+import { SegControl } from '@/components/SegControl'
 
 // ── TweakState (moved here from TweaksPanel) ──────────────────────────────────
 
@@ -14,41 +15,6 @@ export interface TweakState {
   selectionPattern: 'buttons' | 'click'
   reservePct: number
   chartInteractionMode: 'drag' | 'twoClick' | 'deficit'
-}
-
-// ── Shared sub-components ─────────────────────────────────────────────────────
-
-function SegControl<T extends string>({
-  value, options, onChange,
-}: {
-  value: T
-  options: { value: T; label: string }[]
-  onChange: (v: T) => void
-}) {
-  const n = options.length
-  const idx = Math.max(0, options.findIndex(o => o.value === value))
-  return (
-    <div className="twk-seg">
-      <div
-        className="twk-seg-thumb"
-        style={{
-          left: `calc(2px + ${idx} * (100% - 4px) / ${n})`,
-          width: `calc((100% - 4px) / ${n})`,
-        }}
-      />
-      {options.map(o => (
-        <button
-          key={o.value}
-          type="button"
-          role="radio"
-          aria-checked={o.value === value}
-          onClick={() => onChange(o.value)}
-        >
-          {o.label}
-        </button>
-      ))}
-    </div>
-  )
 }
 
 function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {

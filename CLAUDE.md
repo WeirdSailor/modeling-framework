@@ -18,6 +18,23 @@ npx tsc --noEmit  # type check
 
 ---
 
+## App Sections (Balancing / Battery)
+
+The app is split into top-level **sections** via `AppSection` (`'balancing' | 'battery'`, defined in `src/models/types.ts` alongside `APP_SECTIONS`). A `SegControl` ("Balancing | Battery") sits at the top of `DraftSidebar`, above the identity picker — `activeSection` state lives in `page.tsx` (default `'balancing'`, not in Zustand).
+
+- **Balancing** — everything described in this document: the full tab set (Dashboard, Chart, Workspace, Committed, BMU Summary, Redeclare, Requirements), Config/Feedback buttons, Deficit Solver, etc. This is the entire pre-existing app, now wrapped in `{activeSection === 'balancing' && <main className="workspace">...}`.
+- **Battery** — currently a placeholder (`{activeSection === 'battery' && <main className="workspace">...}` rendering "Battery Management — Coming soon"). Future battery-management tabs/components will be added inside this branch.
+
+**Shared across both sections:**
+- The left sidebar (`DraftSidebar`) — identity picker, draft list, refresh, collapse — is always rendered regardless of `activeSection`.
+- All Zustand store state (`units`, `settlementPeriods`, `drafts`, etc.) — both sections read from the same store.
+
+**`handleSectionChange(section)`** in `page.tsx` sets `activeSection` and always resets `activeTab` to `'dashboard'` — sections do **not** remember each other's last-active tab independently. Do not add per-section tab memory without re-confirming this is still desired.
+
+`SegControl` was extracted from `ConfigPanel.tsx` into its own shared component (`src/components/SegControl.tsx`, exported) so `DraftSidebar` could reuse it. `ConfigPanel.tsx` now imports it instead of defining it locally. (`TweaksPanel.tsx` has its own unused copy — that file is dead code, not imported anywhere, and was left untouched.)
+
+---
+
 ## Current Architecture
 
 ### State — Zustand only (`src/store/useModellingStore.ts`)
@@ -143,8 +160,9 @@ These values are also persisted in a **localStorage cache** (see Standing Data C
 
 | File | Role |
 |------|------|
-| `src/app/page.tsx` | Top-level: data loading, layout, tab switching, derived data, confirm modals, sharing actions; owns `hiddenDraftIds` state for chart draft visibility; owns `solveTarget` state for the Deficit Solver; owns `activeAreaTab: AreaId` for Chart subtab; tab order: Dashboard \| Workspace \| Chart \| Committed \| Redeclare \| Requirements \| BMU Summary |
-| `src/components/DraftSidebar.tsx` | Identity picker ("You are: [NSE ▼]"), window time + Refresh, draft list filtered to current user, "Shared with me" collapsible section; coloured circle visibility toggle per active draft; collapse button (‹/›) at top; New Draft button pinned to bottom footer |
+| `src/app/page.tsx` | Top-level: data loading, layout, tab switching, derived data, confirm modals, sharing actions; owns `activeSection: AppSection` (Balancing/Battery, default `'balancing'`) and `handleSectionChange`; owns `hiddenDraftIds` state for chart draft visibility; owns `solveTarget` state for the Deficit Solver; owns `activeAreaTab: AreaId` for Chart subtab; tab order (Balancing section): Dashboard \| Workspace \| Chart \| Committed \| Redeclare \| Requirements \| BMU Summary |
+| `src/components/DraftSidebar.tsx` | "Balancing \| Battery" `SegControl` section switcher at top, then identity picker ("You are: [NSE ▼]"), window time + Refresh, draft list filtered to current user, "Shared with me" collapsible section; coloured circle visibility toggle per active draft; collapse button (‹/›) at top; New Draft button pinned to bottom footer |
+| `src/components/SegControl.tsx` | Shared pill-style segmented control (`twk-seg`/`twk-seg-thumb` CSS); used by `ConfigPanel` and `DraftSidebar`'s section switcher |
 | `src/components/DraftDetails.tsx` | Draft header: share icon (left of name, opens sharing popover), name input, description field (truncated, hover tooltip), From/To SP pickers + Scenario/GSP filter buttons in same row, action buttons; no cost/meta row, no state badge; From/To options display as `DD\|HH:MM`; accepts `solveMw?: number \| null` prop — shows a red "N MW deficit" badge when set |
 | `src/components/AvailableTable.tsx` | Available units table: sort, checkbox or click selection, type + service chips; no toolbar — Scenario/GSP filters live in DraftDetails and are passed as props; Select button appears in header only when rows are checked; **Deficit Solver**: `solveMode` + `solveMw` props enable covering-set pre-check (highlighted rows) |
 | `src/components/SelectedTable.tsx` | Selected units in active draft: Σ PN / Σ MEL / Est. value totals, notes input, remove button, service chip; **From/To columns** (before Event) with inline selects for per-unit window editing; To can be cleared to undefined (open-ended) |
@@ -160,7 +178,7 @@ These values are also persisted in a **localStorage cache** (see Standing Data C
 | `src/components/ConfirmModal.tsx` | Dark-mode-aware confirm dialog (replaces native browser confirm) |
 | `src/config/areas.ts` | `AreaId` union type (8 values), `AreaConfig` interface, `AREAS` array, `NON_MARGIN_AREAS`, `getArea(id)` |
 | `src/utils/areaAggregates.ts` | `unitAreaContribution`, `computeAreaAvailabilities`, `applyDraftToAreaBaseline`, `computeAreaStatus` — per-area contribution formulas and availability computation |
-| `src/models/types.ts` | All interfaces; `USERS`, `UserId`, `ServiceType`, `UnitSnapshot`, `AreaRequirementRow`; `SettlementPeriodData.areaAvailability?: Record<string, number>` |
+| `src/models/types.ts` | All interfaces; `USERS`, `UserId`, `ServiceType`, `UnitSnapshot`, `AreaRequirementRow`, `AppSection`, `APP_SECTIONS`; `SettlementPeriodData.areaAvailability?: Record<string, number>` |
 | `src/services/elexon.ts` | All fetch logic + mock fallback; auto-runs incremental standing data sync at start of `fetchBmUnits` when cache is stale; `fetchDemandOutturn` fetches INDO actual demand (used by `fetchHistoricalData` in place of the day-ahead forecast) |
 | `src/services/standingDataSync.ts` | localStorage-based standing data cache: backfill, incremental sync, coverage computation; keys `so:standing_data` and `so:sync_metadata` |
 | `src/services/requirementsSync.ts` | Firestore persistence for `areaRequirements`; single shared document `config/area_requirements`; `loadAreaRequirements()` on mount, `saveAreaRequirements()` debounced 500ms on every change |
@@ -210,6 +228,7 @@ These values are also persisted in a **localStorage cache** (see Standing Data C
 - **`handleSolveNavigate` auto-selects scenario from active area** — uses `getArea(activeAreaTab).defaultScenario` so the workspace scenario matches whichever area the operator solved from. Do not hardcode `'margin'`.
 - **`ModellingAction.reasonCode` no longer has `CONSTRAINT` or `RESERVE`** — replaced by `RECOVERY_RESERVE | FREQ_CONTROL_RESERVE | GENERAL_RESERVE | CONTINGENCY_RESERVE | RESPONSE`. Any switch/case on `reasonCode` in CommittedTab, SelectedTable, RedeclareTab must handle all 8 current codes and must not reference the removed ones.
 - **`SCENARIO_REASON` in `page.tsx` maps `pullback → 'MARGIN'`** — pullback has no dedicated reason code; it falls back to MARGIN. `reserve → 'RECOVERY_RESERVE'`, `response → 'RESPONSE'`.
+- **`activeSection` in `page.tsx` is local state, not Zustand** — same pattern as `reservePct`, `hiddenDraftIds`, `solveTarget`. `handleSectionChange` always resets `activeTab` to `'dashboard'` on switch (no per-section tab memory). The sidebar (`DraftSidebar`) is rendered unconditionally regardless of `activeSection` — do not gate it behind a section check.
 
 ---
 

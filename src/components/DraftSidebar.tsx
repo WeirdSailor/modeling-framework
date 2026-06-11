@@ -1,8 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import type { DraftPlan, SettlementPeriodData, UserId } from '@/models/types'
-import { USERS } from '@/models/types'
+import type { AppSection, DraftPlan, SettlementPeriodData, UserId } from '@/models/types'
+import { APP_SECTIONS, USERS } from '@/models/types'
+import { SegControl } from '@/components/SegControl'
 
 interface Props {
   drafts: DraftPlan[]
@@ -20,6 +21,8 @@ interface Props {
   onToggleChartVisibility: (id: string) => void
   sidebarOpen: boolean
   onToggleSidebar: () => void
+  activeSection: AppSection
+  onSectionChange: (section: AppSection) => void
 }
 
 function StateBadge({ status }: { status: DraftPlan['status'] }) {
@@ -93,6 +96,7 @@ export default function DraftSidebar({
   drafts, activeId, currentUser, onSelectUser, onSelect, onCreate,
   showArchive, setShowArchive, settlementPeriods, isLoading, onRefresh,
   hiddenDraftIds, onToggleChartVisibility, sidebarOpen, onToggleSidebar,
+  activeSection, onSectionChange,
 }: Props) {
   const [showCommitted, setShowCommitted] = useState(true)
   const [showShared, setShowShared] = useState(true)
@@ -128,6 +132,15 @@ export default function DraftSidebar({
             <span className="brand-title">BM Drafts</span>
             <span className="brand-sub">Balancing Mechanism</span>
           </div>
+        </div>
+
+        {/* Section switcher */}
+        <div style={{ margin: '8px 0 4px' }}>
+          <SegControl
+            value={activeSection}
+            options={APP_SECTIONS.map(s => ({ value: s.id, label: s.label }))}
+            onChange={onSectionChange}
+          />
         </div>
 
         {/* Identity picker */}
