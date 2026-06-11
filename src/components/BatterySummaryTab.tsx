@@ -300,17 +300,17 @@ export default function BatterySummaryTab({ units, settlementPeriods, unitServic
 
       {/* Table */}
       <div className="table-scroll" style={{ flex: 1 }}>
-        <table className="data-table">
+        <table className="data-table" style={{ tableLayout: 'fixed', width: '100%' }}>
           <thead>
             <tr>
-              <th>BMU</th>
-              <th style={{ width: 100 }}>Type</th>
-              <th style={{ width: 100 }}>Service</th>
-              <th className="num" style={{ width: 100 }}>PN</th>
-              <th className="num" style={{ width: 100 }}>MEL</th>
-              <th className="num" style={{ width: 100 }}>Avail.</th>
-              <th className="num" style={{ width: 100 }}>Cumulative</th>
-              <th className="num" style={{ width: 100 }}>£ MEL</th>
+              <th style={{ width: 220 }}>BMU</th>
+              <th>Type</th>
+              <th>Service</th>
+              <th className="num">PN</th>
+              <th className="num">MEL</th>
+              <th className="num">Avail.</th>
+              <th className="num">Cumulative</th>
+              <th className="num">£ MEL</th>
             </tr>
           </thead>
           <tbody>
