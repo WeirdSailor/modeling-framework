@@ -1,7 +1,7 @@
 import type { BMUnit, SettlementPeriodData } from '@/models/types'
 import { spToStartTime, dateToSp, dateToSettlementDate } from '@/utils/settlements'
 import { computeAggregates } from '@/utils/margin'
-import { FETCH_EXCLUDED_FUEL_TYPES } from '@/utils/fuelTypes'
+import { FETCH_EXCLUDED_FUEL_TYPES, isBatteryUnit } from '@/utils/fuelTypes'
 import { loadStandingDataCache, getSyncMetadata, runIncrementalSync } from '@/services/standingDataSync'
 
 // ---------------------------------------------------------------------------
@@ -11,7 +11,8 @@ import { loadStandingDataCache, getSyncMetadata, runIncrementalSync } from '@/se
 interface RawBmUnitRef {
   nationalGridBmUnit: string
   elexonBmUnit: string | null
-  fuelType: string
+  fuelType: string | null
+  bmUnitName: string | null
   generationCapacity: string
   demandCapacity: string
   gspGroupId: string
@@ -304,7 +305,7 @@ export async function fetchBmUnits(): Promise<BMUnit[]> {
     if (raw.bmUnitType !== 'T') continue
 
     // Exclude interconnectors and solar; keep WIND so Pullback scenario can use it
-    if (FETCH_EXCLUDED_FUEL_TYPES.has(raw.fuelType)) continue
+    if (raw.fuelType !== null && FETCH_EXCLUDED_FUEL_TYPES.has(raw.fuelType)) continue
 
     // Only units with positive generation capacity
     const cap = parseFloat(raw.generationCapacity)
@@ -330,10 +331,14 @@ export async function fetchBmUnits(): Promise<BMUnit[]> {
     // Skip units with no standing data across all 4 params — decommissioned / never registered
     if (sel === undefined && ndz === undefined && mnzt === undefined && mzt === undefined) continue
 
+    const fuelType = isBatteryUnit(raw.fuelType, raw.nationalGridBmUnit, raw.bmUnitName)
+      ? 'BATTERY'
+      : (raw.fuelType ?? 'OTHER')
+
     units.push({
       bmUnitId,
       nationalGridBmUnit: raw.nationalGridBmUnit,
-      fuelType: raw.fuelType,
+      fuelType,
       registeredCapacity: Math.round(cap),
       gspGroup: raw.gspGroupId,
       sel,

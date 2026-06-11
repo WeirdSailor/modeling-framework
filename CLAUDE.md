@@ -43,6 +43,7 @@ The app is split into top-level **sections** via `AppSection` (`'balancing' | 'b
 
 - Added to `EXCLUDED_FUEL_TYPES` in `src/utils/fuelTypes.ts` — battery units are hidden from Balancing's `AvailableTable`/`SelectedTable` (display filter only).
 - **Not** added to `FETCH_EXCLUDED_FUEL_TYPES` — battery units are still fetched normally and still contribute to `sp.pn`/EMX/EOL/EMI via `computeAggregates` (which iterates `sp.pn` directly, unaffected by the display filter).
+- **`'BATTERY'` is never returned by Elexon's reference API** — real BESS units come back with `fuelType: 'OTHER'` or `null` (a value also used by some non-battery units, e.g. solar farms). `fetchBmUnits` (`elexon.ts`) derives `fuelType: 'BATTERY'` itself via `isBatteryUnit(fuelType, nationalGridBmUnit, bmUnitName)` in `fuelTypes.ts`: true when the raw `fuelType` is `'OTHER'`/`null` AND either `nationalGridBmUnit` ends in `B-<digits>` (e.g. `PILLB-1`, `KILSB-3`, `COALB-1`) or `bmUnitName` matches `/batt|bess|storage/i`. The `B-\d+` suffix check is gated on `OTHER`/`null` fuelType specifically because some CCGT/NUCLEAR units (`SEAB-1`, `WBURB-1/2/3`, `HUNB-7/8`, `SIZB-1/2`) also end in `B-<digits>`. Non-battery units with raw `fuelType: null` are normalized to `'OTHER'` (a real Elexon value) instead of `null`.
 
 ### Summary tab (`src/components/BatterySummaryTab.tsx`)
 
