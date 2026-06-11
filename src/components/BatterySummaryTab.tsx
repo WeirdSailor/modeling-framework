@@ -304,8 +304,8 @@ export default function BatterySummaryTab({ units, settlementPeriods, unitServic
           <thead>
             <tr>
               <th>BMU</th>
-              <th>Type</th>
-              <th>Service</th>
+              <th style={{ width: 100 }}>Type</th>
+              <th style={{ width: 100 }}>Service</th>
               <th className="num" style={{ width: 100 }}>PN</th>
               <th className="num" style={{ width: 100 }}>MEL</th>
               <th className="num" style={{ width: 100 }}>Avail.</th>
