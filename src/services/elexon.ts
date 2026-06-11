@@ -301,8 +301,11 @@ export async function fetchBmUnits(): Promise<BMUnit[]> {
   const units: BMUnit[] = []
 
   for (const raw of refRaw) {
-    // Only transmission-connected units (T_ prefix)
-    if (raw.bmUnitType !== 'T') continue
+    const isBattery = isBatteryUnit(raw.fuelType, raw.nationalGridBmUnit, raw.bmUnitName)
+
+    // Transmission-connected units (T_ prefix), plus embedded (E_) battery
+    // storage sites — most grid-scale BESS are embedded, not transmission.
+    if (raw.bmUnitType !== 'T' && !(raw.bmUnitType === 'E' && isBattery)) continue
 
     // Exclude interconnectors and solar; keep WIND so Pullback scenario can use it
     if (raw.fuelType !== null && FETCH_EXCLUDED_FUEL_TYPES.has(raw.fuelType)) continue
@@ -328,12 +331,12 @@ export async function fetchBmUnits(): Promise<BMUnit[]> {
     const mnzt = mnztEntry?.periodMin !== undefined ? mnztEntry.periodMin : cached?.mnzt
     const mzt  = mztEntry?.periodMin  !== undefined ? mztEntry.periodMin  : cached?.mzt
 
-    // Skip units with no standing data across all 4 params — decommissioned / never registered
-    if (sel === undefined && ndz === undefined && mnzt === undefined && mzt === undefined) continue
+    // Skip units with no standing data across all 4 params — decommissioned / never registered.
+    // Battery units are exempt: embedded BESS sites structurally don't submit
+    // SEL/NDZ/MNZT/MZT via these endpoints, so this would otherwise drop all of them.
+    if (!isBattery && sel === undefined && ndz === undefined && mnzt === undefined && mzt === undefined) continue
 
-    const fuelType = isBatteryUnit(raw.fuelType, raw.nationalGridBmUnit, raw.bmUnitName)
-      ? 'BATTERY'
-      : (raw.fuelType ?? 'OTHER')
+    const fuelType = isBattery ? 'BATTERY' : (raw.fuelType ?? 'OTHER')
 
     units.push({
       bmUnitId,
