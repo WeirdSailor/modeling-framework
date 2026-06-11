@@ -39,6 +39,9 @@ serviceAccountKey.json
 # Git worktrees
 .worktrees/
 
+# Superpowers brainstorm sessions
+.superpowers/
+
 # vercel
 .vercel
 
