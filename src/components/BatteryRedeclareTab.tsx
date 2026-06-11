@@ -13,7 +13,6 @@ interface Props {
 interface BatteryRedeclareRow {
   bmUnitId: string
   nationalGridBmUnit: string
-  gspGroup: string
   ndz: number
   mzt: number
   mnzt: number
@@ -28,7 +27,6 @@ export default function BatteryRedeclareTab({ units, unitPnByBmUnit, unitService
   const rows = useMemo<BatteryRedeclareRow[]>(() => units.map(u => ({
     bmUnitId: u.bmUnitId,
     nationalGridBmUnit: u.nationalGridBmUnit,
-    gspGroup: u.gspGroup,
     ndz: u.ndz ?? 0,
     mzt: u.mzt ?? 0,
     mnzt: u.mnzt ?? 0,
@@ -89,7 +87,6 @@ export default function BatteryRedeclareTab({ units, unitPnByBmUnit, unitService
                 <td className="mono">
                   <div className="bmu-cell-inner">
                     <span>{row.nationalGridBmUnit}</span>
-                    <span className="site-sub">{row.gspGroup}</span>
                   </div>
                 </td>
                 <td><span className="chip chip-battery">Battery</span></td>

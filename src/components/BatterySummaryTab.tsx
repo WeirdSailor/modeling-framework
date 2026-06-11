@@ -336,7 +336,6 @@ export default function BatterySummaryTab({ units, settlementPeriods, unitServic
                 <td className="mono">
                   <div className="bmu-cell-inner">
                     <span>{row.nationalGridBmUnit}</span>
-                    <span className="site-sub">{row.gspGroup}</span>
                   </div>
                 </td>
                 <td><TypeChip /></td>
