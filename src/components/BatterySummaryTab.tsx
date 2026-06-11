@@ -306,11 +306,11 @@ export default function BatterySummaryTab({ units, settlementPeriods, unitServic
               <th>BMU</th>
               <th>Type</th>
               <th>Service</th>
-              <th className="num">PN</th>
-              <th className="num">MEL</th>
-              <th className="num">Avail.</th>
-              <th className="num">Cumulative</th>
-              <th className="num">£ MEL</th>
+              <th className="num" style={{ width: 100 }}>PN</th>
+              <th className="num" style={{ width: 100 }}>MEL</th>
+              <th className="num" style={{ width: 100 }}>Avail.</th>
+              <th className="num" style={{ width: 100 }}>Cumulative</th>
+              <th className="num" style={{ width: 100 }}>£ MEL</th>
             </tr>
           </thead>
           <tbody>
