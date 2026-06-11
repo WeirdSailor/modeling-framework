@@ -497,22 +497,25 @@ export default function Home() {
             </button>
           </div>
 
-          {activeBatteryTab === 'summary' && (
+          {/* Both tabs stay mounted so BatterySummaryTab's local filter state
+              (GSP/AS Services filters, timeframe, card selection) survives
+              switching to Redeclare and back. */}
+          <div style={{ display: activeBatteryTab === 'summary' ? 'flex' : 'none', flexDirection: 'column', flex: 1, minHeight: 0 }}>
             <BatterySummaryTab
               units={batteryUnits}
               settlementPeriods={settlementPeriods}
               unitServices={unitServices}
             />
-          )}
+          </div>
 
-          {activeBatteryTab === 'redeclare' && (
+          <div style={{ display: activeBatteryTab === 'redeclare' ? 'flex' : 'none', flexDirection: 'column', flex: 1, minHeight: 0 }}>
             <BatteryRedeclareTab
               units={batteryUnits}
               unitPnByBmUnit={unitPnByBmUnit}
               unitServices={unitServices}
               onSetService={setUnitService}
             />
-          )}
+          </div>
         </main>
       )}
 
