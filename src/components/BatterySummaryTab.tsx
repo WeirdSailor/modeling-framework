@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from 'react'
 import type { BMUnit, ServiceType, SettlementPeriodData } from '@/models/types'
 import { GSP_AREAS } from '@/config/scenarios'
 import { GspFilterPopover, usePopoverDismiss } from '@/components/GspFilterPopover'
+import { maxBatteryPn } from '@/utils/batteryPn'
 
 interface Props {
   units: BMUnit[]
@@ -88,14 +89,9 @@ interface BatteryRow {
   bmUnitId: string
   nationalGridBmUnit: string
   gspGroup: string
-  ndz: number
-  mzt: number
-  mnzt: number
-  sel: number
   mel: number
-  priceToSel: number
   priceToMel: number
-  pn: number
+  pn: number | undefined
   capacity: number
 }
 
@@ -117,25 +113,16 @@ export default function BatterySummaryTab({ units, settlementPeriods, unitServic
       .slice(0, spCount)
 
     return units.map(u => {
-      let worstPn = 0
-      for (const sp of windowSps) {
-        const pn = sp.pn[u.bmUnitId] ?? 0
-        if (pn > worstPn) worstPn = pn
-      }
+      const worstPn = maxBatteryPn(u.bmUnitId, windowSps)
       const mel = u.registeredCapacity ?? 0
       return {
         bmUnitId: u.bmUnitId,
         nationalGridBmUnit: u.nationalGridBmUnit,
         gspGroup: u.gspGroup,
-        ndz: u.ndz ?? 0,
-        mzt: u.mzt ?? 0,
-        mnzt: u.mnzt ?? 0,
-        sel: u.sel ?? 0,
         mel,
-        priceToSel: u.priceToSel ?? 0,
         priceToMel: u.priceToMel ?? 0,
         pn: worstPn,
-        capacity: Math.max(0, mel - worstPn),
+        capacity: Math.max(0, mel - (worstPn ?? 0)),
       }
     })
   }, [units, settlementPeriods, spCount])
@@ -319,38 +306,36 @@ export default function BatterySummaryTab({ units, settlementPeriods, unitServic
               <th>BMU</th>
               <th>Type</th>
               <th>Service</th>
-              <th className="num">NDZ</th>
-              <th className="num">MZT</th>
-              <th className="num">MNZT</th>
-              <th className="num">SEL</th>
-              <th className="num">MEL</th>
-              <th className="num">£ SEL</th>
-              <th className="num">£ MEL</th>
               <th className="num">PN</th>
-              <th className="num">Capacity</th>
+              <th className="num">MEL</th>
+              <th className="num">Avail.</th>
+              <th className="num">Cumulative</th>
+              <th className="num">£ MEL</th>
             </tr>
           </thead>
           <tbody>
-            {visibleRows.map(row => (
-              <tr key={row.bmUnitId}>
-                <td className="mono">
-                  <div className="bmu-cell-inner">
-                    <span>{row.nationalGridBmUnit}</span>
-                  </div>
-                </td>
-                <td><TypeChip /></td>
-                <td><ServiceChip service={row.service} /></td>
-                <td className="mono num">{row.ndz > 0 ? row.ndz : '—'}</td>
-                <td className="mono num">{row.mzt > 0 ? row.mzt : '—'}</td>
-                <td className="mono num">{row.mnzt > 0 ? row.mnzt : '—'}</td>
-                <td className="mono num">{row.sel > 0 ? row.sel.toFixed(0) : '—'}</td>
-                <td className="mono num">{row.mel > 0 ? row.mel.toFixed(0) : '—'}</td>
-                <td className="mono num">{row.priceToSel > 0 ? `£${row.priceToSel}` : '—'}</td>
-                <td className="mono num">{row.priceToMel > 0 ? `£${row.priceToMel}` : '—'}</td>
-                <td className="mono num">{row.pn > 0 ? row.pn.toFixed(0) : '—'}</td>
-                <td className="mono num">{row.capacity.toFixed(0)}</td>
-              </tr>
-            ))}
+            {(() => {
+              let cumulative = 0
+              return visibleRows.map(row => {
+                cumulative += row.capacity
+                return (
+                  <tr key={row.bmUnitId}>
+                    <td className="mono">
+                      <div className="bmu-cell-inner">
+                        <span>{row.nationalGridBmUnit}</span>
+                      </div>
+                    </td>
+                    <td><TypeChip /></td>
+                    <td><ServiceChip service={row.service} /></td>
+                    <td className="mono num">{row.pn !== undefined ? row.pn.toFixed(0) : '—'}</td>
+                    <td className="mono num">{row.mel > 0 ? row.mel.toFixed(0) : '—'}</td>
+                    <td className="mono num">{row.capacity.toFixed(0)}</td>
+                    <td className="mono num">{cumulative.toFixed(0)}</td>
+                    <td className="mono num">{row.priceToMel > 0 ? `£${row.priceToMel}` : '—'}</td>
+                  </tr>
+                )
+              })
+            })()}
           </tbody>
         </table>
       </div>

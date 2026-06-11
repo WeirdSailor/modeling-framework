@@ -511,7 +511,7 @@ export default function Home() {
           <div style={{ display: activeBatteryTab === 'redeclare' ? 'flex' : 'none', flexDirection: 'column', flex: 1, minHeight: 0 }}>
             <BatteryRedeclareTab
               units={batteryUnits}
-              unitPnByBmUnit={unitPnByBmUnit}
+              settlementPeriods={settlementPeriods}
               unitServices={unitServices}
               onSetService={setUnitService}
             />

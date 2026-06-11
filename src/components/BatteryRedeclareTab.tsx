@@ -1,11 +1,12 @@
 'use client'
 
 import { useMemo } from 'react'
-import type { BMUnit, ServiceType } from '@/models/types'
+import type { BMUnit, ServiceType, SettlementPeriodData } from '@/models/types'
+import { maxBatteryPn } from '@/utils/batteryPn'
 
 interface Props {
   units: BMUnit[]
-  unitPnByBmUnit: Record<string, number>
+  settlementPeriods: SettlementPeriodData[]
   unitServices: Record<string, ServiceType>
   onSetService: (bmUnitId: string, service: ServiceType | undefined) => void
 }
@@ -20,10 +21,10 @@ interface BatteryRedeclareRow {
   mel: number
   priceToSel: number
   priceToMel: number
-  pn: number
+  pn: number | undefined
 }
 
-export default function BatteryRedeclareTab({ units, unitPnByBmUnit, unitServices, onSetService }: Props) {
+export default function BatteryRedeclareTab({ units, settlementPeriods, unitServices, onSetService }: Props) {
   const rows = useMemo<BatteryRedeclareRow[]>(() => units.map(u => ({
     bmUnitId: u.bmUnitId,
     nationalGridBmUnit: u.nationalGridBmUnit,
@@ -34,8 +35,8 @@ export default function BatteryRedeclareTab({ units, unitPnByBmUnit, unitService
     mel: u.registeredCapacity ?? 0,
     priceToSel: u.priceToSel ?? 0,
     priceToMel: u.priceToMel ?? 0,
-    pn: unitPnByBmUnit[u.bmUnitId] ?? 0,
-  })), [units, unitPnByBmUnit])
+    pn: maxBatteryPn(u.bmUnitId, settlementPeriods),
+  })), [units, settlementPeriods])
 
   if (rows.length === 0) {
     return (
@@ -108,7 +109,7 @@ export default function BatteryRedeclareTab({ units, unitPnByBmUnit, unitService
                 <td className="mono num">{row.mel > 0 ? row.mel.toFixed(0) : '—'}</td>
                 <td className="mono num">{row.priceToSel > 0 ? `£${row.priceToSel}` : '—'}</td>
                 <td className="mono num">{row.priceToMel > 0 ? `£${row.priceToMel}` : '—'}</td>
-                <td className="mono num">{row.pn > 0 ? row.pn.toFixed(0) : '—'}</td>
+                <td className="mono num">{row.pn !== undefined ? row.pn.toFixed(0) : '—'}</td>
               </tr>
             ))}
           </tbody>
