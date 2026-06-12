@@ -3,21 +3,22 @@
 import { useMemo, useRef, useState } from 'react'
 import type { BMUnit, ServiceType, SettlementPeriodData } from '@/models/types'
 import { GSP_AREAS } from '@/config/scenarios'
-import { GspFilterPopover, usePopoverDismiss } from '@/components/GspFilterPopover'
-import { maxBatteryPn } from '@/utils/batteryPn'
+import { GspFilterPopover } from '@/components/GspFilterPopover'
+import { TIMEFRAME_OPTIONS, AsServicesPopover, type AsServicesFilter } from '@/components/BatteryFilters'
+import { computeBatteryAvailability } from '@/utils/batteryAvailability'
+import { computeBatteryReliability } from '@/utils/batteryReliability'
 
 interface Props {
   units: BMUnit[]
   settlementPeriods: SettlementPeriodData[]
   unitServices: Record<string, ServiceType>
+  gspFilter: Record<string, 'include' | 'exclude'>
+  onGspFilterChange: (f: Record<string, 'include' | 'exclude'>) => void
+  asFilter: AsServicesFilter
+  onAsFilterChange: (f: AsServicesFilter) => void
+  tfIndex: number
+  onTfIndexChange: (i: number) => void
 }
-
-const TIMEFRAME_OPTIONS = [
-  { label: 'Next 30 min',  spCount: 1 },
-  { label: 'Next 1 hour',  spCount: 2 },
-  { label: 'Next 1.5 hours', spCount: 3 },
-  { label: 'Next 2 hours', spCount: 4 },
-]
 
 type CardId = 'total' | 'contracted' | 'constrained' | 'usable'
 
@@ -48,57 +49,10 @@ function formatMw(value: number): string {
   return `${Math.round(value).toLocaleString()} MW`
 }
 
-function AsServicesPopover({ filter, onChange, onClose, wrapperRef }: {
-  filter: { sr: boolean; qr: boolean }
-  onChange: (f: { sr: boolean; qr: boolean }) => void
-  onClose: () => void
-  wrapperRef: React.RefObject<HTMLDivElement | null>
-}) {
-  const ref = useRef<HTMLDivElement>(null)
-  usePopoverDismiss(ref, wrapperRef, onClose)
-
-  return (
-    <div ref={ref} style={{
-      position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 50,
-      background: 'var(--bg-panel)', border: '1px solid var(--border-strong)',
-      borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,.35)', width: 220, overflow: 'hidden',
-    }}>
-      <div style={{ padding: '7px 12px', borderBottom: '1px solid var(--border)' }}>
-        <span style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--text-faint)' }}>
-          Treat as contracted
-        </span>
-      </div>
-      {(['sr', 'qr'] as const).map(key => (
-        <label key={key} style={{
-          display: 'flex', alignItems: 'center', gap: 8,
-          padding: '7px 12px', fontSize: 12.5, color: 'var(--text)', cursor: 'pointer',
-        }}>
-          <input
-            type="checkbox"
-            checked={filter[key]}
-            onChange={e => onChange({ ...filter, [key]: e.target.checked })}
-          />
-          {key.toUpperCase()} units
-        </label>
-      ))}
-    </div>
-  )
-}
-
-interface BatteryRow {
-  bmUnitId: string
-  nationalGridBmUnit: string
-  gspGroup: string
-  mel: number
-  priceToMel: number
-  pn: number | undefined
-  capacity: number
-}
-
-export default function BatterySummaryTab({ units, settlementPeriods, unitServices }: Props) {
-  const [gspFilter, setGspFilter] = useState<Record<string, 'include' | 'exclude'>>({})
-  const [asFilter, setAsFilter] = useState<{ sr: boolean; qr: boolean }>({ sr: false, qr: false })
-  const [tfIndex, setTfIndex] = useState(0)
+export default function BatterySummaryTab({
+  units, settlementPeriods, unitServices,
+  gspFilter, onGspFilterChange, asFilter, onAsFilterChange, tfIndex, onTfIndexChange,
+}: Props) {
   const [selectedCard, setSelectedCard] = useState<CardId | null>(null)
   const [gspOpen, setGspOpen] = useState(false)
   const [asOpen, setAsOpen] = useState(false)
@@ -107,51 +61,25 @@ export default function BatterySummaryTab({ units, settlementPeriods, unitServic
 
   const { spCount } = TIMEFRAME_OPTIONS[tfIndex]
 
-  const rows = useMemo<BatteryRow[]>(() => {
-    const windowSps = [...settlementPeriods]
-      .sort((a, b) => a.settlementPeriod - b.settlementPeriod)
-      .slice(0, spCount)
-
-    return units.map(u => {
-      const worstPn = maxBatteryPn(u.bmUnitId, windowSps)
-      const mel = u.registeredCapacity ?? 0
-      return {
-        bmUnitId: u.bmUnitId,
-        nationalGridBmUnit: u.nationalGridBmUnit,
-        gspGroup: u.gspGroup,
-        mel,
-        priceToMel: u.priceToMel ?? 0,
-        pn: worstPn,
-        capacity: Math.max(0, mel - (worstPn ?? 0)),
-      }
-    })
-  }, [units, settlementPeriods, spCount])
+  const rows = useMemo(
+    () => computeBatteryAvailability(units, settlementPeriods, spCount),
+    [units, settlementPeriods, spCount]
+  )
 
   const gspIncluded = useMemo(() => Object.entries(gspFilter).filter(([, v]) => v === 'include').map(([k]) => k), [gspFilter])
   const gspExcluded = useMemo(() => Object.entries(gspFilter).filter(([, v]) => v === 'exclude').map(([k]) => k), [gspFilter])
 
-  function isConstrained(gspGroup: string): boolean {
-    if (gspIncluded.length > 0 && !gspIncluded.includes(gspGroup)) return true
-    if (gspExcluded.includes(gspGroup)) return true
-    return false
-  }
+  const classified = useMemo(
+    () => computeBatteryReliability(rows, gspFilter, asFilter, unitServices, 0, 0).rows,
+    [rows, gspFilter, asFilter, unitServices]
+  )
 
-  const classified = useMemo(() => rows.map(r => {
-    const constrained = isConstrained(r.gspGroup)
-    const service = unitServices[r.bmUnitId]
-    const contracted = !constrained && (
-      (service === 'SR' && asFilter.sr) || (service === 'QR' && asFilter.qr)
-    )
-    const usable = !constrained && !contracted
-    return { ...r, constrained, contracted, usable, service }
-  }), [rows, gspIncluded, gspExcluded, unitServices, asFilter])
-
-  const sumCapacity = (list: typeof classified) => list.reduce((s, r) => s + r.capacity, 0)
+  const sumCapacity = (list: typeof classified) => list.reduce((s, r) => s + r.avail, 0)
 
   const totalRows = classified
   const constrainedRows = classified.filter(r => r.constrained)
   const contractedRows = classified.filter(r => r.contracted)
-  const usableRows = classified.filter(r => r.usable)
+  const usableRows = classified.filter(r => r.included)
 
   const cardData: Record<CardId, { rows: typeof classified; sum: number }> = {
     total:       { rows: totalRows,       sum: sumCapacity(totalRows) },
@@ -209,7 +137,7 @@ export default function BatterySummaryTab({ units, settlementPeriods, unitServic
                 {incCount > 0 && <span style={{ background: '#4f46e5', color: '#fff', fontSize: 10, borderRadius: 999, padding: '1px 5px', fontWeight: 600 }}>+{incCount}</span>}
                 {excCount > 0 && <span style={{ background: '#dc2626', color: '#fff', fontSize: 10, borderRadius: 999, padding: '1px 5px', fontWeight: 600 }}>−{excCount}</span>}
               </button>
-              {gspOpen && <GspFilterPopover gspFilter={gspFilter} onChange={setGspFilter} onClose={() => setGspOpen(false)} wrapperRef={gspWrapperRef} />}
+              {gspOpen && <GspFilterPopover gspFilter={gspFilter} onChange={onGspFilterChange} onClose={() => setGspOpen(false)} wrapperRef={gspWrapperRef} />}
             </div>
           )
         })()}
@@ -230,7 +158,7 @@ export default function BatterySummaryTab({ units, settlementPeriods, unitServic
                 AS Services ▾
                 {count > 0 && <span style={{ background: '#4f46e5', color: '#fff', fontSize: 10, borderRadius: 999, padding: '1px 5px', fontWeight: 600 }}>{count}</span>}
               </button>
-              {asOpen && <AsServicesPopover filter={asFilter} onChange={setAsFilter} onClose={() => setAsOpen(false)} wrapperRef={asWrapperRef} />}
+              {asOpen && <AsServicesPopover filter={asFilter} onChange={onAsFilterChange} onClose={() => setAsOpen(false)} wrapperRef={asWrapperRef} />}
             </div>
           )
         })()}
@@ -240,7 +168,7 @@ export default function BatterySummaryTab({ units, settlementPeriods, unitServic
           {TIMEFRAME_OPTIONS.map((opt, i) => (
             <button
               key={opt.label}
-              onClick={() => setTfIndex(i)}
+              onClick={() => onTfIndexChange(i)}
               style={{
                 padding: '3px 10px', borderRadius: 4, fontSize: 11, cursor: 'pointer',
                 background: tfIndex === i ? 'var(--accent,#6366f1)' : 'var(--surface)',
@@ -317,7 +245,7 @@ export default function BatterySummaryTab({ units, settlementPeriods, unitServic
             {(() => {
               let cumulative = 0
               return visibleRows.map(row => {
-                cumulative += row.capacity
+                cumulative += row.avail
                 return (
                   <tr key={row.bmUnitId}>
                     <td className="mono">
@@ -329,7 +257,7 @@ export default function BatterySummaryTab({ units, settlementPeriods, unitServic
                     <td><ServiceChip service={row.service} /></td>
                     <td className="mono num">{row.pn !== undefined ? row.pn.toFixed(0) : '—'}</td>
                     <td className="mono num">{row.mel > 0 ? row.mel.toFixed(0) : '—'}</td>
-                    <td className="mono num">{row.capacity.toFixed(0)}</td>
+                    <td className="mono num">{row.avail.toFixed(0)}</td>
                     <td className="mono num">{cumulative.toFixed(0)}</td>
                     <td className="mono num">{row.priceToMel > 0 ? `£${row.priceToMel}` : '—'}</td>
                   </tr>
