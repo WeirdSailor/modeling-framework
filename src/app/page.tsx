@@ -20,6 +20,7 @@ import CommittedTab from '@/components/CommittedTab'
 import RedeclareTab from '@/components/RedeclareTab'
 import BatterySummaryTab from '@/components/BatterySummaryTab'
 import BatteryRedeclareTab from '@/components/BatteryRedeclareTab'
+import type { AsServicesFilter } from '@/components/BatteryFilters'
 import GraphTab from '@/components/GraphTab'
 import RequirementsTab from '@/components/RequirementsTab'
 import Dashboard from '@/components/Dashboard'
@@ -89,6 +90,9 @@ export default function Home() {
   const [voltageArea, setVoltageArea] = useState('')
   const [scenario, setScenario] = useState('none')
   const [gspFilter, setGspFilter] = useState<Record<string, 'include' | 'exclude'>>({})
+  const [batteryGspFilter, setBatteryGspFilter] = useState<Record<string, 'include' | 'exclude'>>({})
+  const [batteryAsFilter, setBatteryAsFilter] = useState<AsServicesFilter>({ sr: false, qr: false })
+  const [batteryTfIndex, setBatteryTfIndex] = useState(0)
   const [solveTarget, setSolveTarget] = useState<{
     fromSp: number
     toSp: number
@@ -505,6 +509,12 @@ export default function Home() {
               units={batteryUnits}
               settlementPeriods={settlementPeriods}
               unitServices={unitServices}
+              gspFilter={batteryGspFilter}
+              onGspFilterChange={setBatteryGspFilter}
+              asFilter={batteryAsFilter}
+              onAsFilterChange={setBatteryAsFilter}
+              tfIndex={batteryTfIndex}
+              onTfIndexChange={setBatteryTfIndex}
             />
           </div>
 

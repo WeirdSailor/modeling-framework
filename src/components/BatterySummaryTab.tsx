@@ -11,6 +11,12 @@ interface Props {
   units: BMUnit[]
   settlementPeriods: SettlementPeriodData[]
   unitServices: Record<string, ServiceType>
+  gspFilter: Record<string, 'include' | 'exclude'>
+  onGspFilterChange: (f: Record<string, 'include' | 'exclude'>) => void
+  asFilter: AsServicesFilter
+  onAsFilterChange: (f: AsServicesFilter) => void
+  tfIndex: number
+  onTfIndexChange: (i: number) => void
 }
 
 type CardId = 'total' | 'contracted' | 'constrained' | 'usable'
@@ -42,10 +48,10 @@ function formatMw(value: number): string {
   return `${Math.round(value).toLocaleString()} MW`
 }
 
-export default function BatterySummaryTab({ units, settlementPeriods, unitServices }: Props) {
-  const [gspFilter, setGspFilter] = useState<Record<string, 'include' | 'exclude'>>({})
-  const [asFilter, setAsFilter] = useState<AsServicesFilter>({ sr: false, qr: false })
-  const [tfIndex, setTfIndex] = useState(0)
+export default function BatterySummaryTab({
+  units, settlementPeriods, unitServices,
+  gspFilter, onGspFilterChange, asFilter, onAsFilterChange, tfIndex, onTfIndexChange,
+}: Props) {
   const [selectedCard, setSelectedCard] = useState<CardId | null>(null)
   const [gspOpen, setGspOpen] = useState(false)
   const [asOpen, setAsOpen] = useState(false)
@@ -141,7 +147,7 @@ export default function BatterySummaryTab({ units, settlementPeriods, unitServic
                 {incCount > 0 && <span style={{ background: '#4f46e5', color: '#fff', fontSize: 10, borderRadius: 999, padding: '1px 5px', fontWeight: 600 }}>+{incCount}</span>}
                 {excCount > 0 && <span style={{ background: '#dc2626', color: '#fff', fontSize: 10, borderRadius: 999, padding: '1px 5px', fontWeight: 600 }}>−{excCount}</span>}
               </button>
-              {gspOpen && <GspFilterPopover gspFilter={gspFilter} onChange={setGspFilter} onClose={() => setGspOpen(false)} wrapperRef={gspWrapperRef} />}
+              {gspOpen && <GspFilterPopover gspFilter={gspFilter} onChange={onGspFilterChange} onClose={() => setGspOpen(false)} wrapperRef={gspWrapperRef} />}
             </div>
           )
         })()}
@@ -162,7 +168,7 @@ export default function BatterySummaryTab({ units, settlementPeriods, unitServic
                 AS Services ▾
                 {count > 0 && <span style={{ background: '#4f46e5', color: '#fff', fontSize: 10, borderRadius: 999, padding: '1px 5px', fontWeight: 600 }}>{count}</span>}
               </button>
-              {asOpen && <AsServicesPopover filter={asFilter} onChange={setAsFilter} onClose={() => setAsOpen(false)} wrapperRef={asWrapperRef} />}
+              {asOpen && <AsServicesPopover filter={asFilter} onChange={onAsFilterChange} onClose={() => setAsOpen(false)} wrapperRef={asWrapperRef} />}
             </div>
           )
         })()}
@@ -172,7 +178,7 @@ export default function BatterySummaryTab({ units, settlementPeriods, unitServic
           {TIMEFRAME_OPTIONS.map((opt, i) => (
             <button
               key={opt.label}
-              onClick={() => setTfIndex(i)}
+              onClick={() => onTfIndexChange(i)}
               style={{
                 padding: '3px 10px', borderRadius: 4, fontSize: 11, cursor: 'pointer',
                 background: tfIndex === i ? 'var(--accent,#6366f1)' : 'var(--surface)',
