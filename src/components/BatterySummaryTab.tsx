@@ -20,12 +20,13 @@ interface Props {
   onTfIndexChange: (i: number) => void
 }
 
-type CardId = 'total' | 'contracted' | 'constrained' | 'usable'
+type CardId = 'total' | 'contracted' | 'constrained' | 'highPrice' | 'usable'
 
 const CARD_COLORS: Record<CardId, string> = {
   total:       '#58a6ff',
   contracted:  '#8b5cf6',
   constrained: '#ef4444',
+  highPrice:   '#f59e0b',
   usable:      '#22c55e',
 }
 
@@ -33,6 +34,7 @@ const CARD_LABELS: Record<CardId, string> = {
   total:       'Total',
   contracted:  'Contracted',
   constrained: 'Constrained',
+  highPrice:   'High Price',
   usable:      'Usable',
 }
 
@@ -56,6 +58,7 @@ export default function BatterySummaryTab({
   const [selectedCard, setSelectedCard] = useState<CardId | null>(null)
   const [gspOpen, setGspOpen] = useState(false)
   const [asOpen, setAsOpen] = useState(false)
+  const [priceThreshold, setPriceThreshold] = useState('')
   const gspWrapperRef = useRef<HTMLDivElement>(null)
   const asWrapperRef = useRef<HTMLDivElement>(null)
 
@@ -69,9 +72,11 @@ export default function BatterySummaryTab({
   const gspIncluded = useMemo(() => Object.entries(gspFilter).filter(([, v]) => v === 'include').map(([k]) => k), [gspFilter])
   const gspExcluded = useMemo(() => Object.entries(gspFilter).filter(([, v]) => v === 'exclude').map(([k]) => k), [gspFilter])
 
+  const numericPriceThreshold = priceThreshold === '' ? undefined : Number(priceThreshold)
+
   const classified = useMemo(
-    () => computeBatteryReliability(rows, gspFilter, asFilter, unitServices, 0, 0).rows,
-    [rows, gspFilter, asFilter, unitServices]
+    () => computeBatteryReliability(rows, gspFilter, asFilter, unitServices, 0, 0, numericPriceThreshold).rows,
+    [rows, gspFilter, asFilter, unitServices, numericPriceThreshold]
   )
 
   const sumCapacity = (list: typeof classified) => list.reduce((s, r) => s + r.avail, 0)
@@ -79,12 +84,14 @@ export default function BatterySummaryTab({
   const totalRows = classified
   const constrainedRows = classified.filter(r => r.constrained)
   const contractedRows = classified.filter(r => r.contracted)
+  const highPriceRows = classified.filter(r => r.highPrice)
   const usableRows = classified.filter(r => r.included)
 
   const cardData: Record<CardId, { rows: typeof classified; sum: number }> = {
     total:       { rows: totalRows,       sum: sumCapacity(totalRows) },
     contracted:  { rows: contractedRows,  sum: sumCapacity(contractedRows) },
     constrained: { rows: constrainedRows, sum: sumCapacity(constrainedRows) },
+    highPrice:   { rows: highPriceRows,   sum: sumCapacity(highPriceRows) },
     usable:      { rows: usableRows,      sum: sumCapacity(usableRows) },
   }
 
@@ -163,6 +170,21 @@ export default function BatterySummaryTab({
           )
         })()}
 
+        {/* Max price filter */}
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-soft)' }}>
+          Max £ MEL
+          <input
+            type="number"
+            min={0}
+            value={priceThreshold}
+            onChange={e => setPriceThreshold(e.target.value)}
+            style={{
+              width: 80, padding: '4px 8px', fontSize: 12, borderRadius: 4,
+              border: '1px solid var(--border-strong)', background: 'var(--bg-panel)', color: 'var(--text)',
+            }}
+          />
+        </label>
+
         {/* Timeframe selector */}
         <div style={{ display: 'flex', gap: 4, marginLeft: 'auto' }}>
           {TIMEFRAME_OPTIONS.map((opt, i) => (
@@ -192,7 +214,7 @@ export default function BatterySummaryTab({
         flexWrap: 'wrap',
         flexShrink: 0,
       }}>
-        {(['total', 'contracted', 'constrained', 'usable'] as CardId[]).map(card => {
+        {(['total', 'contracted', 'constrained', 'highPrice', 'usable'] as CardId[]).map(card => {
           const isActive = selectedCard === card
           const color = CARD_COLORS[card]
           const { rows: cardRows, sum } = cardData[card]
