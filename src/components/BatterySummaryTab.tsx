@@ -4,7 +4,7 @@ import { useMemo, useRef, useState } from 'react'
 import type { BMUnit, ServiceType, SettlementPeriodData } from '@/models/types'
 import { GSP_AREAS } from '@/config/scenarios'
 import { GspFilterPopover, usePopoverDismiss } from '@/components/GspFilterPopover'
-import { maxBatteryPn } from '@/utils/batteryPn'
+import { computeBatteryAvailability } from '@/utils/batteryAvailability'
 
 interface Props {
   units: BMUnit[]
@@ -85,16 +85,6 @@ function AsServicesPopover({ filter, onChange, onClose, wrapperRef }: {
   )
 }
 
-interface BatteryRow {
-  bmUnitId: string
-  nationalGridBmUnit: string
-  gspGroup: string
-  mel: number
-  priceToMel: number
-  pn: number | undefined
-  capacity: number
-}
-
 export default function BatterySummaryTab({ units, settlementPeriods, unitServices }: Props) {
   const [gspFilter, setGspFilter] = useState<Record<string, 'include' | 'exclude'>>({})
   const [asFilter, setAsFilter] = useState<{ sr: boolean; qr: boolean }>({ sr: false, qr: false })
@@ -107,25 +97,10 @@ export default function BatterySummaryTab({ units, settlementPeriods, unitServic
 
   const { spCount } = TIMEFRAME_OPTIONS[tfIndex]
 
-  const rows = useMemo<BatteryRow[]>(() => {
-    const windowSps = [...settlementPeriods]
-      .sort((a, b) => a.settlementPeriod - b.settlementPeriod)
-      .slice(0, spCount)
-
-    return units.map(u => {
-      const worstPn = maxBatteryPn(u.bmUnitId, windowSps)
-      const mel = u.registeredCapacity ?? 0
-      return {
-        bmUnitId: u.bmUnitId,
-        nationalGridBmUnit: u.nationalGridBmUnit,
-        gspGroup: u.gspGroup,
-        mel,
-        priceToMel: u.priceToMel ?? 0,
-        pn: worstPn,
-        capacity: Math.max(0, mel - (worstPn ?? 0)),
-      }
-    })
-  }, [units, settlementPeriods, spCount])
+  const rows = useMemo(
+    () => computeBatteryAvailability(units, settlementPeriods, spCount),
+    [units, settlementPeriods, spCount]
+  )
 
   const gspIncluded = useMemo(() => Object.entries(gspFilter).filter(([, v]) => v === 'include').map(([k]) => k), [gspFilter])
   const gspExcluded = useMemo(() => Object.entries(gspFilter).filter(([, v]) => v === 'exclude').map(([k]) => k), [gspFilter])
@@ -146,7 +121,7 @@ export default function BatterySummaryTab({ units, settlementPeriods, unitServic
     return { ...r, constrained, contracted, usable, service }
   }), [rows, gspIncluded, gspExcluded, unitServices, asFilter])
 
-  const sumCapacity = (list: typeof classified) => list.reduce((s, r) => s + r.capacity, 0)
+  const sumCapacity = (list: typeof classified) => list.reduce((s, r) => s + r.avail, 0)
 
   const totalRows = classified
   const constrainedRows = classified.filter(r => r.constrained)
@@ -317,7 +292,7 @@ export default function BatterySummaryTab({ units, settlementPeriods, unitServic
             {(() => {
               let cumulative = 0
               return visibleRows.map(row => {
-                cumulative += row.capacity
+                cumulative += row.avail
                 return (
                   <tr key={row.bmUnitId}>
                     <td className="mono">
@@ -329,7 +304,7 @@ export default function BatterySummaryTab({ units, settlementPeriods, unitServic
                     <td><ServiceChip service={row.service} /></td>
                     <td className="mono num">{row.pn !== undefined ? row.pn.toFixed(0) : '—'}</td>
                     <td className="mono num">{row.mel > 0 ? row.mel.toFixed(0) : '—'}</td>
-                    <td className="mono num">{row.capacity.toFixed(0)}</td>
+                    <td className="mono num">{row.avail.toFixed(0)}</td>
                     <td className="mono num">{cumulative.toFixed(0)}</td>
                     <td className="mono num">{row.priceToMel > 0 ? `£${row.priceToMel}` : '—'}</td>
                   </tr>
