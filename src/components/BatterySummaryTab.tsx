@@ -3,7 +3,8 @@
 import { useMemo, useRef, useState } from 'react'
 import type { BMUnit, ServiceType, SettlementPeriodData } from '@/models/types'
 import { GSP_AREAS } from '@/config/scenarios'
-import { GspFilterPopover, usePopoverDismiss } from '@/components/GspFilterPopover'
+import { GspFilterPopover } from '@/components/GspFilterPopover'
+import { TIMEFRAME_OPTIONS, AsServicesPopover, type AsServicesFilter } from '@/components/BatteryFilters'
 import { computeBatteryAvailability } from '@/utils/batteryAvailability'
 
 interface Props {
@@ -11,13 +12,6 @@ interface Props {
   settlementPeriods: SettlementPeriodData[]
   unitServices: Record<string, ServiceType>
 }
-
-const TIMEFRAME_OPTIONS = [
-  { label: 'Next 30 min',  spCount: 1 },
-  { label: 'Next 1 hour',  spCount: 2 },
-  { label: 'Next 1.5 hours', spCount: 3 },
-  { label: 'Next 2 hours', spCount: 4 },
-]
 
 type CardId = 'total' | 'contracted' | 'constrained' | 'usable'
 
@@ -48,46 +42,9 @@ function formatMw(value: number): string {
   return `${Math.round(value).toLocaleString()} MW`
 }
 
-function AsServicesPopover({ filter, onChange, onClose, wrapperRef }: {
-  filter: { sr: boolean; qr: boolean }
-  onChange: (f: { sr: boolean; qr: boolean }) => void
-  onClose: () => void
-  wrapperRef: React.RefObject<HTMLDivElement | null>
-}) {
-  const ref = useRef<HTMLDivElement>(null)
-  usePopoverDismiss(ref, wrapperRef, onClose)
-
-  return (
-    <div ref={ref} style={{
-      position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 50,
-      background: 'var(--bg-panel)', border: '1px solid var(--border-strong)',
-      borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,.35)', width: 220, overflow: 'hidden',
-    }}>
-      <div style={{ padding: '7px 12px', borderBottom: '1px solid var(--border)' }}>
-        <span style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--text-faint)' }}>
-          Treat as contracted
-        </span>
-      </div>
-      {(['sr', 'qr'] as const).map(key => (
-        <label key={key} style={{
-          display: 'flex', alignItems: 'center', gap: 8,
-          padding: '7px 12px', fontSize: 12.5, color: 'var(--text)', cursor: 'pointer',
-        }}>
-          <input
-            type="checkbox"
-            checked={filter[key]}
-            onChange={e => onChange({ ...filter, [key]: e.target.checked })}
-          />
-          {key.toUpperCase()} units
-        </label>
-      ))}
-    </div>
-  )
-}
-
 export default function BatterySummaryTab({ units, settlementPeriods, unitServices }: Props) {
   const [gspFilter, setGspFilter] = useState<Record<string, 'include' | 'exclude'>>({})
-  const [asFilter, setAsFilter] = useState<{ sr: boolean; qr: boolean }>({ sr: false, qr: false })
+  const [asFilter, setAsFilter] = useState<AsServicesFilter>({ sr: false, qr: false })
   const [tfIndex, setTfIndex] = useState(0)
   const [selectedCard, setSelectedCard] = useState<CardId | null>(null)
   const [gspOpen, setGspOpen] = useState(false)
