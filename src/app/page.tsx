@@ -495,16 +495,21 @@ export default function Home() {
               Summary
             </button>
             <button
-              className={`tab-btn${activeBatteryTab === 'redeclare' ? ' active' : ''}`}
-              onClick={() => setActiveBatteryTab('redeclare')}
-            >
-              Redeclare
-            </button>
-            <button
               className={`tab-btn${activeBatteryTab === 'reliability' ? ' active' : ''}`}
               onClick={() => setActiveBatteryTab('reliability')}
             >
               Reliability
+            </button>
+            <div className="tab-spacer" />
+            <button
+              className="tweaks-trigger"
+              onClick={() => setActiveBatteryTab('redeclare')}
+              style={{
+                margin: '0 0 0 8px',
+                ...(activeBatteryTab === 'redeclare' ? { borderColor: 'var(--accent)', color: 'var(--text)' } : {}),
+              }}
+            >
+              Redeclare
             </button>
           </div>
 
