@@ -609,7 +609,7 @@ export function MarginChart({
           <Line dataKey="emi"    name="EMI"    stroke={t.emi}    strokeWidth={1.5} dot={false} activeDot={{ r: 3 }} />
           <Line dataKey="eol"    name="EOL"    stroke={t.eol}    strokeWidth={2}   dot={false} activeDot={{ r: 3 }} />
           <Line dataKey="demand" name="Demand" stroke={t.demand} strokeWidth={2.5} dot={false} activeDot={{ r: 4 }} />
-          <Line dataKey="tr2"    name={`TR2 (${reservePct}% reserve + Gen. Reserve)`} stroke={t.tr2} strokeWidth={2} dot={false} activeDot={{ r: 3 }} />
+          <Line dataKey="tr2"    name="TR2"    stroke={t.tr2}    strokeWidth={2}   dot={false} activeDot={{ r: 3 }} />
           <Line dataKey="emx"    name="EMX"    stroke={t.emx}    strokeWidth={2}   dot={false} activeDot={{ r: 3 }} />
 
           {activeDrafts.map(draft => (
