@@ -6,6 +6,7 @@ import { GSP_AREAS } from '@/config/scenarios'
 import { GspFilterPopover } from '@/components/GspFilterPopover'
 import { TIMEFRAME_OPTIONS, AsServicesPopover, type AsServicesFilter } from '@/components/BatteryFilters'
 import { computeBatteryAvailability } from '@/utils/batteryAvailability'
+import { computeBatteryReliability } from '@/utils/batteryReliability'
 
 interface Props {
   units: BMUnit[]
@@ -68,28 +69,17 @@ export default function BatterySummaryTab({
   const gspIncluded = useMemo(() => Object.entries(gspFilter).filter(([, v]) => v === 'include').map(([k]) => k), [gspFilter])
   const gspExcluded = useMemo(() => Object.entries(gspFilter).filter(([, v]) => v === 'exclude').map(([k]) => k), [gspFilter])
 
-  function isConstrained(gspGroup: string): boolean {
-    if (gspIncluded.length > 0 && !gspIncluded.includes(gspGroup)) return true
-    if (gspExcluded.includes(gspGroup)) return true
-    return false
-  }
-
-  const classified = useMemo(() => rows.map(r => {
-    const constrained = isConstrained(r.gspGroup)
-    const service = unitServices[r.bmUnitId]
-    const contracted = !constrained && (
-      (service === 'SR' && asFilter.sr) || (service === 'QR' && asFilter.qr)
-    )
-    const usable = !constrained && !contracted
-    return { ...r, constrained, contracted, usable, service }
-  }), [rows, gspIncluded, gspExcluded, unitServices, asFilter])
+  const classified = useMemo(
+    () => computeBatteryReliability(rows, gspFilter, asFilter, unitServices, 0, 0).rows,
+    [rows, gspFilter, asFilter, unitServices]
+  )
 
   const sumCapacity = (list: typeof classified) => list.reduce((s, r) => s + r.avail, 0)
 
   const totalRows = classified
   const constrainedRows = classified.filter(r => r.constrained)
   const contractedRows = classified.filter(r => r.contracted)
-  const usableRows = classified.filter(r => r.usable)
+  const usableRows = classified.filter(r => r.included)
 
   const cardData: Record<CardId, { rows: typeof classified; sum: number }> = {
     total:       { rows: totalRows,       sum: sumCapacity(totalRows) },
