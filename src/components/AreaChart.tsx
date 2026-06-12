@@ -49,7 +49,7 @@ function formatYTick(v: number) {
 
 // ── Custom tooltip ────────────────────────────────────────────────────────────
 
-function makeTooltip(area: AreaConfig, activeDrafts: DraftPlan[], t: ChartTheme) {
+function makeTooltip(area: AreaConfig, activeDrafts: DraftPlan[], t: ChartTheme, onHide: () => void) {
   return function TooltipContent(props: TooltipContentProps) {
     const { active, payload } = props
     if (!active || !payload || payload.length === 0) return null
@@ -62,12 +62,24 @@ function makeTooltip(area: AreaConfig, activeDrafts: DraftPlan[], t: ChartTheme)
 
     return (
       <div style={{
+        position: 'relative',
         background: t.tooltipBg, border: `1px solid ${t.tooltipBorder}`,
         borderRadius: 8, padding: '10px 12px', fontSize: 11.5,
         fontFamily: 'var(--font-mono, monospace)',
         boxShadow: '0 4px 16px rgba(0,0,0,.25)', minWidth: 180,
       }}>
-        <p style={{ fontWeight: 600, color: t.tooltipText, margin: '0 0 6px' }}>
+        <button
+          onClick={onHide}
+          title="Hide tooltip"
+          style={{
+            position: 'absolute', top: 6, right: 6,
+            border: 'none', background: 'none', cursor: 'pointer',
+            color: t.tooltipMuted, fontSize: 13, lineHeight: 1, padding: 2,
+          }}
+        >
+          ✕
+        </button>
+        <p style={{ fontWeight: 600, color: t.tooltipText, margin: '0 0 6px', paddingRight: 14 }}>
           SP {raw.sp} ({raw.label})
         </p>
         <p style={{ color: t.tooltipMuted, margin: '2px 0' }}>
@@ -146,6 +158,7 @@ export default function AreaChart({
   const [dragEnd,   setDragEnd]   = useState<number | null>(null)
   const [clickPhase, setClickPhase] = useState<0 | 1>(0)
   const [clickStart, setClickStart] = useState<number | null>(null)
+  const [tooltipHidden, setTooltipHidden] = useState(true)
 
   useEffect(() => {
     function onDocMouseUp() {
@@ -342,7 +355,7 @@ export default function AreaChart({
 
   const selLo = dragStart != null && dragEnd != null ? Math.min(dragStart, dragEnd) : null
   const selHi = dragStart != null && dragEnd != null ? Math.max(dragStart, dragEnd) : null
-  const tooltipRenderer = makeTooltip(area, activeDrafts, t)
+  const tooltipRenderer = makeTooltip(area, activeDrafts, t, () => setTooltipHidden(true))
 
   return (
     <div style={{
@@ -365,6 +378,7 @@ export default function AreaChart({
             <span style={{ display: 'inline-block', width: 12, height: 12, borderRadius: 3, background: '#ef4444', opacity: .7 }} />
             Shortfall
           </span>
+          <span style={{ opacity: .7 }}>{tooltipHidden ? 'Right-click chart for tooltip' : 'Right-click to hide tooltip'}</span>
         </div>
       </div>
 
@@ -377,6 +391,10 @@ export default function AreaChart({
             onMouseMove={handleMouseMove as never}
             onMouseUp={handleMouseUp as never}
             onClick={handleClick as never}
+            onContextMenu={((_: unknown, e: MouseEvent) => {
+              e.preventDefault()
+              setTooltipHidden(v => !v)
+            }) as never}
           >
             <CartesianGrid strokeDasharray="3 3" stroke={t.grid} />
 
@@ -395,7 +413,9 @@ export default function AreaChart({
               label={{ value: area.unit, angle: -90, position: 'insideLeft', offset: 10, fontSize: 11, fill: t.axisText }}
             />
 
-            <Tooltip content={tooltipRenderer} trigger="click" />
+            {!tooltipHidden && (
+              <Tooltip content={tooltipRenderer} wrapperStyle={{ pointerEvents: 'auto' }} />
+            )}
             <Legend
               verticalAlign="bottom"
               height={36}

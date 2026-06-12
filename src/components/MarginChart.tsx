@@ -208,7 +208,7 @@ export function MarginChart({
   // twoClick: 0 = waiting for start, 1 = waiting for end
   const [clickPhase, setClickPhase] = useState<0 | 1>(0)
   const [clickStart, setClickStart] = useState<number | null>(null)
-  const [tooltipHidden, setTooltipHidden] = useState(false)
+  const [tooltipHidden, setTooltipHidden] = useState(true)
 
   // Refs for synchronous drag tracking — React setState is async so onMouseMove
   // would see stale isDragging/dragStart from the previous render.
@@ -396,9 +396,7 @@ export function MarginChart({
     return point
   })
 
-  const tooltipRenderer = tooltipHidden
-    ? () => null
-    : renderTooltip(activeDrafts, t, reservePct, () => setTooltipHidden(true))
+  const tooltipRenderer = renderTooltip(activeDrafts, t, reservePct, () => setTooltipHidden(true))
   const frontierLabel   = frontierIndex >= 0 ? (chartData[frontierIndex]?.label as string ?? null) : null
   const lastLabel       = chartData[chartData.length - 1]?.label as string
 
@@ -426,6 +424,7 @@ export function MarginChart({
             <span style={{ display: 'inline-block', width: 12, height: 12, borderRadius: 3, background: '#ef4444', opacity: .7 }} />
             Shortfall
           </span>
+          <span style={{ opacity: .7 }}>{tooltipHidden ? 'Right-click chart for tooltip' : 'Right-click to hide tooltip'}</span>
         </div>
       </div>
 
@@ -470,8 +469,11 @@ export function MarginChart({
               setDragEnd(null)
             }
           }}
+          onContextMenu={(_, e) => {
+            e.preventDefault()
+            setTooltipHidden(v => !v)
+          }}
           onClick={e => {
-            setTooltipHidden(false)
             if (chartInteractionMode === 'twoClick') {
               const raw = e?.activeTooltipIndex
               const idx = raw != null ? parseInt(String(raw), 10) : null
@@ -523,7 +525,9 @@ export function MarginChart({
             label={{ value: 'MW', angle: -90, position: 'insideLeft', offset: 10, fontSize: 11, fill: t.axisText }}
           />
 
-          <Tooltip content={tooltipRenderer} trigger="click" />
+          {!tooltipHidden && (
+            <Tooltip content={tooltipRenderer} wrapperStyle={{ pointerEvents: 'auto' }} />
+          )}
           <Legend
             verticalAlign="bottom"
             height={36}
