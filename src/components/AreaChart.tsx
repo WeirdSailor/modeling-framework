@@ -378,7 +378,20 @@ export default function AreaChart({
             <span style={{ display: 'inline-block', width: 12, height: 12, borderRadius: 3, background: '#ef4444', opacity: .7 }} />
             Shortfall
           </span>
-          <span style={{ opacity: .7 }}>{tooltipHidden ? 'Right-click chart for tooltip' : 'Right-click to hide tooltip'}</span>
+          <button
+            onClick={() => setTooltipHidden(v => !v)}
+            title={tooltipHidden ? 'Show tooltip' : 'Hide tooltip'}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              width: 22, height: 22, padding: 0, borderRadius: 4, fontSize: 12,
+              cursor: 'pointer',
+              border: `1px solid ${tooltipHidden ? t.tooltipBorder : '#6366f1'}`,
+              background: tooltipHidden ? 'transparent' : '#6366f1',
+              color: tooltipHidden ? t.tooltipMuted : '#fff',
+            }}
+          >
+            💬
+          </button>
         </div>
       </div>
 
