@@ -327,6 +327,7 @@ export default function BatteryReliabilityTab({
               label={{ value: 'MW', angle: -90, position: 'insideLeft', offset: 10, fontSize: 11, fill: t.axisText }}
             />
             <Tooltip
+              cursor={false}
               contentStyle={{ background: t.tooltipBg, border: `1px solid ${t.tooltipBorder}`, borderRadius: 8, fontSize: 11.5 }}
               labelFormatter={(v: any) => String(v).slice(11, 16)}
               labelStyle={{ color: t.tooltipText }}
