@@ -139,7 +139,8 @@ export function computeAreaStatus(
     let req: number
     if (area === 'margin') {
       avail = sp.emx
-      req = sp.demand * (1 + reservePct / 100)
+      const generalReserveRow = (areaRequirements['general_reserve'] ?? []).find(r => r.sp === sp.settlementPeriod)
+      req = sp.demand * (1 + reservePct / 100) + (generalReserveRow?.requirement ?? 0)
     } else {
       avail = sp.areaAvailability?.[area] ?? 0
       const row = (areaRequirements[area] ?? []).find(r => r.sp === sp.settlementPeriod)

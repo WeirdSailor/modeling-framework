@@ -185,6 +185,7 @@ export default function Dashboard({ settlementPeriods, areaRequirements, areaThr
                 area={area.id}
                 settlementPeriods={settlementPeriods}
                 areaRequirements={rows}
+                generalReserveRequirements={areaRequirements['general_reserve'] ?? []}
                 reservePct={reservePct}
               />
             </div>
@@ -224,10 +225,11 @@ function TileViewA({ area, status, color }: {
 
 // ── Sparkline ─────────────────────────────────────────────────────────────────
 
-function Sparkline({ area, settlementPeriods, areaRequirements, reservePct }: {
+function Sparkline({ area, settlementPeriods, areaRequirements, generalReserveRequirements, reservePct }: {
   area: string
   settlementPeriods: SettlementPeriodData[]
   areaRequirements: AreaRequirementRow[]
+  generalReserveRequirements: AreaRequirementRow[]
   reservePct: number
 }) {
   const points = settlementPeriods.map((sp, i) => {
@@ -235,7 +237,8 @@ function Sparkline({ area, settlementPeriods, areaRequirements, reservePct }: {
     let req: number
     if (area === 'margin') {
       avail = sp.emx
-      req = sp.demand * (1 + reservePct / 100)
+      const generalReserveRow = generalReserveRequirements.find(r => r.sp === sp.settlementPeriod)
+      req = sp.demand * (1 + reservePct / 100) + (generalReserveRow?.requirement ?? 0)
     } else {
       avail = sp.areaAvailability?.[area] ?? 0
       req = areaRequirements[i]?.requirement ?? 0

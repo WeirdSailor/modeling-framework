@@ -17,7 +17,7 @@ import {
 import type { TooltipContentProps, TooltipPayloadEntry } from 'recharts'
 import { useModellingStore } from '@/store/useModellingStore'
 import { applyDraftToBaseline } from '@/utils/margin'
-import type { DraftPlan } from '@/models/types'
+import type { DraftPlan, AreaRequirementRow } from '@/models/types'
 
 function useDarkMode() {
   const [isDark, setIsDark] = useState(false)
@@ -104,7 +104,7 @@ function formatMW(value: number): string {
   return value.toLocaleString('en-GB')
 }
 
-function renderTooltip(activeDrafts: DraftPlan[], t: ChartTheme, reservePct: number) {
+function renderTooltip(activeDrafts: DraftPlan[], t: ChartTheme, reservePct: number, onHide: () => void) {
   return function TooltipContent(props: TooltipContentProps) {
     const { active, payload, label } = props
     if (!active || !payload || payload.length === 0) return null
@@ -118,6 +118,7 @@ function renderTooltip(activeDrafts: DraftPlan[], t: ChartTheme, reservePct: num
 
     return (
       <div style={{
+        position: 'relative',
         background: t.tooltipBg,
         border: `1px solid ${t.tooltipBorder}`,
         borderRadius: 8,
@@ -127,14 +128,25 @@ function renderTooltip(activeDrafts: DraftPlan[], t: ChartTheme, reservePct: num
         boxShadow: '0 4px 16px rgba(0,0,0,.25)',
         minWidth: 180,
       }}>
-        <p style={{ fontWeight: 600, color: t.tooltipText, margin: '0 0 6px' }}>
+        <button
+          onClick={onHide}
+          title="Hide tooltip"
+          style={{
+            position: 'absolute', top: 6, right: 6,
+            border: 'none', background: 'none', cursor: 'pointer',
+            color: t.tooltipMuted, fontSize: 13, lineHeight: 1, padding: 2,
+          }}
+        >
+          ✕
+        </button>
+        <p style={{ fontWeight: 600, color: t.tooltipText, margin: '0 0 6px', paddingRight: 14 }}>
           SP {raw.sp} ({label})
           {!isConfirmed && (
             <span style={{ marginLeft: 6, color: t.gateClosure, fontWeight: 400 }}>[unconfirmed]</span>
           )}
         </p>
         <p style={{ color: t.tooltipMuted, margin: '2px 0' }}>Demand: {formatMW(raw.demand)} MW</p>
-        <p style={{ color: t.tr2, margin: '2px 0' }}>TR2:&nbsp;&nbsp;&nbsp;&nbsp;{formatMW(raw.tr2)} MW ({reservePct}% reserve)</p>
+        <p style={{ color: t.tr2, margin: '2px 0' }}>TR2:&nbsp;&nbsp;&nbsp;&nbsp;{formatMW(raw.tr2)} MW ({reservePct}% reserve + {formatMW(raw.generalReserve)} MW Gen. Reserve)</p>
         <p style={{ color: t.tooltipMuted, margin: '2px 0' }}>EMX:&nbsp;&nbsp;&nbsp;&nbsp;{formatMW(raw.emx)} MW</p>
         <p style={{ color: t.tooltipMuted, margin: '2px 0' }}>EOL:&nbsp;&nbsp;&nbsp;&nbsp;{formatMW(raw.eol)} MW</p>
         <p style={{ color: t.tooltipMuted, margin: '2px 0' }}>EMI:&nbsp;&nbsp;&nbsp;&nbsp;{formatMW(raw.emi)} MW</p>
@@ -164,16 +176,24 @@ function renderTooltip(activeDrafts: DraftPlan[], t: ChartTheme, reservePct: num
 export function MarginChart({
   hiddenDraftIds = new Set<string>(),
   reservePct = 10,
+  generalReserveRequirements = [],
   chartInteractionMode = 'drag',
   clearSelectionKey = 0,
   onSolveSelect,
 }: {
   hiddenDraftIds?: Set<string>
   reservePct?: number
+  generalReserveRequirements?: AreaRequirementRow[]
   chartInteractionMode?: 'drag' | 'twoClick' | 'deficit'
   clearSelectionKey?: number
   onSolveSelect?: (fromSp: number, toSp: number, worstDeficitMw: number) => void
 }) {
+  const generalReserveBySp = useMemo(
+    () => new Map(generalReserveRequirements.map(r => [r.sp, r.requirement])),
+    [generalReserveRequirements]
+  )
+  const generalReserveFor = (spNum: number) => generalReserveBySp.get(spNum) ?? 0
+
   const settlementPeriods = useModellingStore(state => state.settlementPeriods)
   const drafts            = useModellingStore(state => state.drafts)
   const units             = useModellingStore(state => state.units)
@@ -188,6 +208,7 @@ export function MarginChart({
   // twoClick: 0 = waiting for start, 1 = waiting for end
   const [clickPhase, setClickPhase] = useState<0 | 1>(0)
   const [clickStart, setClickStart] = useState<number | null>(null)
+  const [tooltipHidden, setTooltipHidden] = useState(false)
 
   // Refs for synchronous drag tracking — React setState is async so onMouseMove
   // would see stale isDragging/dragStart from the previous render.
@@ -243,7 +264,7 @@ export function MarginChart({
     const toSp   = hi + 1
     const worst  = Math.min(
       ...settlementPeriods.slice(lo, hi + 1).map(sp => {
-        const tr2 = sp.demand * (1 + reservePct / 100)
+        const tr2 = sp.demand * (1 + reservePct / 100) + generalReserveFor(sp.settlementPeriod)
         return sp.emx - tr2
       })
     )
@@ -255,13 +276,14 @@ export function MarginChart({
     const ranges: { lo: number; hi: number }[] = []
     let start = -1
     settlementPeriods.forEach((sp, i) => {
-      const inDeficit = sp.emx - sp.demand * (1 + reservePct / 100) < 0
+      const tr2 = sp.demand * (1 + reservePct / 100) + generalReserveFor(sp.settlementPeriod)
+      const inDeficit = sp.emx - tr2 < 0
       if (inDeficit && start === -1) start = i
       if (!inDeficit && start !== -1) { ranges.push({ lo: start, hi: i - 1 }); start = -1 }
     })
     if (start !== -1) ranges.push({ lo: start, hi: settlementPeriods.length - 1 })
     return ranges
-  }, [settlementPeriods, reservePct])
+  }, [settlementPeriods, reservePct, generalReserveBySp])
 
   if (isLoading || settlementPeriods.length === 0) {
     return (
@@ -321,7 +343,8 @@ export function MarginChart({
       }
     }
 
-    const tr2 = sp.demand * (1 + reservePct / 100)
+    const generalReserve = generalReserveFor(spNum)
+    const tr2 = sp.demand * (1 + reservePct / 100) + generalReserve
     const margin = sp.emx - tr2
 
     const point: Record<string, number | string | null> = {
@@ -330,6 +353,7 @@ export function MarginChart({
       confirmed: sp.hasConfirmedPn ? 1 : 0,
       demand: sp.demand,
       tr2,
+      generalReserve,
       emx: sp.emx,
       eol: sp.eol,
       emi: sp.emi,
@@ -372,7 +396,9 @@ export function MarginChart({
     return point
   })
 
-  const tooltipRenderer = renderTooltip(activeDrafts, t, reservePct)
+  const tooltipRenderer = tooltipHidden
+    ? () => null
+    : renderTooltip(activeDrafts, t, reservePct, () => setTooltipHidden(true))
   const frontierLabel   = frontierIndex >= 0 ? (chartData[frontierIndex]?.label as string ?? null) : null
   const lastLabel       = chartData[chartData.length - 1]?.label as string
 
@@ -445,6 +471,7 @@ export function MarginChart({
             }
           }}
           onClick={e => {
+            setTooltipHidden(false)
             if (chartInteractionMode === 'twoClick') {
               const raw = e?.activeTooltipIndex
               const idx = raw != null ? parseInt(String(raw), 10) : null
@@ -565,7 +592,7 @@ export function MarginChart({
           <Line dataKey="emi"    name="EMI"    stroke={t.emi}    strokeWidth={1.5} dot={false} activeDot={{ r: 3 }} />
           <Line dataKey="eol"    name="EOL"    stroke={t.eol}    strokeWidth={2}   dot={false} activeDot={{ r: 3 }} />
           <Line dataKey="demand" name="Demand" stroke={t.demand} strokeWidth={2.5} dot={false} activeDot={{ r: 4 }} />
-          <Line dataKey="tr2"    name={`TR2 (${reservePct}% reserve)`} stroke={t.tr2} strokeWidth={2} dot={false} activeDot={{ r: 3 }} />
+          <Line dataKey="tr2"    name={`TR2 (${reservePct}% reserve + Gen. Reserve)`} stroke={t.tr2} strokeWidth={2} dot={false} activeDot={{ r: 3 }} />
           <Line dataKey="emx"    name="EMX"    stroke={t.emx}    strokeWidth={2}   dot={false} activeDot={{ r: 3 }} />
 
           {activeDrafts.map(draft => (

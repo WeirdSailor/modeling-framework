@@ -790,6 +790,7 @@ export default function Home() {
                 <MarginChart
                   hiddenDraftIds={hiddenDraftIds}
                   reservePct={tweaks.reservePct}
+                  generalReserveRequirements={areaRequirements['general_reserve'] ?? []}
                   chartInteractionMode={tweaks.chartInteractionMode}
                   clearSelectionKey={clearSelectionKey}
                   onSolveSelect={handleSolveSelect}
