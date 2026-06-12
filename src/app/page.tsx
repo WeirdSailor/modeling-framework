@@ -508,9 +508,9 @@ export default function Home() {
             </button>
           </div>
 
-          {/* Both tabs stay mounted so BatterySummaryTab's local filter state
+          {/* All three tabs stay mounted so BatterySummaryTab's local filter state
               (GSP/AS Services filters, timeframe, card selection) survives
-              switching to Redeclare and back. */}
+              switching tabs and back. */}
           <div style={{ display: activeBatteryTab === 'summary' ? 'flex' : 'none', flexDirection: 'column', flex: 1, minHeight: 0 }}>
             <BatterySummaryTab
               units={batteryUnits}
