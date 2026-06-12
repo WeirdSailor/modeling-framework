@@ -20,6 +20,7 @@ import CommittedTab from '@/components/CommittedTab'
 import RedeclareTab from '@/components/RedeclareTab'
 import BatterySummaryTab from '@/components/BatterySummaryTab'
 import BatteryRedeclareTab from '@/components/BatteryRedeclareTab'
+import BatteryReliabilityTab from '@/components/BatteryReliabilityTab'
 import type { AsServicesFilter } from '@/components/BatteryFilters'
 import GraphTab from '@/components/GraphTab'
 import RequirementsTab from '@/components/RequirementsTab'
@@ -30,7 +31,7 @@ import { AREAS, getArea } from '@/config/areas'
 import { computeAreaStatus } from '@/utils/areaAggregates'
 
 type Tab = 'dashboard' | 'workspace' | 'chart' | 'committed' | 'redeclare' | 'graph' | 'requirements'
-type BatteryTab = 'summary' | 'redeclare'
+type BatteryTab = 'summary' | 'redeclare' | 'reliability'
 
 interface ConfirmState {
   message: string
@@ -499,6 +500,12 @@ export default function Home() {
             >
               Redeclare
             </button>
+            <button
+              className={`tab-btn${activeBatteryTab === 'reliability' ? ' active' : ''}`}
+              onClick={() => setActiveBatteryTab('reliability')}
+            >
+              Reliability
+            </button>
           </div>
 
           {/* Both tabs stay mounted so BatterySummaryTab's local filter state
@@ -524,6 +531,20 @@ export default function Home() {
               settlementPeriods={settlementPeriods}
               unitServices={unitServices}
               onSetService={setUnitService}
+            />
+          </div>
+
+          <div style={{ display: activeBatteryTab === 'reliability' ? 'flex' : 'none', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+            <BatteryReliabilityTab
+              units={batteryUnits}
+              settlementPeriods={settlementPeriods}
+              unitServices={unitServices}
+              gspFilter={batteryGspFilter}
+              onGspFilterChange={setBatteryGspFilter}
+              asFilter={batteryAsFilter}
+              onAsFilterChange={setBatteryAsFilter}
+              tfIndex={batteryTfIndex}
+              onTfIndexChange={setBatteryTfIndex}
             />
           </div>
         </main>
