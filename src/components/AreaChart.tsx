@@ -395,7 +395,7 @@ export default function AreaChart({
               label={{ value: area.unit, angle: -90, position: 'insideLeft', offset: 10, fontSize: 11, fill: t.axisText }}
             />
 
-            <Tooltip content={tooltipRenderer} />
+            <Tooltip content={tooltipRenderer} trigger="click" />
             <Legend
               verticalAlign="bottom"
               height={36}
