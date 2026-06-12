@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import type { AppSection, DraftPlan, SettlementPeriodData, UserId } from '@/models/types'
 import { APP_SECTIONS, USERS } from '@/models/types'
-import { SegControl } from '@/components/SegControl'
 
 interface Props {
   drafts: DraftPlan[]
@@ -136,11 +135,13 @@ export default function DraftSidebar({
 
         {/* Section switcher */}
         <div style={{ margin: '8px 0 4px' }}>
-          <SegControl
+          <select
             value={activeSection}
-            options={APP_SECTIONS.map(s => ({ value: s.id, label: s.label }))}
-            onChange={onSectionChange}
-          />
+            onChange={e => onSectionChange(e.target.value as AppSection)}
+            style={{ width: '100%', fontSize: 12, fontWeight: 600 }}
+          >
+            {APP_SECTIONS.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+          </select>
         </div>
 
         {/* Identity picker */}

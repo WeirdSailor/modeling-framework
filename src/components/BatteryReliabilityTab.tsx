@@ -336,7 +336,7 @@ export default function BatteryReliabilityTab({
               y={requirementMW} stroke="#f59e0b" strokeDasharray="5 4" strokeWidth={1.5}
               label={{ value: 'Requirement', position: 'insideTopRight', fontSize: 10, fill: '#f59e0b' }}
             />
-            <Bar dataKey="reliable" name="Reliable" stackId="a" fill="#22c55e" maxBarSize={80}>
+            <Bar dataKey="reliable" name="Reliable" stackId="a" fill="#22c55e" maxBarSize={80} activeBar={false}>
               {chartData.map((bar, i) => (
                 <Cell
                   key={i}
@@ -346,9 +346,9 @@ export default function BatteryReliabilityTab({
                 />
               ))}
             </Bar>
-            <Bar dataKey="deratedOff" name="De-rated off" stackId="a" fill="#22c55e" fillOpacity={0.35} maxBarSize={80} />
-            <Bar dataKey="contracted" name="Contracted" stackId="a" fill="#8b5cf6" maxBarSize={80} />
-            <Bar dataKey="constrained" name="Constrained" stackId="a" fill="#ef4444" maxBarSize={80} />
+            <Bar dataKey="deratedOff" name="De-rated off" stackId="a" fill="#22c55e" fillOpacity={0.35} maxBarSize={80} activeBar={false} />
+            <Bar dataKey="contracted" name="Contracted" stackId="a" fill="#8b5cf6" maxBarSize={80} activeBar={false} />
+            <Bar dataKey="constrained" name="Constrained" stackId="a" fill="#ef4444" maxBarSize={80} activeBar={false} />
           </BarChart>
         </ResponsiveContainer>
       </div>

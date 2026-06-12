@@ -498,7 +498,7 @@ export default function Home() {
               className={`tab-btn${activeBatteryTab === 'reliability' ? ' active' : ''}`}
               onClick={() => setActiveBatteryTab('reliability')}
             >
-              Reliability
+              Graph
             </button>
             <div className="tab-spacer" />
             <button
