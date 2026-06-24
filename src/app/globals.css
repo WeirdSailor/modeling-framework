@@ -508,6 +508,7 @@ em.muted { font-style: normal; }
   z-index: 1; white-space: nowrap;
 }
 .data-table th.num, .data-table td.num { text-align: right; }
+.data-table th.center, .data-table td.center { text-align: center; }
 .data-table th.sortable { cursor: pointer; user-select: none; }
 .data-table th.sortable:hover { background: var(--bg-active); color: var(--text); }
 .data-table th.col-active { color: var(--text); }

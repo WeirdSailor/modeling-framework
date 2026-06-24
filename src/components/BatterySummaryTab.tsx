@@ -254,8 +254,8 @@ export default function BatterySummaryTab({
           <thead>
             <tr>
               <th style={{ width: 220 }}>BMU</th>
-              <th>Type</th>
-              <th>Service</th>
+              <th className="center">Type</th>
+              <th className="center">Service</th>
               <th className="num">PN</th>
               <th className="num">MEL</th>
               <th className="num">Avail.</th>
@@ -275,8 +275,8 @@ export default function BatterySummaryTab({
                         <span>{row.nationalGridBmUnit}</span>
                       </div>
                     </td>
-                    <td><TypeChip /></td>
-                    <td><ServiceChip service={row.service} /></td>
+                    <td className="center"><TypeChip /></td>
+                    <td className="center"><ServiceChip service={row.service} /></td>
                     <td className="mono num">{row.pn !== undefined ? row.pn.toFixed(0) : '—'}</td>
                     <td className="mono num">{row.mel > 0 ? row.mel.toFixed(0) : '—'}</td>
                     <td className="mono num">{row.avail.toFixed(0)}</td>
