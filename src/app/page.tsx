@@ -100,6 +100,14 @@ export default function Home() {
     worstDeficitMw: number
     adjustedMw: number
   } | null>(null)
+  // Deficit Solver checkbox/highlight state for AvailableTable, lifted here because
+  // AvailableTable unmounts every time the Workspace tab is left (see its own
+  // "activeTab === 'workspace'" guard below) — state local to that component would
+  // reset on every remount and cause the covering-set seed to re-run against units
+  // already moved into the draft, re-ticking/re-highlighting the next batch of rows.
+  const [availablePendingIds, setAvailablePendingIds] = useState<Set<string>>(new Set())
+  const [availableDisplayCoveringSet, setAvailableDisplayCoveringSet] = useState<Set<string>>(new Set())
+  const [availableSeededSolveMw, setAvailableSeededSolveMw] = useState<number | null>(null)
   const [clearSelectionKey, setClearSelectionKey] = useState(0)
   const [solvePanelVisible, setSolvePanelVisible] = useState(false)
   const [dataMode, setDataMode] = useState<'real' | 'historical'>('real')
@@ -705,6 +713,12 @@ export default function Home() {
                     onAddUnits={handleAddUnits}
                     solveMode={solveTarget !== null}
                     solveMw={solveTarget?.adjustedMw ?? null}
+                    pendingIds={availablePendingIds}
+                    setPendingIds={setAvailablePendingIds}
+                    displayCoveringSet={availableDisplayCoveringSet}
+                    setDisplayCoveringSet={setAvailableDisplayCoveringSet}
+                    seededSolveMw={availableSeededSolveMw}
+                    setSeededSolveMw={setAvailableSeededSolveMw}
                   />
                   <SelectedTable
                     draft={activeDraft}

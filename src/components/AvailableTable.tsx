@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
+import { useState, useMemo, useCallback, useEffect, type Dispatch, type SetStateAction } from 'react'
 import type { BMUnit, ServiceType } from '@/models/types'
 
 
@@ -18,6 +18,17 @@ interface Props {
   onAddUnits: (ids: string[]) => void
   solveMode?: boolean
   solveMw?: number | null
+  // Lifted to the parent (page.tsx) rather than local state: this component is
+  // conditionally rendered (mounted/unmounted on every Workspace <-> other-tab
+  // switch), so state that must survive a solve flow spanning several tab visits
+  // cannot live here — it would reset on every remount and re-trigger the
+  // covering-set re-seed bug (see the effect below).
+  pendingIds: Set<string>
+  setPendingIds: Dispatch<SetStateAction<Set<string>>>
+  displayCoveringSet: Set<string>
+  setDisplayCoveringSet: Dispatch<SetStateAction<Set<string>>>
+  seededSolveMw: number | null
+  setSeededSolveMw: Dispatch<SetStateAction<number | null>>
 }
 
 type SortKey = 'bmUnitId' | 'nationalGridBmUnit' | 'fuelType' | 'pn' | 'mel' | 'sel' | 'ndz' | 'mnzt' | 'mzt' | 'priceToSel' | 'priceToMel'
@@ -113,9 +124,9 @@ export default function AvailableTable({
   units, unitPnByBmUnit, unitServices, activeDraftUnitIds, otherDraftUnitMap,
   selectionPattern, readOnly, voltageArea, scenario, gspFilter, onAddUnits,
   solveMode = false, solveMw = null,
+  pendingIds, setPendingIds, displayCoveringSet, setDisplayCoveringSet, seededSolveMw, setSeededSolveMw,
 }: Props) {
   const [sort, setSort] = useState<{ key: SortKey; dir: 'asc' | 'desc' }>({ key: 'nationalGridBmUnit', dir: 'asc' })
-  const [pendingIds, setPendingIds] = useState<Set<string>>(new Set())
 
   const rows = useMemo<UnitRow[]>(() => {
     return units.map(u => ({
@@ -171,28 +182,25 @@ export default function AvailableTable({
     return ids
   }, [solveMode, solveMw, visible, activeDraftUnitIds])
 
-  const seededSolveMwRef = useRef<number | null>(null)
-  // Frozen snapshot of coveringSet at seed time, used for the row highlight so it
-  // doesn't shift to a new batch of rows as units are moved into the draft (coveringSet
-  // itself keeps recomputing live against activeDraftUnitIds).
-  const [displayCoveringSet, setDisplayCoveringSet] = useState<Set<string>>(new Set())
-
   useEffect(() => {
     if (!solveMode) {
-      seededSolveMwRef.current = null
+      setSeededSolveMw(null)
       setDisplayCoveringSet(new Set())
       return
     }
     // Re-seed pendingIds only once per distinct solve request (identified by solveMw).
     // Without this guard, moving units into the draft shrinks activeDraftUnitIds'
     // complement, coveringSet recomputes to cover the same solveMw with different
-    // (lower-ranked) units, and this effect would re-tick those rows.
-    if (solveMw && solveMw > 0 && coveringSet.size > 0 && seededSolveMwRef.current !== solveMw) {
+    // (lower-ranked) units, and this effect would re-tick those rows — including on
+    // every remount of this component (e.g. leaving and returning to the Workspace
+    // tab), since seededSolveMw/displayCoveringSet are lifted to the parent and
+    // survive that remount instead of resetting to their initial values.
+    if (solveMw && solveMw > 0 && coveringSet.size > 0 && seededSolveMw !== solveMw) {
       setPendingIds(new Set(coveringSet))
       setDisplayCoveringSet(new Set(coveringSet))
-      seededSolveMwRef.current = solveMw
+      setSeededSolveMw(solveMw)
     }
-  }, [solveMode, solveMw, coveringSet])
+  }, [solveMode, solveMw, coveringSet, seededSolveMw, setPendingIds, setDisplayCoveringSet, setSeededSolveMw])
 
   const selectableVisible = useMemo(
     () => visible.filter(r => !activeDraftUnitIds.has(r.bmUnitId)).map(r => r.bmUnitId),
