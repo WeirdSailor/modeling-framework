@@ -172,10 +172,15 @@ export default function AvailableTable({
   }, [solveMode, solveMw, visible, activeDraftUnitIds])
 
   const seededSolveMwRef = useRef<number | null>(null)
+  // Frozen snapshot of coveringSet at seed time, used for the row highlight so it
+  // doesn't shift to a new batch of rows as units are moved into the draft (coveringSet
+  // itself keeps recomputing live against activeDraftUnitIds).
+  const [displayCoveringSet, setDisplayCoveringSet] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     if (!solveMode) {
       seededSolveMwRef.current = null
+      setDisplayCoveringSet(new Set())
       return
     }
     // Re-seed pendingIds only once per distinct solve request (identified by solveMw).
@@ -184,6 +189,7 @@ export default function AvailableTable({
     // (lower-ranked) units, and this effect would re-tick those rows.
     if (solveMw && solveMw > 0 && coveringSet.size > 0 && seededSolveMwRef.current !== solveMw) {
       setPendingIds(new Set(coveringSet))
+      setDisplayCoveringSet(new Set(coveringSet))
       seededSolveMwRef.current = solveMw
     }
   }, [solveMode, solveMw, coveringSet])
@@ -308,7 +314,7 @@ export default function AvailableTable({
               const inDraft     = activeDraftUnitIds.has(row.bmUnitId)
               const otherDrafts = otherDraftUnitMap.get(row.bmUnitId) ?? []
               const pending  = pendingIds.has(row.bmUnitId)
-              const inCoveringSet = solveMode && coveringSet.has(row.bmUnitId)
+              const inCoveringSet = solveMode && displayCoveringSet.has(row.bmUnitId)
               return (
                 <tr
                   key={row.bmUnitId}
