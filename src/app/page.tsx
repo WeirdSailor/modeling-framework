@@ -190,6 +190,7 @@ export default function Home() {
       setUnits(units)
       setSPs(settlementPeriods)
       setSolveTarget(null)
+      setAvailablePendingIds(new Set())
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load data')
     } finally {
@@ -207,6 +208,7 @@ export default function Home() {
         setUnits(units)
         setSPs(settlementPeriods)
         setSolveTarget(null)
+        setAvailablePendingIds(new Set())
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load historical data')
       } finally {
@@ -374,6 +376,8 @@ export default function Home() {
       confirmLabel: 'Commit',
       onConfirm: () => {
         commitDraft(activeDraftId)
+        setSolveTarget(null)
+        setAvailablePendingIds(new Set())
         flashToast('Draft committed')
         setConfirmState(null)
       },
@@ -387,6 +391,8 @@ export default function Home() {
       confirmLabel: 'Discard',
       onConfirm: () => {
         discardDraft(activeDraftId)
+        setSolveTarget(null)
+        setAvailablePendingIds(new Set())
         flashToast('Draft discarded')
         setConfirmState(null)
       },
@@ -408,6 +414,8 @@ export default function Home() {
       danger: true,
       onConfirm: () => {
         deleteDraft(activeDraftId)
+        setSolveTarget(null)
+        setAvailablePendingIds(new Set())
         flashToast('Draft deleted')
         setConfirmState(null)
       },
