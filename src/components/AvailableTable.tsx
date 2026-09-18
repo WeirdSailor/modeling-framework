@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useCallback, useEffect } from 'react'
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import type { BMUnit, ServiceType } from '@/models/types'
 
 
@@ -171,11 +171,22 @@ export default function AvailableTable({
     return ids
   }, [solveMode, solveMw, visible, activeDraftUnitIds])
 
+  const seededSolveMwRef = useRef<number | null>(null)
+
   useEffect(() => {
-    if (solveMode && coveringSet.size > 0) {
-      setPendingIds(new Set(coveringSet))
+    if (!solveMode) {
+      seededSolveMwRef.current = null
+      return
     }
-  }, [solveMode, coveringSet])
+    // Re-seed pendingIds only once per distinct solve request (identified by solveMw).
+    // Without this guard, moving units into the draft shrinks activeDraftUnitIds'
+    // complement, coveringSet recomputes to cover the same solveMw with different
+    // (lower-ranked) units, and this effect would re-tick those rows.
+    if (solveMw && solveMw > 0 && coveringSet.size > 0 && seededSolveMwRef.current !== solveMw) {
+      setPendingIds(new Set(coveringSet))
+      seededSolveMwRef.current = solveMw
+    }
+  }, [solveMode, solveMw, coveringSet])
 
   const selectableVisible = useMemo(
     () => visible.filter(r => !activeDraftUnitIds.has(r.bmUnitId)).map(r => r.bmUnitId),
