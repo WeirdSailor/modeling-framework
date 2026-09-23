@@ -757,3 +757,20 @@ input[type="checkbox"]:disabled { cursor: not-allowed; opacity: .4; }
   box-shadow: 0 1px 2px rgba(0,0,0,.25); transition: transform .15s;
 }
 .twk-toggle[data-on="1"] i { transform: translateX(14px); }
+
+/* ── Active constraints tile: band cells ──
+   Active bands use a diagonal hatch (never colour alone) at three intensities;
+   near is solid amber; no-data uses a dot pattern. All derived from theme tokens. */
+.cc-cell-active1 { background-image: repeating-linear-gradient(135deg,
+  color-mix(in srgb, var(--red) 55%, var(--bg-panel)) 0 4px,
+  color-mix(in srgb, var(--red) 22%, var(--bg-panel)) 4px 8px); }
+.cc-cell-active2 { background-image: repeating-linear-gradient(135deg,
+  color-mix(in srgb, var(--red) 75%, var(--bg-panel)) 0 4px,
+  color-mix(in srgb, var(--red) 38%, var(--bg-panel)) 4px 8px); }
+.cc-cell-active3 { background-image: repeating-linear-gradient(135deg,
+  color-mix(in srgb, var(--red) 95%, var(--bg-panel)) 0 4px,
+  color-mix(in srgb, var(--red) 55%, var(--bg-panel)) 4px 8px); }
+.cc-cell-near    { background: color-mix(in srgb, var(--amber) 55%, var(--bg-panel)); }
+.cc-cell-within  { background: var(--bg-subtle); }
+.cc-cell-nodata  { background-image: radial-gradient(color-mix(in srgb, var(--text-faint) 65%, transparent) 1px, transparent 1.3px);
+  background-size: 6px 6px; background-color: var(--bg-panel); }

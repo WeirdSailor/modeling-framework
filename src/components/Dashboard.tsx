@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import { AREAS, getArea, type AreaId } from '@/config/areas'
 import { computeAreaStatus, type AreaStatus, type AreaStatusResult } from '@/utils/areaAggregates'
 import type { SettlementPeriodData, AreaRequirementRow, DraftPlan, UnitSnapshot } from '@/models/types'
+import ConstraintsTile from './ConstraintsTile'
 
 const CHANGE_THRESHOLD = 10 // percent — must match CommittedTab
 
@@ -134,6 +135,15 @@ export default function Dashboard({ settlementPeriods, areaRequirements, areaThr
           ))}
         </div>
       </div>
+
+      {/* Active constraints — most actionable content, shown first */}
+      <ConstraintsTile
+        spCount={spCount}
+        onOpenConstraint={(id) => {
+          // TODO: wire to a constraint detail route once one exists.
+          console.log('Open constraint detail (stub):', id)
+        }}
+      />
 
       {/* Tile grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>

@@ -86,6 +86,37 @@ export interface AreaRequirementRow {
   constrained: number  // portion unusable (e.g. constrained off)
 }
 
+// ── Transmission constraint monitoring (dashboard tile, prototype/dummy data) ──
+
+export interface ConstraintPeriod {
+  start: string;    // ISO timestamp, SP start (UTC)
+  flowMw: number;
+  limitMw: number;
+}
+
+export interface ConstraintForecast {
+  id: string;       // e.g. "B6"
+  name: string;      // display name
+  periods: ConstraintPeriod[];
+}
+
+export interface ForecastRun {
+  runId: string;
+  runTime: string;   // ISO timestamp of the forecast run
+  constraints: ConstraintForecast[];
+}
+
+export interface ConstraintTileInput {
+  window: { start: string; end: string };  // from dashboard time selector
+  now: string;                              // injected, never read from Date.now() inside pure logic
+  current: ForecastRun;
+  previous?: ForecastRun;                   // for change badges
+}
+
+export type ConstraintBand = 'active3' | 'active2' | 'active1' | 'near' | 'within' | 'noData'
+export type ConstraintStatus = 'active' | 'near' | 'within'
+export type ConstraintChangeType = 'new' | 'cleared' | 'worse' | null
+
 export interface DraftPlan {
   id: string;
   name: string;
