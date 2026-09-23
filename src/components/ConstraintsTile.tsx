@@ -423,10 +423,11 @@ function bandClass(band: WindowedCell['band'], denseMode: boolean): string {
   }
 }
 
-// White on active/activeSevere, amber on near — within/noData print no value.
+// Coloured text matching each band's outline — within/noData print no value.
 function cellTextColor(band: WindowedCell['band']): string | undefined {
-  if (band === 'active' || band === 'activeSevere') return '#FFFFFF'
-  if (band === 'near') return '#F2B544'
+  if (band === 'activeSevere') return '#FFD3D5'
+  if (band === 'active') return '#FFA3A7'
+  if (band === 'near') return '#E3A845'
   return undefined
 }
 
@@ -544,7 +545,7 @@ function SelectedCellDetail({ row, index }: { row: ConstraintRowSummary; index: 
       {content.flow && <DetailRow label={content.flow.label} value={content.flow.value} />}
       {content.limit && <DetailRow label={content.limit.label} value={content.limit.value} />}
       {content.margin && (
-        <DetailRow label={content.margin.label} value={content.margin.value} color={content.margin.negative ? 'var(--red)' : undefined} />
+        <DetailRow label={content.margin.label} value={content.margin.value} color={content.margin.negative ? '#FFA3A7' : undefined} />
       )}
       <DetailRow label="State" value={content.state} />
 
@@ -646,7 +647,7 @@ function PeriodTooltip({ content, cellEl, containerEl }: {
       {content.margin && (
         <div>
           <span style={{ color: '#98A3B3' }}>{content.margin.label} </span>
-          <span style={{ color: content.margin.negative ? '#FF8A8F' : '#E6EAF0' }}>{content.margin.value}</span>
+          <span style={{ color: content.margin.negative ? '#FFA3A7' : '#E6EAF0' }}>{content.margin.value}</span>
         </div>
       )}
       <div style={{ color: '#98A3B3', marginTop: 2 }}>{content.state}</div>

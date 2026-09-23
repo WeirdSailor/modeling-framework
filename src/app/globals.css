@@ -759,15 +759,16 @@ input[type="checkbox"]:disabled { cursor: not-allowed; opacity: .4; }
 .twk-toggle[data-on="1"] i { transform: translateX(14px); }
 
 /* ── Active constraints tile: band cells ──
-   Form + lightness carry the meaning, not pattern: active bands are solid
-   fills, near is an outline (or a translucent fill once cells are too
-   narrow for a border to read), within is a plain dark cell, and no-data is
-   the only hatched cell. Colours are contrast-audited literals, not theme
-   tokens — this tile uses a fixed dark control-room palette by design (see
-   the period tooltip, which does the same). */
-.cc-cell-active-severe { background: #D9363E; }
-.cc-cell-active        { background: #A3232A; }
-.cc-cell-near          { background: #2A2213; box-shadow: inset 0 0 0 1px #E8A33D; }
-.cc-cell-near-dense    { background: rgba(232, 163, 61, 0.45); }
+   Form + lightness carry the meaning, not pattern: active bands are dark
+   tinted fills with an inset outline (so cell sizes don't change) and
+   coloured text — the same treatment as near, just with red instead of
+   amber, so red still draws the eye first. Within is a plain dark cell,
+   no-data is the only hatched cell. Colours are contrast-audited literals,
+   not theme tokens — this tile uses a fixed dark control-room palette by
+   design (see the period tooltip, which does the same). */
+.cc-cell-active-severe { background: #5A1E24; box-shadow: inset 0 0 0 1px #FF7F85; }
+.cc-cell-active        { background: #3A1A1E; box-shadow: inset 0 0 0 1px #E0676C; }
+.cc-cell-near          { background: #241E12; box-shadow: inset 0 0 0 1px #C28A34; }
+.cc-cell-near-dense    { background: rgba(194, 138, 52, 0.45); }
 .cc-cell-within        { background: #1B2430; }
 .cc-cell-nodata        { background-image: repeating-linear-gradient(135deg, #1B2430 0 3px, #2A3542 3px 6px); }
