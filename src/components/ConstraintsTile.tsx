@@ -343,7 +343,7 @@ function ConstraintRow({ row, vm, gridTemplateColumns, denseMode, onOpen, contai
       </div>
 
       {/* Worst utilisation bullet bar */}
-      <WorstUtilisationBar utilisationPct={row.worstUtilisationPct} color={color} />
+      <WorstUtilisationBar utilisationPct={row.worstUtilisationPct} worstOverloadMw={row.worstOverloadMw} color={color} />
 
       {/* First violation */}
       <div style={{ fontSize: 11 }}>
@@ -370,20 +370,23 @@ function ConstraintRow({ row, vm, gridTemplateColumns, denseMode, onOpen, contai
   )
 }
 
-function WorstUtilisationBar({ utilisationPct, color }: { utilisationPct: number | null; color: string }) {
-  if (utilisationPct == null) return <div style={{ fontSize: 11, color: 'var(--text-faint)' }}>—</div>
+// Bar position/colour are driven by utilisation % (calculation-only); the printed
+// value is the margin in MW (limit - flow), per the operator's preferred units.
+function WorstUtilisationBar({ utilisationPct, worstOverloadMw, color }: { utilisationPct: number | null; worstOverloadMw: number | null; color: string }) {
+  if (utilisationPct == null || worstOverloadMw == null) return <div style={{ fontSize: 11, color: 'var(--text-faint)' }}>—</div>
   const MIN = 85, MAX = 112
   const clamp = (v: number) => Math.max(MIN, Math.min(MAX, v))
   const pct = ((clamp(utilisationPct) - MIN) / (MAX - MIN)) * 100
   const hundredPct = ((100 - MIN) / (MAX - MIN)) * 100
+  const marginMw = Math.round(-worstOverloadMw)
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
       <div style={{ position: 'relative', flex: 1, height: 6, background: 'var(--bg-subtle)', borderRadius: 3, overflow: 'hidden' }}>
         <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${pct}%`, background: color, borderRadius: 3 }} />
         <div style={{ position: 'absolute', left: `${hundredPct}%`, top: 0, bottom: 0, width: 1, background: 'var(--text-faint)' }} />
       </div>
-      <span className="mono" style={{ fontSize: 11, fontWeight: 700, color: 'var(--text)', width: 34, textAlign: 'right' }}>
-        {Math.round(utilisationPct)}%
+      <span className="mono" style={{ fontSize: 11, fontWeight: 700, color: 'var(--text)', width: 56, textAlign: 'right' }}>
+        {marginMw > 0 ? `+${marginMw}` : marginMw} MW
       </span>
     </div>
   )
@@ -451,7 +454,7 @@ function Cell({ row, cell, denseMode, containerRef }: {
     >
       {showValue && (
         <span className="mono" style={{ fontSize: 10, fontWeight: 700, color: 'var(--text)' }}>
-          {Math.round(cell.utilisationPct as number)}
+          {Math.round((cell.limitMw as number) - (cell.flowMw as number))}
         </span>
       )}
       {tip && (
