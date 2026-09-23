@@ -254,30 +254,6 @@ export default function BatterySummaryTab({
         flexWrap: 'wrap',
         flexShrink: 0,
       }}>
-        {/* GSP filter */}
-        {(() => {
-          const incCount = gspIncluded.length
-          const excCount = gspExcluded.length
-          const active = incCount > 0 || excCount > 0
-          const excOnly = excCount > 0 && incCount === 0
-          return (
-            <div ref={gspWrapperRef} style={{ position: 'relative' }}>
-              <button style={{
-                border: `1px solid ${active ? (excOnly ? '#dc2626' : '#4f46e5') : 'var(--border-strong)'}`,
-                borderRadius: 6, padding: '5px 10px', fontSize: 12, cursor: 'pointer',
-                background: active ? (excOnly ? 'rgba(220,38,38,.1)' : 'rgba(79,70,229,.1)') : 'var(--bg-panel)',
-                color: active ? (excOnly ? '#fca5a5' : '#a5b4fc') : 'var(--text-soft)',
-                display: 'flex', alignItems: 'center', gap: 6,
-              }} onClick={() => setGspOpen(o => !o)}>
-                GSP ▾
-                {incCount > 0 && <span style={{ background: '#4f46e5', color: '#fff', fontSize: 10, borderRadius: 999, padding: '1px 5px', fontWeight: 600 }}>+{incCount}</span>}
-                {excCount > 0 && <span style={{ background: '#dc2626', color: '#fff', fontSize: 10, borderRadius: 999, padding: '1px 5px', fontWeight: 600 }}>−{excCount}</span>}
-              </button>
-              {gspOpen && <GspFilterPopover gspFilter={gspFilter} onChange={onGspFilterChange} onClose={() => setGspOpen(false)} wrapperRef={gspWrapperRef} />}
-            </div>
-          )
-        })()}
-
         {/* Type filter */}
         {(() => {
           const count = typeFilter.size
@@ -303,6 +279,30 @@ export default function BatterySummaryTab({
                   wrapperRef={typeWrapperRef}
                 />
               )}
+            </div>
+          )
+        })()}
+
+        {/* GSP filter (labeled "Constraint") */}
+        {(() => {
+          const incCount = gspIncluded.length
+          const excCount = gspExcluded.length
+          const active = incCount > 0 || excCount > 0
+          const excOnly = excCount > 0 && incCount === 0
+          return (
+            <div ref={gspWrapperRef} style={{ position: 'relative' }}>
+              <button style={{
+                border: `1px solid ${active ? (excOnly ? '#dc2626' : '#4f46e5') : 'var(--border-strong)'}`,
+                borderRadius: 6, padding: '5px 10px', fontSize: 12, cursor: 'pointer',
+                background: active ? (excOnly ? 'rgba(220,38,38,.1)' : 'rgba(79,70,229,.1)') : 'var(--bg-panel)',
+                color: active ? (excOnly ? '#fca5a5' : '#a5b4fc') : 'var(--text-soft)',
+                display: 'flex', alignItems: 'center', gap: 6,
+              }} onClick={() => setGspOpen(o => !o)}>
+                Constraint ▾
+                {incCount > 0 && <span style={{ background: '#4f46e5', color: '#fff', fontSize: 10, borderRadius: 999, padding: '1px 5px', fontWeight: 600 }}>+{incCount}</span>}
+                {excCount > 0 && <span style={{ background: '#dc2626', color: '#fff', fontSize: 10, borderRadius: 999, padding: '1px 5px', fontWeight: 600 }}>−{excCount}</span>}
+              </button>
+              {gspOpen && <GspFilterPopover gspFilter={gspFilter} onChange={onGspFilterChange} onClose={() => setGspOpen(false)} wrapperRef={gspWrapperRef} />}
             </div>
           )
         })()}
