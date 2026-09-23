@@ -21,6 +21,7 @@ interface Props {
   onAsFilterChange: (f: AsServicesFilter) => void
   tfIndex: number
   onTfIndexChange: (i: number) => void
+  deRatePct: number
 }
 
 // ── Theme (mirrors AreaChart/MarginChart) ───────────────────────────────────
@@ -93,9 +94,9 @@ interface ChartBar extends ReliabilityTotals {
 export default function BatteryReliabilityTab({
   units, settlementPeriods, unitServices,
   gspFilter, onGspFilterChange, asFilter, onAsFilterChange, tfIndex, onTfIndexChange,
+  deRatePct,
 }: Props) {
   const [requirementMW, setRequirementMW] = useState(0)
-  const [deRatePct, setDeRatePct] = useState(0)
   const [gspOpen, setGspOpen] = useState(false)
   const [asOpen, setAsOpen] = useState(false)
   const gspWrapperRef = useRef<HTMLDivElement>(null)
@@ -267,20 +268,11 @@ export default function BatteryReliabilityTab({
             }}
           />
         </label>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-soft)' }}>
-          De-rate (%)
-          <input
-            type="number"
-            min={0}
-            max={100}
-            value={deRatePct}
-            onChange={e => setDeRatePct(Math.min(100, Math.max(0, Number(e.target.value))))}
-            style={{
-              width: 70, padding: '4px 8px', fontSize: 12, borderRadius: 4,
-              border: '1px solid var(--border-strong)', background: 'var(--bg-panel)', color: 'var(--text)',
-            }}
-          />
-        </label>
+        {deRatePct > 0 && (
+          <span style={{ fontSize: 12, color: 'var(--text-soft)' }}>
+            De-rate: <strong style={{ color: 'var(--text)' }}>{deRatePct}%</strong> (set on Summary tab)
+          </span>
+        )}
       </div>
 
       {/* Headline */}

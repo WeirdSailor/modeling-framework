@@ -18,15 +18,18 @@ interface Props {
   onAsFilterChange: (f: AsServicesFilter) => void
   tfIndex: number
   onTfIndexChange: (i: number) => void
+  deRatePct: number
+  onDeRatePctChange: (pct: number) => void
 }
 
-type CardId = 'total' | 'contracted' | 'constrained' | 'highPrice' | 'usable'
+type CardId = 'total' | 'contracted' | 'constrained' | 'highPrice' | 'derated' | 'usable'
 
 const CARD_COLORS: Record<CardId, string> = {
   total:       '#58a6ff',
   contracted:  '#8b5cf6',
   constrained: '#ef4444',
   highPrice:   '#f59e0b',
+  derated:     '#f97316',
   usable:      '#22c55e',
 }
 
@@ -35,6 +38,7 @@ const CARD_LABELS: Record<CardId, string> = {
   contracted:  'Contracted',
   constrained: 'Constrained',
   highPrice:   'High Price',
+  derated:     'Derated',
   usable:      'Usable',
 }
 
@@ -54,6 +58,7 @@ function formatMw(value: number): string {
 export default function BatterySummaryTab({
   units, settlementPeriods, unitServices,
   gspFilter, onGspFilterChange, asFilter, onAsFilterChange, tfIndex, onTfIndexChange,
+  deRatePct, onDeRatePctChange,
 }: Props) {
   const [selectedCard, setSelectedCard] = useState<CardId | null>(null)
   const [gspOpen, setGspOpen] = useState(false)
@@ -87,17 +92,36 @@ export default function BatterySummaryTab({
   const highPriceRows = classified.filter(r => r.highPrice)
   const usableRows = classified.filter(r => r.included)
 
+  const usableBeforeDerate = sumCapacity(usableRows)
+  const deratedAmount = usableBeforeDerate * (deRatePct / 100)
+  const reliableUsable = usableBeforeDerate - deratedAmount
+
   const cardData: Record<CardId, { rows: typeof classified; sum: number }> = {
     total:       { rows: totalRows,       sum: sumCapacity(totalRows) },
     contracted:  { rows: contractedRows,  sum: sumCapacity(contractedRows) },
     constrained: { rows: constrainedRows, sum: sumCapacity(constrainedRows) },
     highPrice:   { rows: highPriceRows,   sum: sumCapacity(highPriceRows) },
-    usable:      { rows: usableRows,      sum: sumCapacity(usableRows) },
+    derated:     { rows: usableRows,      sum: deratedAmount },
+    usable:      { rows: usableRows,      sum: reliableUsable },
   }
 
-  const visibleRows = selectedCard
+  const visibleCards: CardId[] = deRatePct > 0
+    ? ['total', 'contracted', 'constrained', 'highPrice', 'derated', 'usable']
+    : ['total', 'contracted', 'constrained', 'highPrice', 'usable']
+
+  const unsortedVisibleRows = selectedCard
     ? cardData[selectedCard].rows
     : classified.filter(r => !r.constrained)
+
+  const visibleRows = useMemo(() => {
+    return [...unsortedVisibleRows].sort((a, b) => {
+      const aPriced = a.priceToMel > 0
+      const bPriced = b.priceToMel > 0
+      if (aPriced && bPriced) return a.priceToMel - b.priceToMel
+      if (aPriced !== bPriced) return aPriced ? -1 : 1
+      return 0
+    })
+  }, [unsortedVisibleRows])
 
   function handleCardClick(card: CardId) {
     setSelectedCard(prev => prev === card ? null : card)
@@ -185,6 +209,22 @@ export default function BatterySummaryTab({
           />
         </label>
 
+        {/* Derating */}
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-soft)' }}>
+          De-rate (%)
+          <input
+            type="number"
+            min={0}
+            max={100}
+            value={deRatePct}
+            onChange={e => onDeRatePctChange(Math.min(100, Math.max(0, Number(e.target.value))))}
+            style={{
+              width: 70, padding: '4px 8px', fontSize: 12, borderRadius: 4,
+              border: '1px solid var(--border-strong)', background: 'var(--bg-panel)', color: 'var(--text)',
+            }}
+          />
+        </label>
+
         {/* Timeframe selector */}
         <div style={{ display: 'flex', gap: 4, marginLeft: 'auto' }}>
           {TIMEFRAME_OPTIONS.map((opt, i) => (
@@ -214,7 +254,7 @@ export default function BatterySummaryTab({
         flexWrap: 'wrap',
         flexShrink: 0,
       }}>
-        {(['total', 'contracted', 'constrained', 'highPrice', 'usable'] as CardId[]).map(card => {
+        {visibleCards.map(card => {
           const isActive = selectedCard === card
           const color = CARD_COLORS[card]
           const { rows: cardRows, sum } = cardData[card]
@@ -258,16 +298,21 @@ export default function BatterySummaryTab({
               <th className="center">Service</th>
               <th className="num">PN</th>
               <th className="num">MEL</th>
-              <th className="num">Avail.</th>
-              <th className="num">Cumulative</th>
+              <th className="num">MIL</th>
+              <th className="num">MDO</th>
+              <th className="num">MDB</th>
+              <th className="num">Cumul. Offers</th>
+              <th className="num">Cumul. Bids</th>
               <th className="num">£ MEL</th>
             </tr>
           </thead>
           <tbody>
             {(() => {
-              let cumulative = 0
+              let cumulativeOffers = 0
+              let cumulativeBids = 0
               return visibleRows.map(row => {
-                cumulative += row.avail
+                cumulativeOffers += row.mdo
+                cumulativeBids += row.mdb
                 return (
                   <tr key={row.bmUnitId}>
                     <td className="mono">
@@ -279,8 +324,11 @@ export default function BatterySummaryTab({
                     <td className="center"><ServiceChip service={row.service} /></td>
                     <td className="mono num">{row.pn !== undefined ? row.pn.toFixed(0) : '—'}</td>
                     <td className="mono num">{row.mel > 0 ? row.mel.toFixed(0) : '—'}</td>
-                    <td className="mono num">{row.avail.toFixed(0)}</td>
-                    <td className="mono num">{cumulative.toFixed(0)}</td>
+                    <td className="mono num">{row.mil < 0 ? row.mil.toFixed(0) : '—'}</td>
+                    <td className="mono num">{row.mdo.toFixed(0)}</td>
+                    <td className="mono num">{row.mdb.toFixed(0)}</td>
+                    <td className="mono num">{cumulativeOffers.toFixed(0)}</td>
+                    <td className="mono num">{cumulativeBids.toFixed(0)}</td>
                     <td className="mono num">{row.priceToMel > 0 ? `£${row.priceToMel}` : '—'}</td>
                   </tr>
                 )

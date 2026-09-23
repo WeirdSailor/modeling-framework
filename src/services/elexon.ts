@@ -314,6 +314,9 @@ export async function fetchBmUnits(): Promise<BMUnit[]> {
     const cap = parseFloat(raw.generationCapacity)
     if (!isFinite(cap) || cap <= 0) continue
 
+    const importCapRaw = parseFloat(raw.demandCapacity)
+    const importCap = isFinite(importCapRaw) && importCapRaw > 0 ? Math.round(importCapRaw) : 0
+
     // Prefer elexonBmUnit as the key; fall back to nationalGridBmUnit
     const bmUnitId = raw.elexonBmUnit ?? raw.nationalGridBmUnit
     if (!bmUnitId) continue
@@ -343,6 +346,7 @@ export async function fetchBmUnits(): Promise<BMUnit[]> {
       nationalGridBmUnit: raw.nationalGridBmUnit,
       fuelType,
       registeredCapacity: Math.round(cap),
+      registeredImportCapacity: importCap,
       gspGroup: raw.gspGroupId,
       sel,
       sil: silEntry?.level !== undefined ? silEntry.level : undefined,

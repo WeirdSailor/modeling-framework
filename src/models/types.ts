@@ -3,6 +3,7 @@ export interface BMUnit {
   nationalGridBmUnit: string; // nationalGridBmUnit field (e.g. "DRAXX-1")
   fuelType: string;
   registeredCapacity: number; // MW — parsed from generationCapacity string
+  registeredImportCapacity?: number; // MW — magnitude of import (charging) capability, parsed from demandCapacity string
   gspGroup: string;           // gspGroupId from API (e.g. "_K")
   // Dynamic params — optional, won't exist for all units
   ndz?: number;  // Notice to Deviate from Zero (minutes) — API returns seconds in `notice` field, convert to minutes

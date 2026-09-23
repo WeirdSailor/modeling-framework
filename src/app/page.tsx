@@ -94,6 +94,7 @@ export default function Home() {
   const [batteryGspFilter, setBatteryGspFilter] = useState<Record<string, 'include' | 'exclude'>>({})
   const [batteryAsFilter, setBatteryAsFilter] = useState<AsServicesFilter>({ sr: false, qr: false })
   const [batteryTfIndex, setBatteryTfIndex] = useState(0)
+  const [batteryDeRatePct, setBatteryDeRatePct] = useState(0)
   const [solveTarget, setSolveTarget] = useState<{
     fromSp: number
     toSp: number
@@ -543,6 +544,8 @@ export default function Home() {
               onAsFilterChange={setBatteryAsFilter}
               tfIndex={batteryTfIndex}
               onTfIndexChange={setBatteryTfIndex}
+              deRatePct={batteryDeRatePct}
+              onDeRatePctChange={setBatteryDeRatePct}
             />
           </div>
 
@@ -566,6 +569,7 @@ export default function Home() {
               onAsFilterChange={setBatteryAsFilter}
               tfIndex={batteryTfIndex}
               onTfIndexChange={setBatteryTfIndex}
+              deRatePct={batteryDeRatePct}
             />
           </div>
         </main>
