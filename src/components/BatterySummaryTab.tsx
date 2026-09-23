@@ -298,7 +298,6 @@ export default function BatterySummaryTab({
               <th className="num">PN</th>
               <th className="num">MEL</th>
               <th className="num">MDO</th>
-              <th className="num">MDB</th>
               <th className="num">Cumul. Offers</th>
               <th className="num">£ MEL</th>
             </tr>
@@ -320,7 +319,6 @@ export default function BatterySummaryTab({
                     <td className="mono num">{row.pn !== undefined ? row.pn.toFixed(0) : '—'}</td>
                     <td className="mono num">{row.mel > 0 ? row.mel.toFixed(0) : '—'}</td>
                     <td className="mono num">{row.mdo.toFixed(0)}</td>
-                    <td className="mono num">{row.mdb.toFixed(0)}</td>
                     <td className="mono num">{cumulativeOffers.toFixed(0)}</td>
                     <td className="mono num">{row.priceToMel > 0 ? `£${row.priceToMel}` : '—'}</td>
                   </tr>
