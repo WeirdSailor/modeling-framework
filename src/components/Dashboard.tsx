@@ -136,15 +136,6 @@ export default function Dashboard({ settlementPeriods, areaRequirements, areaThr
         </div>
       </div>
 
-      {/* Active constraints — most actionable content, shown first */}
-      <ConstraintsTile
-        spCount={spCount}
-        onOpenConstraint={(id) => {
-          // TODO: wire to a constraint detail route once one exists.
-          console.log('Open constraint detail (stub):', id)
-        }}
-      />
-
       {/* Tile grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
         {areaStatuses.map(({ area, status }) => {
@@ -201,6 +192,17 @@ export default function Dashboard({ settlementPeriods, areaRequirements, areaThr
             </div>
           )
         })}
+      </div>
+
+      {/* Active constraints */}
+      <div style={{ marginTop: 24 }}>
+        <ConstraintsTile
+          spCount={spCount}
+          onOpenConstraint={(id) => {
+            // TODO: wire to a constraint detail route once one exists.
+            console.log('Open constraint detail (stub):', id)
+          }}
+        />
       </div>
     </div>
   )
