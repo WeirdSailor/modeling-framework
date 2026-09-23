@@ -573,8 +573,10 @@ function SelectedCellDetail({ row, index }: { row: ConstraintRowSummary; index: 
       <div style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--text-faint)', marginBottom: 6 }}>
         Contracted services
       </div>
-      <DetailRow label="Slow Reserve" value={`${services.slowReserveMw.toLocaleString()} MW`} />
-      <DetailRow label="Quick Reserve" value={`${services.quickReserveMw.toLocaleString()} MW`} />
+
+      <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text)', margin: '0 0 4px' }}>Reserve</div>
+      <DetailRow label="Slow Reserve" value={`${services.slowReserveMw.toLocaleString()} MW`} indent />
+      <DetailRow label="Quick Reserve" value={`${services.quickReserveMw.toLocaleString()} MW`} indent />
 
       <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text)', margin: '10px 0 4px' }}>Response</div>
       <DetailRow label="DM" value={`${services.response.dm.toLocaleString()} MW`} indent />
