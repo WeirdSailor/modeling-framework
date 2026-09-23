@@ -95,6 +95,7 @@ export default function Home() {
   const [batteryAsFilter, setBatteryAsFilter] = useState<AsServicesFilter>({ sr: false, qr: false })
   const [batteryTfIndex, setBatteryTfIndex] = useState(0)
   const [batteryDeRatePct, setBatteryDeRatePct] = useState(0)
+  const [batteryPriceThreshold, setBatteryPriceThreshold] = useState('')
   const [solveTarget, setSolveTarget] = useState<{
     fromSp: number
     toSp: number
@@ -546,6 +547,8 @@ export default function Home() {
               onTfIndexChange={setBatteryTfIndex}
               deRatePct={batteryDeRatePct}
               onDeRatePctChange={setBatteryDeRatePct}
+              priceThreshold={batteryPriceThreshold}
+              onPriceThresholdChange={setBatteryPriceThreshold}
             />
           </div>
 
@@ -570,6 +573,7 @@ export default function Home() {
               tfIndex={batteryTfIndex}
               onTfIndexChange={setBatteryTfIndex}
               deRatePct={batteryDeRatePct}
+              priceThreshold={batteryPriceThreshold}
             />
           </div>
         </main>

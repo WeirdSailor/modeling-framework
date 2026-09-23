@@ -20,6 +20,8 @@ interface Props {
   onTfIndexChange: (i: number) => void
   deRatePct: number
   onDeRatePctChange: (pct: number) => void
+  priceThreshold: string
+  onPriceThresholdChange: (v: string) => void
 }
 
 type CardId = 'total' | 'contracted' | 'constrained' | 'highPrice' | 'derated' | 'usable'
@@ -58,12 +60,11 @@ function formatMw(value: number): string {
 export default function BatterySummaryTab({
   units, settlementPeriods, unitServices,
   gspFilter, onGspFilterChange, asFilter, onAsFilterChange, tfIndex, onTfIndexChange,
-  deRatePct, onDeRatePctChange,
+  deRatePct, onDeRatePctChange, priceThreshold, onPriceThresholdChange,
 }: Props) {
   const [selectedCard, setSelectedCard] = useState<CardId | null>(null)
   const [gspOpen, setGspOpen] = useState(false)
   const [asOpen, setAsOpen] = useState(false)
-  const [priceThreshold, setPriceThreshold] = useState('')
   const gspWrapperRef = useRef<HTMLDivElement>(null)
   const asWrapperRef = useRef<HTMLDivElement>(null)
 
@@ -105,9 +106,7 @@ export default function BatterySummaryTab({
     usable:      { rows: usableRows,      sum: reliableUsable },
   }
 
-  const visibleCards: CardId[] = deRatePct > 0
-    ? ['total', 'contracted', 'constrained', 'highPrice', 'derated', 'usable']
-    : ['total', 'contracted', 'constrained', 'highPrice', 'usable']
+  const visibleCards: CardId[] = ['total', 'contracted', 'constrained', 'highPrice', 'derated', 'usable']
 
   const unsortedVisibleRows = selectedCard
     ? cardData[selectedCard].rows
@@ -201,7 +200,7 @@ export default function BatterySummaryTab({
             type="number"
             min={0}
             value={priceThreshold}
-            onChange={e => setPriceThreshold(e.target.value)}
+            onChange={e => onPriceThresholdChange(e.target.value)}
             style={{
               width: 80, padding: '4px 8px', fontSize: 12, borderRadius: 4,
               border: '1px solid var(--border-strong)', background: 'var(--bg-panel)', color: 'var(--text)',
@@ -258,7 +257,7 @@ export default function BatterySummaryTab({
           const isActive = selectedCard === card
           const color = CARD_COLORS[card]
           const { rows: cardRows, sum } = cardData[card]
-          const isEmpty = cardRows.length === 0
+          const isEmpty = card === 'derated' ? sum <= 0 : cardRows.length === 0
           return (
             <div
               key={card}
@@ -298,21 +297,17 @@ export default function BatterySummaryTab({
               <th className="center">Service</th>
               <th className="num">PN</th>
               <th className="num">MEL</th>
-              <th className="num">MIL</th>
               <th className="num">MDO</th>
               <th className="num">MDB</th>
               <th className="num">Cumul. Offers</th>
-              <th className="num">Cumul. Bids</th>
               <th className="num">£ MEL</th>
             </tr>
           </thead>
           <tbody>
             {(() => {
               let cumulativeOffers = 0
-              let cumulativeBids = 0
               return visibleRows.map(row => {
                 cumulativeOffers += row.mdo
-                cumulativeBids += row.mdb
                 return (
                   <tr key={row.bmUnitId}>
                     <td className="mono">
@@ -324,11 +319,9 @@ export default function BatterySummaryTab({
                     <td className="center"><ServiceChip service={row.service} /></td>
                     <td className="mono num">{row.pn !== undefined ? row.pn.toFixed(0) : '—'}</td>
                     <td className="mono num">{row.mel > 0 ? row.mel.toFixed(0) : '—'}</td>
-                    <td className="mono num">{row.mil < 0 ? row.mil.toFixed(0) : '—'}</td>
                     <td className="mono num">{row.mdo.toFixed(0)}</td>
                     <td className="mono num">{row.mdb.toFixed(0)}</td>
                     <td className="mono num">{cumulativeOffers.toFixed(0)}</td>
-                    <td className="mono num">{cumulativeBids.toFixed(0)}</td>
                     <td className="mono num">{row.priceToMel > 0 ? `£${row.priceToMel}` : '—'}</td>
                   </tr>
                 )

@@ -22,6 +22,7 @@ interface Props {
   tfIndex: number
   onTfIndexChange: (i: number) => void
   deRatePct: number
+  priceThreshold: string
 }
 
 // ── Theme (mirrors AreaChart/MarginChart) ───────────────────────────────────
@@ -94,7 +95,7 @@ interface ChartBar extends ReliabilityTotals {
 export default function BatteryReliabilityTab({
   units, settlementPeriods, unitServices,
   gspFilter, onGspFilterChange, asFilter, onAsFilterChange, tfIndex, onTfIndexChange,
-  deRatePct,
+  deRatePct, priceThreshold,
 }: Props) {
   const [requirementMW, setRequirementMW] = useState(0)
   const [gspOpen, setGspOpen] = useState(false)
@@ -116,10 +117,12 @@ export default function BatteryReliabilityTab({
   const gspIncluded = useMemo(() => Object.entries(gspFilter).filter(([, v]) => v === 'include').map(([k]) => k), [gspFilter])
   const gspExcluded = useMemo(() => Object.entries(gspFilter).filter(([, v]) => v === 'exclude').map(([k]) => k), [gspFilter])
 
+  const numericPriceThreshold = priceThreshold === '' ? undefined : Number(priceThreshold)
+
   const tableRows = useMemo(() => {
     const avail = computeBatteryAvailability(units, windowSps, spCount)
-    return computeBatteryReliability(avail, gspFilter, asFilter, unitServices, deRatePct, requirementMW).rows
-  }, [units, windowSps, spCount, gspFilter, asFilter, unitServices, deRatePct, requirementMW])
+    return computeBatteryReliability(avail, gspFilter, asFilter, unitServices, deRatePct, requirementMW, numericPriceThreshold).rows
+  }, [units, windowSps, spCount, gspFilter, asFilter, unitServices, deRatePct, requirementMW, numericPriceThreshold])
 
   const sortedRows = useMemo(() => {
     const list = [...tableRows]
@@ -140,7 +143,7 @@ export default function BatteryReliabilityTab({
   const chartData = useMemo<ChartBar[]>(() => {
     return windowSps.map(sp => {
       const avail = computeBatteryAvailability(units, [sp], 1)
-      const { totals } = computeBatteryReliability(avail, gspFilter, asFilter, unitServices, deRatePct, requirementMW)
+      const { totals } = computeBatteryReliability(avail, gspFilter, asFilter, unitServices, deRatePct, requirementMW, numericPriceThreshold)
       return {
         ...totals,
         sp: sp.settlementPeriod,
@@ -148,7 +151,7 @@ export default function BatteryReliabilityTab({
         deratedOff: totals.usable - totals.reliable,
       }
     })
-  }, [windowSps, units, gspFilter, asFilter, unitServices, deRatePct, requirementMW])
+  }, [windowSps, units, gspFilter, asFilter, unitServices, deRatePct, requirementMW, numericPriceThreshold])
 
   const worstBar = useMemo(() => {
     if (chartData.length === 0) return null
@@ -273,6 +276,11 @@ export default function BatteryReliabilityTab({
             De-rate: <strong style={{ color: 'var(--text)' }}>{deRatePct}%</strong> (set on Summary tab)
           </span>
         )}
+        {numericPriceThreshold !== undefined && numericPriceThreshold > 0 && (
+          <span style={{ fontSize: 12, color: 'var(--text-soft)' }}>
+            Max £ MEL: <strong style={{ color: 'var(--text)' }}>£{numericPriceThreshold}</strong> (set on Summary tab)
+          </span>
+        )}
       </div>
 
       {/* Headline */}
@@ -339,7 +347,8 @@ export default function BatteryReliabilityTab({
                 />
               ))}
             </Bar>
-            <Bar dataKey="deratedOff" name="De-rated off" stackId="a" fill="#22c55e" fillOpacity={0.35} maxBarSize={80} activeBar={false} />
+            <Bar dataKey="deratedOff" name="Derated" stackId="a" fill="#f97316" maxBarSize={80} activeBar={false} />
+            <Bar dataKey="highPrice" name="High Price" stackId="a" fill="#f59e0b" maxBarSize={80} activeBar={false} />
             <Bar dataKey="contracted" name="Contracted" stackId="a" fill="#8b5cf6" maxBarSize={80} activeBar={false} />
             <Bar dataKey="constrained" name="Constrained" stackId="a" fill="#ef4444" maxBarSize={80} activeBar={false} />
           </BarChart>
@@ -358,6 +367,7 @@ export default function BatteryReliabilityTab({
               <SortTh col="avail" sort={sort} onSort={toggleSort} numeric>Avail.</SortTh>
               <th className="num">Constrained</th>
               <th className="num">Contracted</th>
+              <th className="num">High Price</th>
               <th className="num">Included</th>
             </tr>
           </thead>
@@ -375,6 +385,7 @@ export default function BatteryReliabilityTab({
                 <td className="mono num">{row.avail.toFixed(0)}</td>
                 <td className="num">{row.constrained ? '✓' : '—'}</td>
                 <td className="num">{row.contracted ? '✓' : '—'}</td>
+                <td className="num">{row.highPrice ? '✓' : '—'}</td>
                 <td className="num">{row.included ? '✓' : '✗'}</td>
               </tr>
             ))}
