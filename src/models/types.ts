@@ -113,7 +113,7 @@ export interface ConstraintTileInput {
   previous?: ForecastRun;                   // for change badges
 }
 
-export type ConstraintBand = 'active3' | 'active2' | 'active1' | 'near' | 'within' | 'noData'
+export type ConstraintBand = 'activeSevere' | 'active' | 'near' | 'within' | 'noData'
 export type ConstraintStatus = 'active' | 'near' | 'within'
 export type ConstraintChangeType = 'new' | 'cleared' | 'worse' | null
 

@@ -147,7 +147,7 @@ export default function ConstraintsTile({ spCount, onOpenConstraint }: Constrain
         <div>
           <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>Active constraints</div>
           <div style={{ fontSize: 11, color: 'var(--text-soft)', fontFamily: 'var(--font-mono)', marginTop: 2 }}>
-            {formatWindowRange(vm.windowStartMs, vm.windowEndMs)} · settlement periods · forecast run {formatHHMM(new Date(vm.runTime).getTime())}
+            {formatWindowRange(vm.windowStartMs, vm.windowEndMs)} · settlement periods · last updated {formatHHMM(new Date(vm.runTime).getTime())}
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
@@ -175,33 +175,6 @@ export default function ConstraintsTile({ spCount, onOpenConstraint }: Constrain
         <>
           <div style={{ display: 'flex', alignItems: 'stretch' }}>
             <div style={{ flex: 1, minWidth: 0 }}>
-              {/* Aggregate strip */}
-              <div style={{ padding: '0 16px', display: 'grid', gridTemplateColumns: ROW_GRID_COLUMNS, gap: 6, alignItems: 'end' }}>
-                <div style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--text-faint)', paddingBottom: 4 }}>
-                  Active count
-                </div>
-                <div style={{ position: 'relative' }}>
-                  <div style={{ display: 'grid', gridTemplateColumns, gap: denseMode ? 1 : 3, alignItems: 'end', height: 34 }}>
-                    {vm.slotTimes.map((_, i) => {
-                      const count = vm.activeCountPerSlot[i]
-                      const h = vm.totals.peakTogether > 0 ? Math.max(2, (count / vm.totals.peakTogether) * 30) : 2
-                      return (
-                        <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: 34 }}>
-                          {!denseMode && count > 0 && (
-                            <span style={{ fontSize: 9, fontFamily: 'var(--font-mono)', color: 'var(--text-muted)', marginBottom: 1 }}>{count}</span>
-                          )}
-                          <div
-                            className={count > 0 ? 'cc-cell-active2' : 'cc-cell-within'}
-                            style={{ width: '100%', height: h, borderRadius: 1 }}
-                          />
-                        </div>
-                      )
-                    })}
-                  </div>
-                  <NowMarker vm={vm} top={0} bottom={0} />
-                </div>
-              </div>
-
               {/* Time axis */}
               <TimeAxis vm={vm} gridTemplateColumns={gridTemplateColumns} denseMode={denseMode} />
 
@@ -304,6 +277,10 @@ function SortToggle({ mode, onChange }: { mode: ConstraintSortMode; onChange: (m
 
 // ── Changes-since-previous-run line ────────────────────────────────────
 
+function formatOverloadMw(mw: number | undefined): string {
+  return mw != null ? `+${Math.round(mw).toLocaleString()} MW` : '?'
+}
+
 function buildChangesLine(vm: ConstraintTileViewModel): string | null {
   const { new: n, cleared: c, worse: w } = vm.changes
   if (n.length === 0 && c.length === 0 && w.length === 0) return null
@@ -312,16 +289,11 @@ function buildChangesLine(vm: ConstraintTileViewModel): string | null {
   if (c.length) {
     parts.push(c.map(r => {
       const at = r.previousWorstAtMs != null ? ` at ${formatHHMM(r.previousWorstAtMs)}` : ''
-      const util = r.previousWorstUtilisationPct != null ? `${Math.round(r.previousWorstUtilisationPct)}%` : '?'
-      return `1 cleared ${r.id} (was ${util}${at})`
+      return `1 cleared ${r.id} (was ${formatOverloadMw(r.previousWorstOverloadMw)}${at})`
     }).join(' · '))
   }
   if (w.length) {
-    parts.push(w.map(r => {
-      const prev = r.previousWorstUtilisationPct != null ? `${Math.round(r.previousWorstUtilisationPct)}%` : '?'
-      const cur = r.worstUtilisationPct != null ? `${Math.round(r.worstUtilisationPct)}%` : '?'
-      return `1 worse ${r.id} ${prev} → ${cur}`
-    }).join(' · '))
+    parts.push(w.map(r => `1 worse ${r.id} ${formatOverloadMw(r.previousWorstOverloadMw)} → ${formatOverloadMw(r.worstOverloadMw ?? undefined)}`).join(' · '))
   }
   return parts.join(' · ')
 }
@@ -336,7 +308,7 @@ function TimeAxis({ vm, gridTemplateColumns, denseMode }: { vm: ConstraintTileVi
       <div />
       <div style={{ position: 'relative', display: 'grid', gridTemplateColumns, gap: denseMode ? 1 : 3 }}>
         {vm.slotTimes.map((t, i) => (
-          <div key={i} style={{ fontSize: 9, color: 'var(--text-faint)', fontFamily: 'var(--font-mono)', textAlign: 'left' }}>
+          <div key={i} style={{ fontSize: 11, color: 'var(--text-soft)', fontFamily: 'var(--font-mono)', textAlign: 'left' }}>
             {i % tickStepSp === 0 ? formatHHMM(t) : ''}
           </div>
         ))}
@@ -439,15 +411,23 @@ function ConstraintRow({ row, vm, gridTemplateColumns, denseMode, onOpen, active
 
 // ── Cell ───────────────────────────────────────────────────────────────
 
-function bandClass(band: WindowedCell['band']): string {
+function bandClass(band: WindowedCell['band'], denseMode: boolean): string {
   switch (band) {
-    case 'active1': return 'cc-cell-active1'
-    case 'active2': return 'cc-cell-active2'
-    case 'active3': return 'cc-cell-active3'
-    case 'near': return 'cc-cell-near'
+    case 'activeSevere': return 'cc-cell-active-severe'
+    case 'active': return 'cc-cell-active'
+    // Below ~6px an outline gets swamped by the fill, so dense mode swaps the
+    // near band's border for a translucent amber fill instead.
+    case 'near': return denseMode ? 'cc-cell-near-dense' : 'cc-cell-near'
     case 'noData': return 'cc-cell-nodata'
     default: return 'cc-cell-within'
   }
+}
+
+// White on active/activeSevere, amber on near — within/noData print no value.
+function cellTextColor(band: WindowedCell['band']): string | undefined {
+  if (band === 'active' || band === 'activeSevere') return '#FFFFFF'
+  if (band === 'near') return '#F2B544'
+  return undefined
 }
 
 function Cell({ row, index, cell, denseMode, isTabbable, isTooltipActive, isSelected, cellRef, onFocusCell, onShow, onScheduleHide, onHideImmediate, onSelect, onArrow }: {
@@ -509,7 +489,7 @@ function Cell({ row, index, cell, denseMode, isTabbable, isTooltipActive, isSele
       aria-label={label}
       aria-describedby={isTooltipActive ? TOOLTIP_ID : undefined}
       aria-pressed={isSelected}
-      className={bandClass(cell.band)}
+      className={bandClass(cell.band, denseMode)}
       onMouseEnter={handleShow}
       onMouseLeave={onScheduleHide}
       onFocus={() => { onFocusCell(); handleShow() }}
@@ -525,7 +505,7 @@ function Cell({ row, index, cell, denseMode, isTabbable, isTooltipActive, isSele
       }}
     >
       {showValue && (
-        <span className="mono" style={{ fontSize: 10, fontWeight: 700, color: 'var(--text)' }}>
+        <span className="mono" style={{ fontSize: 10, fontWeight: 600, color: cellTextColor(cell.band) ?? 'var(--text)' }}>
           {Math.round((cell.limitMw as number) - (cell.flowMw as number))}
         </span>
       )}
@@ -709,12 +689,11 @@ export function ConstraintsTileSkeleton() {
 
 function Footer() {
   const items: { cls: string; label: string }[] = [
-    { cls: 'cc-cell-active1', label: '>100–103%' },
-    { cls: 'cc-cell-active2', label: '>103–106%' },
-    { cls: 'cc-cell-active3', label: '>106%' },
-    { cls: 'cc-cell-near', label: '95–100% near' },
+    { cls: 'cc-cell-active-severe', label: '>105%' },
+    { cls: 'cc-cell-active', label: '100 to 105%' },
+    { cls: 'cc-cell-near', label: '95 to 100% near' },
     { cls: 'cc-cell-within', label: '<95%' },
-    { cls: 'cc-cell-nodata', label: 'no data' },
+    { cls: 'cc-cell-nodata', label: 'No data' },
   ]
   return (
     <div style={{

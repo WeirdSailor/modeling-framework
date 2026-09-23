@@ -11,9 +11,9 @@ import type {
   ForecastRun,
 } from '@/models/types'
 
-export const NEAR_THRESHOLD = 95     // >=95 and <=100 -> near
-export const ACTIVE1_MAX = 103       // >100 to 103 -> active1
-export const ACTIVE2_MAX = 106       // >103 to 106 -> active2 ; >106 -> active3
+export const NEAR_THRESHOLD = 95            // >=95 and <=100 -> near
+export const ACTIVE_THRESHOLD = 100         // >100 and <=105 -> active
+export const ACTIVE_SEVERE_THRESHOLD = 105  // >105 -> activeSevere
 export const WORSE_THRESHOLD_PP = 2  // worst utilisation must rise by at least this many points to count as "worse"
 export const DENSE_MODE_SP_THRESHOLD = 12 // windows with more SPs than this render as a dense strip (no gaps/values)
 export const MIN_ACTIVE_CELL_PX = 6  // minimum rendered width for an active/near cell in dense mode
@@ -24,15 +24,14 @@ export const SP_MS = 30 * 60 * 1000
 
 export function bandForUtilisation(util: number | null): ConstraintBand {
   if (util == null) return 'noData'
-  if (util > ACTIVE2_MAX) return 'active3'
-  if (util > ACTIVE1_MAX) return 'active2'
-  if (util > 100) return 'active1'
+  if (util > ACTIVE_SEVERE_THRESHOLD) return 'activeSevere'
+  if (util > ACTIVE_THRESHOLD) return 'active'
   if (util >= NEAR_THRESHOLD) return 'near'
   return 'within'
 }
 
 export function isActiveBand(band: ConstraintBand): boolean {
-  return band === 'active1' || band === 'active2' || band === 'active3'
+  return band === 'active' || band === 'activeSevere'
 }
 
 function periodUtilisation(p: ConstraintPeriod | null | undefined): number | null {
@@ -190,6 +189,7 @@ export interface ConstraintRowSummary {
   violatedIntervalCount: number
   change: ConstraintChangeType
   previousWorstUtilisationPct?: number
+  previousWorstOverloadMw?: number
   previousWorstAtMs?: number
 }
 
@@ -248,6 +248,7 @@ function summariseConstraint(
 
   let change: ConstraintChangeType = null
   let previousWorstUtilisationPct: number | undefined
+  let previousWorstOverloadMw: number | undefined
   let previousWorstAtMs: number | undefined
   if (previousRun) {
     const prevForecast = previousRun.constraints.find(c => c.id === id)
@@ -255,6 +256,8 @@ function summariseConstraint(
     const prevActive = prevCells.some(c => isActiveBand(c.band))
     const prevWp = worstPoint(prevCells)
     previousWorstUtilisationPct = prevWp?.cell.utilisationPct ?? undefined
+    previousWorstOverloadMw = prevWp && prevWp.cell.flowMw != null && prevWp.cell.limitMw != null
+      ? prevWp.cell.flowMw - prevWp.cell.limitMw : undefined
     previousWorstAtMs = prevWp ? toMs(prevWp.cell.start) : undefined
 
     if (status === 'active' && !prevActive) {
@@ -271,7 +274,7 @@ function summariseConstraint(
     worstUtilisationPct, worstOverloadMw, worstAtMs,
     firstViolationStartMs, alreadyActiveAtWindowStart, timeUntilFirstViolation,
     violatedDurationMs, violatedIntervalCount,
-    change, previousWorstUtilisationPct, previousWorstAtMs,
+    change, previousWorstUtilisationPct, previousWorstOverloadMw, previousWorstAtMs,
   }
 }
 
