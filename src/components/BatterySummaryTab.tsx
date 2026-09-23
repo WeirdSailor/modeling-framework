@@ -63,6 +63,7 @@ export default function BatterySummaryTab({
   deRatePct, onDeRatePctChange, priceThreshold, onPriceThresholdChange,
 }: Props) {
   const [selectedCard, setSelectedCard] = useState<CardId | null>(null)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [gspOpen, setGspOpen] = useState(false)
   const [asOpen, setAsOpen] = useState(false)
   const gspWrapperRef = useRef<HTMLDivElement>(null)
@@ -124,6 +125,30 @@ export default function BatterySummaryTab({
 
   function handleCardClick(card: CardId) {
     setSelectedCard(prev => prev === card ? null : card)
+  }
+
+  function toggleRowSelected(bmUnitId: string) {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(bmUnitId)) next.delete(bmUnitId)
+      else next.add(bmUnitId)
+      return next
+    })
+  }
+
+  const allVisibleSelected = visibleRows.length > 0 && visibleRows.every(r => selectedIds.has(r.bmUnitId))
+  const someVisibleSelected = visibleRows.some(r => selectedIds.has(r.bmUnitId))
+
+  function toggleAllVisible() {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (allVisibleSelected) {
+        for (const r of visibleRows) next.delete(r.bmUnitId)
+      } else {
+        for (const r of visibleRows) next.add(r.bmUnitId)
+      }
+      return next
+    })
   }
 
   if (units.length === 0) {
@@ -292,6 +317,15 @@ export default function BatterySummaryTab({
         <table className="data-table" style={{ tableLayout: 'fixed', width: '100%' }}>
           <thead>
             <tr>
+              <th className="check-col" style={{ width: 32 }}>
+                <input
+                  type="checkbox"
+                  checked={allVisibleSelected}
+                  ref={el => { if (el) el.indeterminate = !allVisibleSelected && someVisibleSelected }}
+                  onChange={toggleAllVisible}
+                  aria-label="Select all visible"
+                />
+              </th>
               <th style={{ width: 220 }}>BMU</th>
               <th className="center">Type</th>
               <th className="center">Service</th>
@@ -309,6 +343,13 @@ export default function BatterySummaryTab({
                 cumulativeOffers += row.mdo
                 return (
                   <tr key={row.bmUnitId}>
+                    <td className="check-col">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(row.bmUnitId)}
+                        onChange={() => toggleRowSelected(row.bmUnitId)}
+                      />
+                    </td>
                     <td className="mono">
                       <div className="bmu-cell-inner">
                         <span>{row.nationalGridBmUnit}</span>
