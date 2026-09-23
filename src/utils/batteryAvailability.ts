@@ -4,6 +4,7 @@ import { maxBatteryPn } from '@/utils/batteryPn'
 export interface BatteryAvailabilityRow {
   bmUnitId: string
   nationalGridBmUnit: string
+  fuelType: string
   gspGroup: string
   mel: number
   mil: number
@@ -31,6 +32,7 @@ export function computeBatteryAvailability(
     return {
       bmUnitId: u.bmUnitId,
       nationalGridBmUnit: u.nationalGridBmUnit,
+      fuelType: u.fuelType,
       gspGroup: u.gspGroup,
       mel,
       mil,

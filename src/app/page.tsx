@@ -536,7 +536,7 @@ export default function Home() {
               switching tabs and back. */}
           <div style={{ display: activeBatteryTab === 'summary' ? 'flex' : 'none', flexDirection: 'column', flex: 1, minHeight: 0 }}>
             <BatterySummaryTab
-              units={batteryUnits}
+              units={units}
               settlementPeriods={settlementPeriods}
               unitServices={unitServices}
               gspFilter={batteryGspFilter}

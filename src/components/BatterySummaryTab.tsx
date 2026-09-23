@@ -3,7 +3,7 @@
 import { useMemo, useRef, useState } from 'react'
 import type { BMUnit, ServiceType, SettlementPeriodData } from '@/models/types'
 import { GSP_AREAS } from '@/config/scenarios'
-import { GspFilterPopover } from '@/components/GspFilterPopover'
+import { GspFilterPopover, usePopoverDismiss } from '@/components/GspFilterPopover'
 import { TIMEFRAME_OPTIONS, AsServicesPopover, type AsServicesFilter } from '@/components/BatteryFilters'
 import { computeBatteryAvailability } from '@/utils/batteryAvailability'
 import { computeBatteryReliability } from '@/utils/batteryReliability'
@@ -49,8 +49,67 @@ function ServiceChip({ service }: { service: ServiceType | undefined }) {
   return <span className={`chip chip-${service.toLowerCase()}`}>{service}</span>
 }
 
-function TypeChip() {
-  return <span className="chip chip-battery">Battery</span>
+const FUEL_DISPLAY: Record<string, { label: string; chipClass: string }> = {
+  BATTERY: { label: 'Battery', chipClass: 'chip-battery' },
+  CCGT:    { label: 'CCGT',    chipClass: 'chip-ccgt' },
+  COAL:    { label: 'Coal',    chipClass: 'chip-coal' },
+  NUCLEAR: { label: 'Nuclear', chipClass: 'chip-nuclear' },
+  BIOMASS: { label: 'Biomass', chipClass: 'chip-biomass' },
+  PS:      { label: 'Pumped',  chipClass: 'chip-pumped' },
+  NPSHYD:  { label: 'Hydro',   chipClass: 'chip-hydro' },
+  OCGT:    { label: 'OCGT',    chipClass: 'chip-ocgt' },
+  GAS:     { label: 'Gas',     chipClass: 'chip-ccgt' },
+  OIL:     { label: 'Oil',     chipClass: 'chip-coal' },
+  WIND:    { label: 'Wind',    chipClass: 'chip-wind' },
+  SOLAR:   { label: 'Solar',   chipClass: 'chip-wind' },
+}
+
+function getFuelDisplay(fuelType: string): { label: string; chipClass: string } {
+  return FUEL_DISPLAY[fuelType] ?? { label: fuelType, chipClass: '' }
+}
+
+function TypeChip({ fuelType }: { fuelType: string }) {
+  const { label, chipClass } = getFuelDisplay(fuelType)
+  return <span className={`chip ${chipClass}`}>{label}</span>
+}
+
+function TypeFilterPopover({ options, selected, onToggle, onClose, wrapperRef }: {
+  options: string[]
+  selected: Set<string>
+  onToggle: (type: string) => void
+  onClose: () => void
+  wrapperRef: React.RefObject<HTMLDivElement | null>
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+  usePopoverDismiss(ref, wrapperRef, onClose)
+
+  return (
+    <div ref={ref} style={{
+      position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 50,
+      background: 'var(--bg-panel)', border: '1px solid var(--border-strong)',
+      borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,.35)', width: 200,
+      maxHeight: 280, overflowY: 'auto',
+    }}>
+      <div style={{ padding: '7px 12px', borderBottom: '1px solid var(--border)' }}>
+        <span style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--text-faint)' }}>
+          Filter by type
+        </span>
+      </div>
+      {options.map(ft => (
+        <label key={ft} style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          padding: '7px 12px', fontSize: 12.5, color: 'var(--text)', cursor: 'pointer',
+        }}>
+          <input
+            type="checkbox"
+            checked={selected.has(ft)}
+            onChange={() => onToggle(ft)}
+          />
+          {getFuelDisplay(ft).label}
+        </label>
+      ))}
+    </div>
+  )
 }
 
 function formatMw(value: number): string {
@@ -66,14 +125,36 @@ export default function BatterySummaryTab({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [gspOpen, setGspOpen] = useState(false)
   const [asOpen, setAsOpen] = useState(false)
+  const [typeOpen, setTypeOpen] = useState(false)
+  const [typeFilter, setTypeFilter] = useState<Set<string>>(new Set())
   const gspWrapperRef = useRef<HTMLDivElement>(null)
   const asWrapperRef = useRef<HTMLDivElement>(null)
+  const typeWrapperRef = useRef<HTMLDivElement>(null)
 
   const { spCount } = TIMEFRAME_OPTIONS[tfIndex]
 
+  const availableTypes = useMemo(
+    () => Array.from(new Set(units.map(u => u.fuelType))).sort(),
+    [units]
+  )
+
+  const filteredUnits = useMemo(
+    () => typeFilter.size === 0 ? units : units.filter(u => typeFilter.has(u.fuelType)),
+    [units, typeFilter]
+  )
+
+  function toggleTypeFilter(fuelType: string) {
+    setTypeFilter(prev => {
+      const next = new Set(prev)
+      if (next.has(fuelType)) next.delete(fuelType)
+      else next.add(fuelType)
+      return next
+    })
+  }
+
   const rows = useMemo(
-    () => computeBatteryAvailability(units, settlementPeriods, spCount),
-    [units, settlementPeriods, spCount]
+    () => computeBatteryAvailability(filteredUnits, settlementPeriods, spCount),
+    [filteredUnits, settlementPeriods, spCount]
   )
 
   const gspIncluded = useMemo(() => Object.entries(gspFilter).filter(([, v]) => v === 'include').map(([k]) => k), [gspFilter])
@@ -154,8 +235,8 @@ export default function BatterySummaryTab({
   if (units.length === 0) {
     return (
       <div className="workspace-empty">
-        <h2>No battery units found</h2>
-        <p>No units with fuel type BATTERY were returned by the data source.</p>
+        <h2>No units found</h2>
+        <p>No units were returned by the data source.</p>
       </div>
     )
   }
@@ -193,6 +274,35 @@ export default function BatterySummaryTab({
                 {excCount > 0 && <span style={{ background: '#dc2626', color: '#fff', fontSize: 10, borderRadius: 999, padding: '1px 5px', fontWeight: 600 }}>−{excCount}</span>}
               </button>
               {gspOpen && <GspFilterPopover gspFilter={gspFilter} onChange={onGspFilterChange} onClose={() => setGspOpen(false)} wrapperRef={gspWrapperRef} />}
+            </div>
+          )
+        })()}
+
+        {/* Type filter */}
+        {(() => {
+          const count = typeFilter.size
+          const active = count > 0
+          return (
+            <div ref={typeWrapperRef} style={{ position: 'relative' }}>
+              <button style={{
+                border: `1px solid ${active ? '#4f46e5' : 'var(--border-strong)'}`,
+                borderRadius: 6, padding: '5px 10px', fontSize: 12, cursor: 'pointer',
+                background: active ? 'rgba(79,70,229,.1)' : 'var(--bg-panel)',
+                color: active ? '#a5b4fc' : 'var(--text-soft)',
+                display: 'flex', alignItems: 'center', gap: 6,
+              }} onClick={() => setTypeOpen(o => !o)}>
+                Type ▾
+                {count > 0 && <span style={{ background: '#4f46e5', color: '#fff', fontSize: 10, borderRadius: 999, padding: '1px 5px', fontWeight: 600 }}>{count}</span>}
+              </button>
+              {typeOpen && (
+                <TypeFilterPopover
+                  options={availableTypes}
+                  selected={typeFilter}
+                  onToggle={toggleTypeFilter}
+                  onClose={() => setTypeOpen(false)}
+                  wrapperRef={typeWrapperRef}
+                />
+              )}
             </div>
           )
         })()}
@@ -337,6 +447,9 @@ export default function BatterySummaryTab({
             </tr>
           </thead>
           <tbody>
+            {visibleRows.length === 0 && (
+              <tr><td colSpan={9} className="empty">No units match your filters.</td></tr>
+            )}
             {(() => {
               let cumulativeOffers = 0
               return visibleRows.map(row => {
@@ -355,7 +468,7 @@ export default function BatterySummaryTab({
                         <span>{row.nationalGridBmUnit}</span>
                       </div>
                     </td>
-                    <td className="center"><TypeChip /></td>
+                    <td className="center"><TypeChip fuelType={row.fuelType} /></td>
                     <td className="center"><ServiceChip service={row.service} /></td>
                     <td className="mono num">{row.pn !== undefined ? row.pn.toFixed(0) : '—'}</td>
                     <td className="mono num">{row.mel > 0 ? row.mel.toFixed(0) : '—'}</td>
