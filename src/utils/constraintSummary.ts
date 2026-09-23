@@ -369,3 +369,61 @@ export function sortConstraintRows(
   const near = [...nearRows].sort((a, b) => (b.worstUtilisationPct ?? -Infinity) - (a.worstUtilisationPct ?? -Infinity))
   return [...active, ...near]
 }
+
+// ── Period tooltip content ──────────────────────────────────────────────
+
+export interface PeriodTooltipLine {
+  label: string
+  value: string
+}
+
+export interface PeriodTooltipContent {
+  title: string
+  flow: PeriodTooltipLine | null
+  limit: PeriodTooltipLine | null
+  margin: (PeriodTooltipLine & { negative: boolean }) | null
+  state: string
+  ariaLabel: string
+}
+
+/** Formats the exact content for the single settlement-period hover/focus tooltip. */
+export function formatPeriodTooltip(row: ConstraintRowSummary, index: number): PeriodTooltipContent {
+  const cell = row.cells[index]
+  const start = formatHHMM(new Date(cell.start).getTime())
+  const end = formatHHMM(new Date(cell.end).getTime())
+  const title = `${row.id} · ${start}–${end}`
+
+  if (cell.band === 'noData' || cell.flowMw == null || cell.limitMw == null || cell.utilisationPct == null) {
+    return {
+      title, flow: null, limit: null, margin: null,
+      state: 'No data',
+      ariaLabel: `${row.id}, ${start} to ${end}, no data`,
+    }
+  }
+
+  const flowMw = Math.round(cell.flowMw)
+  const limitMw = Math.round(cell.limitMw)
+  const marginMw = limitMw - flowMw
+  const utilPct = Math.round(cell.utilisationPct)
+  const negative = marginMw < 0
+  const marginNumber = negative ? `−${Math.abs(marginMw).toLocaleString()}` : marginMw.toLocaleString()
+
+  const stateWord = isActiveBand(cell.band) ? 'Active' : cell.band === 'near' ? 'Near' : 'Within limits'
+  const prevActive = index > 0 && isActiveBand(row.cells[index - 1]?.band)
+  const nextActive = index < row.cells.length - 1 && isActiveBand(row.cells[index + 1]?.band)
+  const singlePeriod = isActiveBand(cell.band) && !prevActive && !nextActive
+  const state = singlePeriod ? `${stateWord} · single period` : stateWord
+
+  const ariaMargin = negative ? `minus ${Math.abs(marginMw).toLocaleString()}` : marginMw.toLocaleString()
+  const ariaLabel = `${row.id}, ${start} to ${end}, flow ${flowMw.toLocaleString()} megawatts, limit ${limitMw.toLocaleString()} megawatts, `
+    + `margin ${ariaMargin} megawatts, ${utilPct} percent, ${stateWord.toLowerCase()}${singlePeriod ? ', single period' : ''}`
+
+  return {
+    title,
+    flow: { label: 'Flow', value: `${flowMw.toLocaleString()} MW` },
+    limit: { label: 'Limit', value: `${limitMw.toLocaleString()} MW` },
+    margin: { label: 'Margin', value: `${marginNumber} MW · ${utilPct}%`, negative },
+    state,
+    ariaLabel,
+  }
+}

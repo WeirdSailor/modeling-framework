@@ -1,23 +1,34 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { ConstraintTileInput } from '@/models/types'
 import {
   DENSE_MODE_SP_THRESHOLD,
   buildConstraintTileViewModel,
   formatDuration,
   formatHHMM,
+  formatPeriodTooltip,
   isActiveBand,
   sortConstraintRows,
   SP_MS,
   type ConstraintRowSummary,
   type ConstraintSortMode,
   type ConstraintTileViewModel,
+  type PeriodTooltipContent,
   type WindowedCell,
 } from '@/utils/constraintSummary'
 import { buildDemo24hRun, buildDemo4hRuns, floorToSpMs } from '@/config/constraintFixtures'
 
 const REFRESH_MS = 60_000 // move the "now" marker roughly once a minute, without refetching
+
+const TOOLTIP_ID = 'constraint-period-tooltip'
+
+interface ActiveCell {
+  row: ConstraintRowSummary
+  index: number
+  el: HTMLElement
+}
 
 interface ConstraintsTileProps {
   spCount: number // number of settlement periods in the dashboard's selected window
@@ -28,6 +39,40 @@ export default function ConstraintsTile({ spCount, onOpenConstraint }: Constrain
   const [nowMs, setNowMs] = useState(() => Date.now())
   const [sortMode, setSortMode] = useState<ConstraintSortMode>('firstViolation')
   const containerRef = useRef<HTMLDivElement>(null)
+
+  // Single shared tooltip instance for the whole tile — moving between adjacent
+  // cells (mouse glide or arrow keys) never drops through a "hidden" state, so
+  // it never re-fades; only a genuine show after being fully hidden fades in.
+  const [activeCell, setActiveCell] = useState<ActiveCell | null>(null)
+  const hideTimeoutRef = useRef<number | null>(null)
+
+  const showCellTooltip = useCallback((row: ConstraintRowSummary, index: number, el: HTMLElement) => {
+    if (hideTimeoutRef.current != null) { window.clearTimeout(hideTimeoutRef.current); hideTimeoutRef.current = null }
+    setActiveCell({ row, index, el })
+  }, [])
+
+  const scheduleHideTooltip = useCallback(() => {
+    hideTimeoutRef.current = window.setTimeout(() => { setActiveCell(null); hideTimeoutRef.current = null }, 0)
+  }, [])
+
+  const hideTooltipImmediate = useCallback(() => {
+    if (hideTimeoutRef.current != null) { window.clearTimeout(hideTimeoutRef.current); hideTimeoutRef.current = null }
+    setActiveCell(null)
+  }, [])
+
+  useEffect(() => () => { if (hideTimeoutRef.current != null) window.clearTimeout(hideTimeoutRef.current) }, [])
+
+  // Touch: a tap elsewhere while a tooltip is open (from the touch-tap-to-show
+  // path in Cell) dismisses it.
+  useEffect(() => {
+    if (!activeCell) return
+    function handlePointerDown(e: PointerEvent) {
+      if (e.pointerType !== 'touch') return
+      if (activeCell && !activeCell.el.contains(e.target as Node)) hideTooltipImmediate()
+    }
+    document.addEventListener('pointerdown', handlePointerDown)
+    return () => document.removeEventListener('pointerdown', handlePointerDown)
+  }, [activeCell, hideTooltipImmediate])
 
   useEffect(() => {
     const id = setInterval(() => setNowMs(Date.now()), REFRESH_MS)
@@ -157,7 +202,10 @@ export default function ConstraintsTile({ spCount, onOpenConstraint }: Constrain
                 gridTemplateColumns={gridTemplateColumns}
                 denseMode={denseMode}
                 onOpen={() => onOpenConstraint?.(row.id)}
-                containerRef={containerRef}
+                activeCell={activeCell}
+                showCellTooltip={showCellTooltip}
+                scheduleHideTooltip={scheduleHideTooltip}
+                hideTooltipImmediate={hideTooltipImmediate}
               />
             ))}
           </div>
@@ -174,6 +222,14 @@ export default function ConstraintsTile({ spCount, onOpenConstraint }: Constrain
 
       {/* Footer legend */}
       <Footer />
+
+      {activeCell && containerRef.current && (
+        <PeriodTooltip
+          content={formatPeriodTooltip(activeCell.row, activeCell.index)}
+          cellEl={activeCell.el}
+          containerEl={containerRef.current}
+        />
+      )}
     </div>
   )
 }
@@ -292,29 +348,40 @@ function NowMarker({ vm, top, bottom }: { vm: ConstraintTileViewModel; top: numb
 
 // ── Constraint row ───────────────────────────────────────────────────────
 
-function ConstraintRow({ row, vm, gridTemplateColumns, denseMode, onOpen, containerRef }: {
+function ConstraintRow({ row, vm, gridTemplateColumns, denseMode, onOpen, activeCell, showCellTooltip, scheduleHideTooltip, hideTooltipImmediate }: {
   row: ConstraintRowSummary
   vm: ConstraintTileViewModel
   gridTemplateColumns: string
   denseMode: boolean
   onOpen: () => void
-  containerRef: React.RefObject<HTMLDivElement | null>
+  activeCell: ActiveCell | null
+  showCellTooltip: (row: ConstraintRowSummary, index: number, el: HTMLElement) => void
+  scheduleHideTooltip: () => void
+  hideTooltipImmediate: () => void
 }) {
   const isActive = row.status === 'active'
   const color = isActive ? 'var(--red)' : 'var(--amber)'
+  const [mouseHover, setMouseHover] = useState(false)
+  const [focusedIndex, setFocusedIndex] = useState(0)
+  const cellRefs = useRef<(HTMLDivElement | null)[]>([])
+
+  const isRowActive = mouseHover || activeCell?.row.id === row.id
+
+  function focusCellAt(index: number) {
+    const clamped = Math.max(0, Math.min(row.cells.length - 1, index))
+    cellRefs.current[clamped]?.focus()
+  }
 
   return (
     <div
-      role="button"
-      tabIndex={0}
       onClick={onOpen}
-      onKeyDown={e => { if (e.key === 'Enter') onOpen() }}
       style={{
         display: 'grid', gridTemplateColumns: '150px minmax(0,1fr) 90px 150px 120px 110px 70px', gap: 6,
         alignItems: 'center', padding: '5px 0', cursor: 'pointer', borderRadius: 4,
+        background: isRowActive ? '#161E29' : 'transparent',
       }}
-      onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
-      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+      onMouseEnter={() => setMouseHover(true)}
+      onMouseLeave={() => setMouseHover(false)}
     >
       {/* Name */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
@@ -330,7 +397,22 @@ function ConstraintRow({ row, vm, gridTemplateColumns, denseMode, onOpen, contai
       {/* Time strip */}
       <div style={{ position: 'relative', display: 'grid', gridTemplateColumns, gap: denseMode ? 1 : 3 }}>
         {row.cells.map((cell, i) => (
-          <Cell key={i} row={row} cell={cell} denseMode={denseMode} containerRef={containerRef} />
+          <Cell
+            key={i}
+            row={row}
+            index={i}
+            cell={cell}
+            denseMode={denseMode}
+            isTabbable={i === focusedIndex}
+            isTooltipActive={activeCell?.row.id === row.id && activeCell.index === i}
+            cellRef={el => { cellRefs.current[i] = el }}
+            onFocusCell={() => setFocusedIndex(i)}
+            onShow={el => showCellTooltip(row, i, el)}
+            onScheduleHide={scheduleHideTooltip}
+            onHideImmediate={hideTooltipImmediate}
+            onOpen={onOpen}
+            onArrow={dir => focusCellAt(i + dir)}
+          />
         ))}
         <NowMarker vm={vm} top={0} bottom={0} />
       </div>
@@ -392,7 +474,7 @@ function WorstUtilisationBar({ utilisationPct, worstOverloadMw, color }: { utili
   )
 }
 
-// ── Cell with tooltip ─────────────────────────────────────────────────────
+// ── Cell ───────────────────────────────────────────────────────────────
 
 function bandClass(band: WindowedCell['band']): string {
   switch (band) {
@@ -405,51 +487,68 @@ function bandClass(band: WindowedCell['band']): string {
   }
 }
 
-function cellAriaLabel(row: ConstraintRowSummary, cell: WindowedCell): string {
-  const start = formatHHMM(new Date(cell.start).getTime())
-  const end = formatHHMM(new Date(cell.end).getTime())
-  if (cell.band === 'noData' || cell.flowMw == null || cell.limitMw == null) {
-    return `${row.id}, ${start} to ${end}, no data`
-  }
-  const margin = cell.limitMw - cell.flowMw
-  const stateWord = isActiveBand(cell.band) ? 'active' : cell.band === 'near' ? 'near' : 'within limits'
-  return `${row.id}, ${start} to ${end}, flow ${Math.round(cell.flowMw).toLocaleString()} MW, limit ${Math.round(cell.limitMw).toLocaleString()} MW, margin ${margin < 0 ? '−' : ''}${Math.round(Math.abs(margin)).toLocaleString()} MW, ${stateWord}`
-}
-
-function Cell({ row, cell, denseMode, containerRef }: {
+function Cell({ row, index, cell, denseMode, isTabbable, isTooltipActive, cellRef, onFocusCell, onShow, onScheduleHide, onHideImmediate, onOpen, onArrow }: {
   row: ConstraintRowSummary
+  index: number
   cell: WindowedCell
   denseMode: boolean
-  containerRef: React.RefObject<HTMLDivElement | null>
+  isTabbable: boolean
+  isTooltipActive: boolean
+  cellRef: (el: HTMLDivElement | null) => void
+  onFocusCell: () => void
+  onShow: (el: HTMLElement) => void
+  onScheduleHide: () => void
+  onHideImmediate: () => void
+  onOpen: () => void
+  onArrow: (dir: -1 | 1) => void
 }) {
-  const [tip, setTip] = useState<{ x: number; y: number } | null>(null)
   const ref = useRef<HTMLDivElement>(null)
-  const label = cellAriaLabel(row, cell)
+  // Cheap: only computes the aria-label sentence, not the whole tooltip layout.
+  const label = useMemo(() => formatPeriodTooltip(row, index).ariaLabel, [row, index])
   const showValue = !denseMode && (cell.band === 'near' || isActiveBand(cell.band)) && cell.utilisationPct != null
 
-  function showTip() {
-    if (!ref.current || !containerRef.current) return
-    const cr = containerRef.current.getBoundingClientRect()
-    const er = ref.current.getBoundingClientRect()
-    const x = Math.min(Math.max(er.left - cr.left + er.width / 2, 60), cr.width - 60)
-    const y = er.top - cr.top
-    setTip({ x, y })
+  function setRef(el: HTMLDivElement | null) {
+    ref.current = el
+    cellRef(el)
+  }
+
+  function handleShow() {
+    if (ref.current) onShow(ref.current)
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (e.key === 'ArrowLeft') { e.preventDefault(); onArrow(-1) }
+    else if (e.key === 'ArrowRight') { e.preventDefault(); onArrow(1) }
+    else if (e.key === 'Enter') { onOpen() }
+    else if (e.key === 'Escape') { onHideImmediate() }
+  }
+
+  // Touch: first tap shows the tooltip without navigating; a second tap on the
+  // same (already-tooltipped) cell falls through to the row's onClick.
+  function handlePointerUp(e: React.PointerEvent) {
+    if (e.pointerType !== 'touch') return
+    if (!isTooltipActive) { e.preventDefault(); e.stopPropagation(); handleShow() }
   }
 
   return (
     <div
-      ref={ref}
-      tabIndex={0}
-      role="img"
+      ref={setRef}
+      tabIndex={isTabbable ? 0 : -1}
+      role="button"
       aria-label={label}
+      aria-describedby={isTooltipActive ? TOOLTIP_ID : undefined}
       className={bandClass(cell.band)}
-      onMouseEnter={showTip}
-      onMouseLeave={() => setTip(null)}
-      onFocus={showTip}
-      onBlur={() => setTip(null)}
+      onMouseEnter={handleShow}
+      onMouseLeave={onScheduleHide}
+      onFocus={() => { onFocusCell(); handleShow() }}
+      onBlur={onScheduleHide}
+      onKeyDown={handleKeyDown}
+      onPointerUp={handlePointerUp}
       style={{
         height: denseMode ? 22 : 26, borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        outline: 'none',
+        cursor: 'pointer',
+        outline: isTooltipActive ? '2px solid #E6EAF0' : 'none',
+        outlineOffset: isTooltipActive ? 1 : 0,
       }}
     >
       {showValue && (
@@ -457,17 +556,87 @@ function Cell({ row, cell, denseMode, containerRef }: {
           {Math.round((cell.limitMw as number) - (cell.flowMw as number))}
         </span>
       )}
-      {tip && (
-        <div style={{
-          position: 'absolute', left: tip.x, top: tip.y, transform: 'translate(-50%, calc(-100% - 6px))',
-          background: 'var(--bg-panel)', border: '1px solid var(--border-strong)', borderRadius: 6,
-          padding: '6px 8px', fontSize: 11, color: 'var(--text)', whiteSpace: 'nowrap', zIndex: 20,
-          boxShadow: 'var(--shadow-md)', pointerEvents: 'none',
-        }}>
-          {label}
+    </div>
+  )
+}
+
+// ── Period tooltip ─────────────────────────────────────────────────────
+
+const TOOLTIP_WIDTH = 190
+const TOOLTIP_GAP = 4
+const TOOLTIP_EDGE_MARGIN = 8
+
+function PeriodTooltip({ content, cellEl, containerEl }: {
+  content: PeriodTooltipContent
+  cellEl: HTMLElement
+  containerEl: HTMLElement
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [pos, setPos] = useState<{ left: number; top: number } | null>(null)
+  const [ready, setReady] = useState(false)
+
+  // Position before paint on every move (no jump); never causes the opacity fade.
+  useLayoutEffect(() => {
+    if (!ref.current) return
+    const cellRect = cellEl.getBoundingClientRect()
+    const tileRect = containerEl.getBoundingClientRect()
+    const h = ref.current.getBoundingClientRect().height
+
+    const centerX = cellRect.left + cellRect.width / 2
+    let left = centerX - TOOLTIP_WIDTH / 2
+    left = Math.max(tileRect.left + TOOLTIP_EDGE_MARGIN, Math.min(left, tileRect.right - TOOLTIP_EDGE_MARGIN - TOOLTIP_WIDTH))
+
+    const spaceAbove = cellRect.top - tileRect.top
+    const top = spaceAbove >= h + TOOLTIP_GAP ? cellRect.top - TOOLTIP_GAP - h : cellRect.bottom + TOOLTIP_GAP
+
+    setPos({ left, top })
+  }, [content, cellEl, containerEl])
+
+  // Fades in once, on mount only; subsequent prop updates (moving between
+  // cells) never touch `ready`, so they never re-trigger the transition.
+  useEffect(() => { setReady(true) }, [])
+
+  return createPortal(
+    <div
+      ref={ref}
+      id={TOOLTIP_ID}
+      role="tooltip"
+      style={{
+        position: 'fixed',
+        left: pos?.left ?? -9999,
+        top: pos?.top ?? -9999,
+        width: TOOLTIP_WIDTH,
+        background: '#05080C',
+        border: '1px solid #3A4656',
+        borderRadius: 6,
+        padding: '8px 10px',
+        fontFamily: 'var(--font-mono)',
+        fontSize: 12,
+        lineHeight: 1.45,
+        color: '#E6EAF0',
+        boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+        zIndex: 1000,
+        pointerEvents: 'none',
+        opacity: ready ? 1 : 0,
+        transition: 'opacity 100ms',
+      }}
+    >
+      <div style={{ fontWeight: 600, marginBottom: 4 }}>{content.title}</div>
+      {content.flow && (
+        <div><span style={{ color: '#98A3B3' }}>{content.flow.label} </span>{content.flow.value}</div>
+      )}
+      {content.limit && (
+        <div><span style={{ color: '#98A3B3' }}>{content.limit.label} </span>{content.limit.value}</div>
+      )}
+      {content.margin && (
+        <div>
+          <span style={{ color: '#98A3B3' }}>{content.margin.label} </span>
+          <span style={{ color: content.margin.negative ? '#FF8A8F' : '#E6EAF0' }}>{content.margin.value}</span>
         </div>
       )}
-    </div>
+      <div style={{ color: '#98A3B3', marginTop: 2 }}>{content.state}</div>
+    </div>,
+    document.body,
   )
 }
 
