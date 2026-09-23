@@ -111,3 +111,39 @@ export function buildDemo24hRun(nowMs: number): ForecastRun {
   const anchorMs = floorToSpMs(nowMs)
   return stampRun('current-24h', nowMs - 15 * 60 * 1000, anchorMs, CURRENT_24H)
 }
+
+// ── Contracted services (dummy, per-constraint) ─────────────────────────
+// Not period-specific — like real SR/QR/Response contracts, these represent
+// standing capacity committed to the boundary/area, not a single settlement
+// period. Deterministic per constraint id so the demo is stable across renders.
+
+export interface ContractedServices {
+  slowReserveMw: number
+  quickReserveMw: number
+  response: { dm: number; dr: number; dc: number }
+}
+
+function hashStr(s: string): number {
+  let h = 0
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0
+  return h
+}
+
+function seededValue(seed: number, min: number, max: number, step = 5): number {
+  const x = Math.sin(seed) * 10000
+  const frac = x - Math.floor(x)
+  return Math.round((min + frac * (max - min)) / step) * step
+}
+
+export function getContractedServices(constraintId: string): ContractedServices {
+  const base = hashStr(constraintId)
+  return {
+    slowReserveMw: seededValue(base + 1, 100, 400),
+    quickReserveMw: seededValue(base + 2, 50, 300),
+    response: {
+      dm: seededValue(base + 3, 20, 160),
+      dr: seededValue(base + 4, 20, 160),
+      dc: seededValue(base + 5, 20, 200),
+    },
+  }
+}

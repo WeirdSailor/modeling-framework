@@ -6,7 +6,6 @@ import type { ConstraintTileInput } from '@/models/types'
 import {
   DENSE_MODE_SP_THRESHOLD,
   buildConstraintTileViewModel,
-  formatDuration,
   formatHHMM,
   formatPeriodTooltip,
   isActiveBand,
@@ -18,16 +17,22 @@ import {
   type PeriodTooltipContent,
   type WindowedCell,
 } from '@/utils/constraintSummary'
-import { buildDemo24hRun, buildDemo4hRuns, floorToSpMs } from '@/config/constraintFixtures'
+import { buildDemo24hRun, buildDemo4hRuns, floorToSpMs, getContractedServices } from '@/config/constraintFixtures'
 
 const REFRESH_MS = 60_000 // move the "now" marker roughly once a minute, without refetching
 
 const TOOLTIP_ID = 'constraint-period-tooltip'
+const ROW_GRID_COLUMNS = '150px minmax(0,1fr)'
 
 interface ActiveCell {
   row: ConstraintRowSummary
   index: number
   el: HTMLElement
+}
+
+interface SelectedCell {
+  row: ConstraintRowSummary
+  index: number
 }
 
 interface ConstraintsTileProps {
@@ -45,6 +50,13 @@ export default function ConstraintsTile({ spCount, onOpenConstraint }: Constrain
   // it never re-fades; only a genuine show after being fully hidden fades in.
   const [activeCell, setActiveCell] = useState<ActiveCell | null>(null)
   const hideTimeoutRef = useRef<number | null>(null)
+
+  // The persistent right-hand detail panel — set by clicking (or Enter-ing) a
+  // cell; independent of the hover tooltip above.
+  const [selectedCell, setSelectedCell] = useState<SelectedCell | null>(null)
+  const selectCell = useCallback((row: ConstraintRowSummary, index: number) => {
+    setSelectedCell({ row, index })
+  }, [])
 
   const showCellTooltip = useCallback((row: ConstraintRowSummary, index: number, el: HTMLElement) => {
     if (hideTimeoutRef.current != null) { window.clearTimeout(hideTimeoutRef.current); hideTimeoutRef.current = null }
@@ -161,53 +173,60 @@ export default function ConstraintsTile({ spCount, onOpenConstraint }: Constrain
         <EmptyState vm={vm} />
       ) : (
         <>
-          {/* Aggregate strip + time axis */}
-          <div style={{ padding: '0 16px', display: 'grid', gridTemplateColumns: '150px minmax(0,1fr) 90px 150px 120px 110px 70px', gap: 6, alignItems: 'end' }}>
-            <div style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--text-faint)', paddingBottom: 4 }}>
-              Active count
-            </div>
-            <div style={{ position: 'relative' }}>
-              <div style={{ display: 'grid', gridTemplateColumns, gap: denseMode ? 1 : 3, alignItems: 'end', height: 34 }}>
-                {vm.slotTimes.map((_, i) => {
-                  const count = vm.activeCountPerSlot[i]
-                  const h = vm.totals.peakTogether > 0 ? Math.max(2, (count / vm.totals.peakTogether) * 30) : 2
-                  return (
-                    <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: 34 }}>
-                      {!denseMode && count > 0 && (
-                        <span style={{ fontSize: 9, fontFamily: 'var(--font-mono)', color: 'var(--text-muted)', marginBottom: 1 }}>{count}</span>
-                      )}
-                      <div
-                        className={count > 0 ? 'cc-cell-active2' : 'cc-cell-within'}
-                        style={{ width: '100%', height: h, borderRadius: 1 }}
-                      />
-                    </div>
-                  )
-                })}
+          <div style={{ display: 'flex', alignItems: 'stretch' }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              {/* Aggregate strip */}
+              <div style={{ padding: '0 16px', display: 'grid', gridTemplateColumns: ROW_GRID_COLUMNS, gap: 6, alignItems: 'end' }}>
+                <div style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--text-faint)', paddingBottom: 4 }}>
+                  Active count
+                </div>
+                <div style={{ position: 'relative' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns, gap: denseMode ? 1 : 3, alignItems: 'end', height: 34 }}>
+                    {vm.slotTimes.map((_, i) => {
+                      const count = vm.activeCountPerSlot[i]
+                      const h = vm.totals.peakTogether > 0 ? Math.max(2, (count / vm.totals.peakTogether) * 30) : 2
+                      return (
+                        <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: 34 }}>
+                          {!denseMode && count > 0 && (
+                            <span style={{ fontSize: 9, fontFamily: 'var(--font-mono)', color: 'var(--text-muted)', marginBottom: 1 }}>{count}</span>
+                          )}
+                          <div
+                            className={count > 0 ? 'cc-cell-active2' : 'cc-cell-within'}
+                            style={{ width: '100%', height: h, borderRadius: 1 }}
+                          />
+                        </div>
+                      )
+                    })}
+                  </div>
+                  <NowMarker vm={vm} top={0} bottom={0} />
+                </div>
               </div>
-              <NowMarker vm={vm} top={0} bottom={0} />
+
+              {/* Time axis */}
+              <TimeAxis vm={vm} gridTemplateColumns={gridTemplateColumns} denseMode={denseMode} />
+
+              {/* Rows */}
+              <div style={{ padding: '2px 16px 6px' }}>
+                {sortedRows.map(row => (
+                  <ConstraintRow
+                    key={row.id}
+                    row={row}
+                    vm={vm}
+                    gridTemplateColumns={gridTemplateColumns}
+                    denseMode={denseMode}
+                    onOpen={() => onOpenConstraint?.(row.id)}
+                    activeCell={activeCell}
+                    selectedCell={selectedCell}
+                    showCellTooltip={showCellTooltip}
+                    scheduleHideTooltip={scheduleHideTooltip}
+                    hideTooltipImmediate={hideTooltipImmediate}
+                    selectCell={selectCell}
+                  />
+                ))}
+              </div>
             </div>
-            <div /><div /><div /><div /><div />
-          </div>
 
-          {/* Time axis */}
-          <TimeAxis vm={vm} gridTemplateColumns={gridTemplateColumns} denseMode={denseMode} />
-
-          {/* Rows */}
-          <div style={{ padding: '2px 16px 6px' }}>
-            {sortedRows.map(row => (
-              <ConstraintRow
-                key={row.id}
-                row={row}
-                vm={vm}
-                gridTemplateColumns={gridTemplateColumns}
-                denseMode={denseMode}
-                onOpen={() => onOpenConstraint?.(row.id)}
-                activeCell={activeCell}
-                showCellTooltip={showCellTooltip}
-                scheduleHideTooltip={scheduleHideTooltip}
-                hideTooltipImmediate={hideTooltipImmediate}
-              />
-            ))}
+            <DetailSidebar selected={selectedCell} />
           </div>
 
           {/* Collapsed within-limits line */}
@@ -313,7 +332,7 @@ function TimeAxis({ vm, gridTemplateColumns, denseMode }: { vm: ConstraintTileVi
   const totalHours = (vm.windowEndMs - vm.windowStartMs) / 3_600_000
   const tickStepSp = totalHours <= 4 ? 1 : totalHours <= 12 ? 2 : 4
   return (
-    <div style={{ padding: '2px 16px 4px', display: 'grid', gridTemplateColumns: '150px minmax(0,1fr) 90px 150px 120px 110px 70px', gap: 6 }}>
+    <div style={{ padding: '2px 16px 4px', display: 'grid', gridTemplateColumns: ROW_GRID_COLUMNS, gap: 6 }}>
       <div />
       <div style={{ position: 'relative', display: 'grid', gridTemplateColumns, gap: denseMode ? 1 : 3 }}>
         {vm.slotTimes.map((t, i) => (
@@ -323,11 +342,6 @@ function TimeAxis({ vm, gridTemplateColumns, denseMode }: { vm: ConstraintTileVi
         ))}
         <NowMarker vm={vm} top={0} bottom={0} />
       </div>
-      <div style={{ fontSize: 9, color: 'var(--text-faint)' }}>WORST OVERLOAD</div>
-      <div style={{ fontSize: 9, color: 'var(--text-faint)' }}>WORST UTILISATION</div>
-      <div style={{ fontSize: 9, color: 'var(--text-faint)' }}>FIRST VIOLATION</div>
-      <div style={{ fontSize: 9, color: 'var(--text-faint)' }}>VIOLATED FOR</div>
-      <div style={{ fontSize: 9, color: 'var(--text-faint)' }}>WORST AT</div>
     </div>
   )
 }
@@ -348,16 +362,18 @@ function NowMarker({ vm, top, bottom }: { vm: ConstraintTileViewModel; top: numb
 
 // ── Constraint row ───────────────────────────────────────────────────────
 
-function ConstraintRow({ row, vm, gridTemplateColumns, denseMode, onOpen, activeCell, showCellTooltip, scheduleHideTooltip, hideTooltipImmediate }: {
+function ConstraintRow({ row, vm, gridTemplateColumns, denseMode, onOpen, activeCell, selectedCell, showCellTooltip, scheduleHideTooltip, hideTooltipImmediate, selectCell }: {
   row: ConstraintRowSummary
   vm: ConstraintTileViewModel
   gridTemplateColumns: string
   denseMode: boolean
   onOpen: () => void
   activeCell: ActiveCell | null
+  selectedCell: SelectedCell | null
   showCellTooltip: (row: ConstraintRowSummary, index: number, el: HTMLElement) => void
   scheduleHideTooltip: () => void
   hideTooltipImmediate: () => void
+  selectCell: (row: ConstraintRowSummary, index: number) => void
 }) {
   const isActive = row.status === 'active'
   const color = isActive ? 'var(--red)' : 'var(--amber)'
@@ -376,14 +392,14 @@ function ConstraintRow({ row, vm, gridTemplateColumns, denseMode, onOpen, active
     <div
       onClick={onOpen}
       style={{
-        display: 'grid', gridTemplateColumns: '150px minmax(0,1fr) 90px 150px 120px 110px 70px', gap: 6,
+        display: 'grid', gridTemplateColumns: ROW_GRID_COLUMNS, gap: 6,
         alignItems: 'center', padding: '5px 0', cursor: 'pointer', borderRadius: 4,
         background: isRowActive ? '#161E29' : 'transparent',
       }}
       onMouseEnter={() => setMouseHover(true)}
       onMouseLeave={() => setMouseHover(false)}
     >
-      {/* Name */}
+      {/* Name — the only remaining way to open the constraint's detail view */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
         {isActive
           ? <span aria-hidden style={{ width: 8, height: 8, background: color, flexShrink: 0 }} />
@@ -405,71 +421,18 @@ function ConstraintRow({ row, vm, gridTemplateColumns, denseMode, onOpen, active
             denseMode={denseMode}
             isTabbable={i === focusedIndex}
             isTooltipActive={activeCell?.row.id === row.id && activeCell.index === i}
+            isSelected={selectedCell?.row.id === row.id && selectedCell.index === i}
             cellRef={el => { cellRefs.current[i] = el }}
             onFocusCell={() => setFocusedIndex(i)}
             onShow={el => showCellTooltip(row, i, el)}
             onScheduleHide={scheduleHideTooltip}
             onHideImmediate={hideTooltipImmediate}
-            onOpen={onOpen}
+            onSelect={() => selectCell(row, i)}
             onArrow={dir => focusCellAt(i + dir)}
           />
         ))}
         <NowMarker vm={vm} top={0} bottom={0} />
       </div>
-
-      {/* Worst overload */}
-      <div className="mono" style={{ fontSize: 11, textAlign: 'right', color: isActive ? 'var(--red)' : 'var(--text-faint)' }}>
-        {row.worstOverloadMw == null ? '—' : isActive
-          ? `+${Math.round(row.worstOverloadMw).toLocaleString()} MW`
-          : `${Math.round(Math.abs(row.worstOverloadMw)).toLocaleString()} MW spare`}
-      </div>
-
-      {/* Worst utilisation bullet bar */}
-      <WorstUtilisationBar utilisationPct={row.worstUtilisationPct} worstOverloadMw={row.worstOverloadMw} color={color} />
-
-      {/* First violation */}
-      <div style={{ fontSize: 11 }}>
-        {row.timeUntilFirstViolation ? (
-          <>
-            <span className="mono" style={{ fontWeight: 700, color: 'var(--text)' }}>{row.timeUntilFirstViolation.primary}</span>
-            {row.timeUntilFirstViolation.detail && (
-              <span style={{ color: 'var(--text-faint)', marginLeft: 4 }}>{row.timeUntilFirstViolation.detail}</span>
-            )}
-          </>
-        ) : <span style={{ color: 'var(--text-faint)' }}>—</span>}
-      </div>
-
-      {/* Violated for */}
-      <div className="mono" style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-        {isActive ? `${formatDuration(row.violatedDurationMs)} · ${row.violatedIntervalCount} int` : <span style={{ color: 'var(--text-faint)' }}>—</span>}
-      </div>
-
-      {/* Worst at */}
-      <div className="mono" style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-        {row.worstAtMs != null ? formatHHMM(row.worstAtMs) : '—'}
-      </div>
-    </div>
-  )
-}
-
-// Bar position/colour are driven by utilisation % (calculation-only); the printed
-// value is the margin in MW (limit - flow), per the operator's preferred units.
-function WorstUtilisationBar({ utilisationPct, worstOverloadMw, color }: { utilisationPct: number | null; worstOverloadMw: number | null; color: string }) {
-  if (utilisationPct == null || worstOverloadMw == null) return <div style={{ fontSize: 11, color: 'var(--text-faint)' }}>—</div>
-  const MIN = 85, MAX = 112
-  const clamp = (v: number) => Math.max(MIN, Math.min(MAX, v))
-  const pct = ((clamp(utilisationPct) - MIN) / (MAX - MIN)) * 100
-  const hundredPct = ((100 - MIN) / (MAX - MIN)) * 100
-  const marginMw = Math.round(-worstOverloadMw)
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-      <div style={{ position: 'relative', flex: 1, height: 6, background: 'var(--bg-subtle)', borderRadius: 3, overflow: 'hidden' }}>
-        <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${pct}%`, background: color, borderRadius: 3 }} />
-        <div style={{ position: 'absolute', left: `${hundredPct}%`, top: 0, bottom: 0, width: 1, background: 'var(--text-faint)' }} />
-      </div>
-      <span className="mono" style={{ fontSize: 11, fontWeight: 700, color: 'var(--text)', width: 56, textAlign: 'right' }}>
-        {marginMw > 0 ? `+${marginMw}` : marginMw} MW
-      </span>
     </div>
   )
 }
@@ -487,19 +450,20 @@ function bandClass(band: WindowedCell['band']): string {
   }
 }
 
-function Cell({ row, index, cell, denseMode, isTabbable, isTooltipActive, cellRef, onFocusCell, onShow, onScheduleHide, onHideImmediate, onOpen, onArrow }: {
+function Cell({ row, index, cell, denseMode, isTabbable, isTooltipActive, isSelected, cellRef, onFocusCell, onShow, onScheduleHide, onHideImmediate, onSelect, onArrow }: {
   row: ConstraintRowSummary
   index: number
   cell: WindowedCell
   denseMode: boolean
   isTabbable: boolean
   isTooltipActive: boolean
+  isSelected: boolean
   cellRef: (el: HTMLDivElement | null) => void
   onFocusCell: () => void
   onShow: (el: HTMLElement) => void
   onScheduleHide: () => void
   onHideImmediate: () => void
-  onOpen: () => void
+  onSelect: () => void
   onArrow: (dir: -1 | 1) => void
 }) {
   const ref = useRef<HTMLDivElement>(null)
@@ -516,15 +480,22 @@ function Cell({ row, index, cell, denseMode, isTabbable, isTooltipActive, cellRe
     if (ref.current) onShow(ref.current)
   }
 
+  function handleClick(e: React.MouseEvent) {
+    // Selecting a cell is distinct from the row's own onClick (which opens the
+    // constraint's detail view via its name) — stop it bubbling there.
+    e.stopPropagation()
+    onSelect()
+  }
+
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === 'ArrowLeft') { e.preventDefault(); onArrow(-1) }
     else if (e.key === 'ArrowRight') { e.preventDefault(); onArrow(1) }
-    else if (e.key === 'Enter') { onOpen() }
+    else if (e.key === 'Enter') { onSelect() }
     else if (e.key === 'Escape') { onHideImmediate() }
   }
 
-  // Touch: first tap shows the tooltip without navigating; a second tap on the
-  // same (already-tooltipped) cell falls through to the row's onClick.
+  // Touch: first tap shows the tooltip without selecting; a second tap on the
+  // same (already-tooltipped) cell falls through to the click handler above.
   function handlePointerUp(e: React.PointerEvent) {
     if (e.pointerType !== 'touch') return
     if (!isTooltipActive) { e.preventDefault(); e.stopPropagation(); handleShow() }
@@ -537,6 +508,7 @@ function Cell({ row, index, cell, denseMode, isTabbable, isTooltipActive, cellRe
       role="button"
       aria-label={label}
       aria-describedby={isTooltipActive ? TOOLTIP_ID : undefined}
+      aria-pressed={isSelected}
       className={bandClass(cell.band)}
       onMouseEnter={handleShow}
       onMouseLeave={onScheduleHide}
@@ -544,11 +516,12 @@ function Cell({ row, index, cell, denseMode, isTabbable, isTooltipActive, cellRe
       onBlur={onScheduleHide}
       onKeyDown={handleKeyDown}
       onPointerUp={handlePointerUp}
+      onClick={handleClick}
       style={{
         height: denseMode ? 22 : 26, borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'center',
         cursor: 'pointer',
-        outline: isTooltipActive ? '2px solid #E6EAF0' : 'none',
-        outlineOffset: isTooltipActive ? 1 : 0,
+        outline: isTooltipActive ? '2px solid #E6EAF0' : isSelected ? '2px solid var(--accent)' : 'none',
+        outlineOffset: isTooltipActive || isSelected ? 1 : 0,
       }}
     >
       {showValue && (
@@ -556,6 +529,66 @@ function Cell({ row, index, cell, denseMode, isTabbable, isTooltipActive, cellRe
           {Math.round((cell.limitMw as number) - (cell.flowMw as number))}
         </span>
       )}
+    </div>
+  )
+}
+
+// ── Detail sidebar ───────────────────────────────────────────────────────
+
+function DetailSidebar({ selected }: { selected: SelectedCell | null }) {
+  return (
+    <div style={{
+      width: 260, flexShrink: 0, borderLeft: '1px solid var(--border)',
+      padding: '10px 14px', display: 'flex', flexDirection: 'column',
+    }}>
+      {!selected ? (
+        <div style={{ margin: 'auto', textAlign: 'center', color: 'var(--text-faint)', fontSize: 12, lineHeight: 1.5 }}>
+          Nothing selected
+          <br />
+          Click a settlement period to see details.
+        </div>
+      ) : (
+        <SelectedCellDetail row={selected.row} index={selected.index} />
+      )}
+    </div>
+  )
+}
+
+function SelectedCellDetail({ row, index }: { row: ConstraintRowSummary; index: number }) {
+  const content = formatPeriodTooltip(row, index)
+  const services = getContractedServices(row.id)
+  return (
+    <div>
+      <div className="mono" style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 8 }}>{content.title}</div>
+
+      {content.flow && <DetailRow label={content.flow.label} value={content.flow.value} />}
+      {content.limit && <DetailRow label={content.limit.label} value={content.limit.value} />}
+      {content.margin && (
+        <DetailRow label={content.margin.label} value={content.margin.value} color={content.margin.negative ? 'var(--red)' : undefined} />
+      )}
+      <DetailRow label="State" value={content.state} />
+
+      <div style={{ borderTop: '1px solid var(--border)', margin: '12px 0 8px' }} />
+
+      <div style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--text-faint)', marginBottom: 6 }}>
+        Contracted services
+      </div>
+      <DetailRow label="Slow Reserve" value={`${services.slowReserveMw.toLocaleString()} MW`} />
+      <DetailRow label="Quick Reserve" value={`${services.quickReserveMw.toLocaleString()} MW`} />
+
+      <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text)', margin: '10px 0 4px' }}>Response</div>
+      <DetailRow label="DM" value={`${services.response.dm.toLocaleString()} MW`} indent />
+      <DetailRow label="DR" value={`${services.response.dr.toLocaleString()} MW`} indent />
+      <DetailRow label="DC" value={`${services.response.dc.toLocaleString()} MW`} indent />
+    </div>
+  )
+}
+
+function DetailRow({ label, value, color, indent }: { label: string; value: string; color?: string; indent?: boolean }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 12, padding: '2px 0', paddingLeft: indent ? 10 : 0 }}>
+      <span style={{ color: 'var(--text-muted)' }}>{label}</span>
+      <span className="mono" style={{ color: color ?? 'var(--text)', fontWeight: 600 }}>{value}</span>
     </div>
   )
 }
@@ -697,7 +730,7 @@ function Footer() {
           <span style={{ width: 1, height: 10, background: 'var(--accent)', display: 'inline-block' }} /> Now
         </span>
       </div>
-      <span>Hover a period for flow, limit, margin · click a constraint for its detail view</span>
+      <span>Hover a period for a quick preview · click a period for full details · click a constraint's name for its detail view</span>
     </div>
   )
 }
