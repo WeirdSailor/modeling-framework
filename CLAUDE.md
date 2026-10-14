@@ -14,6 +14,7 @@ A client-side Next.js 16 decision-support tool for GB electricity system operato
 npm run dev       # http://localhost:3000
 npm run build     # production build check
 npx tsc --noEmit  # type check
+npm run test:dashboard2  # Dashboard 2 unit tests (node --test, no framework; Node ≥ 23.6 for built-in TS type stripping)
 ```
 
 ---
@@ -22,7 +23,7 @@ npx tsc --noEmit  # type check
 
 The app is split into top-level **sections** via `AppSection` (`'balancing' | 'battery'`, defined in `src/models/types.ts` alongside `APP_SECTIONS`). A `SegControl` ("Balancing | Battery") sits at the top of `DraftSidebar`, above the identity picker — `activeSection` state lives in `page.tsx` (default `'balancing'`, not in Zustand).
 
-- **Balancing** — everything described in this document: the full tab set (Dashboard, Chart, Workspace, Committed, BMU Summary, Redeclare, Requirements), Config/Feedback buttons, Deficit Solver, etc. This is the entire pre-existing app, now wrapped in `{activeSection === 'balancing' && <main className="workspace">...}`.
+- **Balancing** — everything described in this document: the full tab set (Dashboard, Dashboard 2, Chart, Workspace, Committed, BMU Summary, Redeclare, Requirements), Config/Feedback buttons, Deficit Solver, etc. This is the entire pre-existing app, now wrapped in `{activeSection === 'balancing' && <main className="workspace">...}`.
 - **Battery** — a two-tab workspace (Summary, Redeclare) for battery-fuel-type units. See "Battery Section" below for full detail.
 
 **Shared across both sections:**
@@ -206,7 +207,7 @@ These values are also persisted in a **localStorage cache** (see Standing Data C
 
 | File | Role |
 |------|------|
-| `src/app/page.tsx` | Top-level: data loading, layout, tab switching, derived data, confirm modals, sharing actions; owns `activeSection: AppSection` (Balancing/Battery, default `'balancing'`) and `handleSectionChange`; owns `activeBatteryTab: 'summary' \| 'redeclare'` (default `'summary'`) and `batteryUnits` (units filtered to `fuelType === 'BATTERY'`); owns `hiddenDraftIds` state for chart draft visibility; owns `solveTarget` state for the Deficit Solver; owns `activeAreaTab: AreaId` for Chart subtab; tab order (Balancing section): Dashboard \| Workspace \| Chart \| Committed \| Redeclare \| Requirements \| BMU Summary |
+| `src/app/page.tsx` | Top-level: data loading, layout, tab switching, derived data, confirm modals, sharing actions; owns `activeSection: AppSection` (Balancing/Battery, default `'balancing'`) and `handleSectionChange`; owns `activeBatteryTab: 'summary' \| 'redeclare'` (default `'summary'`) and `batteryUnits` (units filtered to `fuelType === 'BATTERY'`); owns `hiddenDraftIds` state for chart draft visibility; owns `solveTarget` state for the Deficit Solver; owns `activeAreaTab: AreaId` for Chart subtab; tab order (Balancing section): Dashboard \| Dashboard 2 \| Chart \| Workspace \| Committed \| BMU Summary, with Redeclare \| Requirements as buttons on the right of the tab bar |
 | `src/components/DraftSidebar.tsx` | "Balancing \| Battery" `SegControl` section switcher at top, then identity picker ("You are: [NSE ▼]"), window time + Refresh, draft list filtered to current user, "Shared with me" collapsible section; coloured circle visibility toggle per active draft; collapse button (‹/›) at top; New Draft button pinned to bottom footer |
 | `src/components/SegControl.tsx` | Shared pill-style segmented control (`twk-seg`/`twk-seg-thumb` CSS); used by `ConfigPanel` and `DraftSidebar`'s section switcher |
 | `src/components/BatterySummaryTab.tsx` | Battery section "Summary" tab: GSP filter + AS Services filter + timeframe selector (30min/1h/1.5h/2h) above Total/Contracted/Constrained/Usable cost-card-style cards (Σ capacity = `max(0, MEL − worstPn)`), click-to-filter table of battery units (BMU, Type, Service, NDZ, MZT, MNZT, SEL, MEL, £SEL, £MEL, PN, Capacity) |
@@ -216,6 +217,7 @@ These values are also persisted in a **localStorage cache** (see Standing Data C
 | `src/components/AvailableTable.tsx` | Available units table: sort, checkbox or click selection, type + service chips; no toolbar — Scenario/GSP filters live in DraftDetails and are passed as props; Select button appears in header only when rows are checked; **Deficit Solver**: `solveMode` + `solveMw` props enable covering-set pre-check (highlighted rows) |
 | `src/components/SelectedTable.tsx` | Selected units in active draft: Σ PN / Σ MEL / Est. value totals, notes input, remove button, service chip; **From/To columns** (before Event) with inline selects for per-unit window editing; To can be cleared to undefined (open-ended) |
 | `src/components/Dashboard.tsx` | Landing tab: 8-area status tile grid with sparklines, timeframe selector (2h/4h/8h/12h/24h), A/B view toggle; tiles click through to Chart tab at the selected area's subtab |
+| `src/dashboard2/` | Dashboard 2 tab (cross-area operational awareness view) — self-contained module; root component `components/OperationalDashboard.tsx`. See "Dashboard 2" section below |
 | `src/components/AreaChart.tsx` | Recharts chart for non-Margin areas: requirement line (dashed), availability line (solid, area-coloured), draft overlays (dotted), deficit zone shading, drag-to-solve — identical interaction modes to MarginChart; fires `onSolveSelect` |
 | `src/components/RequirementsTab.tsx` | 48-row editable table per area (Requirement / Contracted / Constrained → Net Available + Gap computed); area chip selector; per-column Fill ↓ input in each column header (Requirement, Contracted, Constrained independently); non-Margin areas only |
 | `src/components/CommittedTab.tsx` | Committed-tab view: cost breakdown cards (Total + per-reason, 8 reason codes), click-to-filter table, change-indicator arrows (↑/↓), service chip, bulk remove; **From/To columns** (read-only, before Event) |
@@ -277,7 +279,28 @@ These values are also persisted in a **localStorage cache** (see Standing Data C
 - **`handleSolveNavigate` auto-selects scenario from active area** — uses `getArea(activeAreaTab).defaultScenario` so the workspace scenario matches whichever area the operator solved from. Do not hardcode `'margin'`.
 - **`ModellingAction.reasonCode` no longer has `CONSTRAINT` or `RESERVE`** — replaced by `RECOVERY_RESERVE | FREQ_CONTROL_RESERVE | GENERAL_RESERVE | CONTINGENCY_RESERVE | RESPONSE`. Any switch/case on `reasonCode` in CommittedTab, SelectedTable, RedeclareTab must handle all 8 current codes and must not reference the removed ones.
 - **`SCENARIO_REASON` in `page.tsx` maps `pullback → 'MARGIN'`** — pullback has no dedicated reason code; it falls back to MARGIN. `reserve → 'RECOVERY_RESERVE'`, `response → 'RESPONSE'`.
+- **Dashboard 2 is self-contained in `src/dashboard2/`** — it reads the store and `constraintFixtures` but never writes to them, and it does not modify any shared module. Keep it that way: extend shared modules additively if Dashboard 2 needs more, never change their behaviour for it.
+- **Dashboard 2's BST correction is local to its real adapters** — `slotStartMs` in `src/dashboard2/data/realAdapters.ts` re-derives true UTC SP starts (gated by `CORRECT_ELEXON_SP_TO_UTC`). The rest of the app still uses the UTC-labelled `sp.startTime`. Do not "fix" `settlements.ts` to match without reviewing every consumer.
+- **`src/dashboard2/time.ts` and `derive.ts` must have no value imports** (type-only imports are fine) — the `node --test` runner imports them directly with type stripping and cannot resolve extensionless relative imports or the `@/` alias.
 - **`activeSection` in `page.tsx` is local state, not Zustand** — same pattern as `reservePct`, `hiddenDraftIds`, `solveTarget`. `handleSectionChange` always resets `activeTab` to `'dashboard'` on switch (no per-section tab memory). The sidebar (`DraftSidebar`) is rendered unconditionally regardless of `activeSection` — do not gate it behind a section check.
+
+---
+
+## Dashboard 2 (Cross-Area Operational Awareness)
+
+A second dashboard tab (Balancing section), placed after Dashboard. The existing Dashboard tab is unchanged. Spec: `Docs/Design/Dashboard/DASHBOARD_IMPLEMENTATION.md` (with `dashboard-handoff/` reference mockup + mock data). Data mapping and assumptions: `Docs/Design/Dashboard/DATA_MAPPING.md` — read it before changing any adapter.
+
+- **Rows** (fixed order): +ve MARGIN, −ve MARGIN, CONSTRAINTS, INERTIA, RESERVE, RESPONSE, LARGEST LOSS, INTERCONNECTORS. Three row types: line (headroom on a fixed ± band), strip (per-SP cell state + ▼/▲ action markers), IC (net-position swing bars on SP boundaries). Hand-built SVG — no Recharts here, by design.
+- **Data:** `HybridDashboardDataProvider` composes per-area sources. `AREA_SOURCES` in `src/dashboard2/dashboard.config.ts` switches any area between `'real'` and `'mock'` (`mock-data.json`). Real adapters (`data/realAdapters.ts`) read the store and existing fixtures:
+  - +ve MARGIN = `emx` vs `demand × (1 + reservePct/100) + general_reserve requirement` (same as the existing Margin tile)
+  - INERTIA / RESERVE (4 items) / RESPONSE (1 item) = `areaAvailability` vs `areaRequirements`
+  - CONSTRAINTS = the ConstraintsTile fixtures (dummy, so labelled as mock in the legend)
+  - INTERCONNECTORS = Σ `sp.pn` over `I_*` BMUs (+ = import to GB)
+  - −ve MARGIN, LARGEST LOSS and strip action markers have no real source → mock.
+- **Legend note** lists every area/part on mock or fixture data ("Mock data: …"); empty when everything is real.
+- **State:** time window, horizon (persisted to `localStorage` key `d2:horizon`), polling and cursor all live inside `src/dashboard2/state/` — not in Zustand and not in `page.tsx`. `page.tsx` only passes `reservePct`. Polls every 30s and refetches immediately when `settlementPeriods`, `areaRequirements` or `reservePct` change.
+- **Time:** UTC 30-minute SP iteration, displayed in Europe/London; handles 46/50-SP clock-change days (covered by tests). Missing SPs render as gaps, never zeros.
+- **All thresholds, bands, poll intervals and source switches** are in `dashboard.config.ts` (placeholders pending SME tuning).
 
 ---
 
@@ -602,7 +625,7 @@ Units where all four of `sel`, `ndz`, `mnzt`, `mzt` are still `undefined` after 
 
 - **BST/UTC offset** — window starts ~1 hour early in summer. Low priority for prototype.
 - **£120 static price** — real BM offer prices not yet integrated; cost figures are indicative only.
-- **No test suite** — margin calculation logic is a good candidate for unit tests.
+- **Minimal test coverage** — only Dashboard 2's `time.ts`/`derive.ts` have unit tests (`npm run test:dashboard2`). Margin calculation logic is a good candidate for more.
 - **D-1 proxy + tomorrow slots** — tomorrow's SPs always have zero confirmed PN; they use yesterday's same-SP data as proxy. This is a reasonable heuristic but not operationally precise.
 - **NDZ/MZT/MNZT blank — root cause found and fixed** — Two bugs: (1) `notice` field in the NDZ endpoint is in **minutes** not seconds; the code was dividing by 60 again, collapsing most values to 0. (2) Standing data is change-only — units only submit new entries when parameters change. CNQPS-2 last submitted NDZ 8–9 weeks ago, outside the old 35-day window. Both fixed: division removed, lookback extended to 84 days. The localStorage backfill now covers up to 6 years, so even infrequently-updated units are captured. Key format is confirmed consistent: `bmUnit: "T_CNQPS-2"` in dynamic param endpoints matches `elexonBmUnit: "T_CNQPS-2"` in reference data — key mismatch is **not** an issue.
 - **Units with partial standing data still show `—` for missing params** — A unit that has SEL but no NDZ/MZT/MNZT (e.g. a unit that never submitted dynamic params) will pass the decommissioned filter but still show dashes in those columns. This is a data reality; no fix planned.
@@ -617,3 +640,5 @@ Units where all four of `sel`, `ndz`, `mnzt`, `mzt` are still `undefined` after 
 - **Inertia H constant is a flat proxy** — using 0.05 GVAs/MW for all synchronous units. Real per-unit H constants are available from Elexon dynamic parameters.
 - **Voltage proxy is national, not GSP-local** — the real voltage support model requires GSP-level filtering already present in the Voltage scenario. Out of scope for current prototype.
 - **Response sub-classification** — Dynamic Containment, Moderation, Regulation treated uniformly. No sub-type distinction yet.
+- **Dashboard 2 data gaps** — no real source for −ve margin, largest loss or strip actions (mock); no +/− reserve direction or LF/HF/pre-/post-fault response split in the store, so RESERVE has 4 upward items and RESPONSE has 1. CONSTRAINTS uses the dummy ConstraintsTile fixtures.
+- **Dashboard 2 IC swings at day boundaries are unverified** — real data showed a large swing (~−4.8 GW) at local midnight, likely where confirmed PN hands over to the D-1 proxy for tomorrow's slots. Not confirmed.
