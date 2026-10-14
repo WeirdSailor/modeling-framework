@@ -1,7 +1,7 @@
 'use client'
 
-// Line row (spec §8.2): headroom = available − requirement on a fixed ±band scale centred on the
-// requirement line. Monotone curve through SP midpoints; gaps where SPs are missing.
+// Line row (spec §8.2): headroom = available − requirement on a fixed scale centred on the requirement
+// line (bandAbove for the upper half, bandBelow for the lower half). Monotone curve through SP midpoints; gaps where SPs are missing.
 
 import { memo, useCallback, useMemo } from 'react'
 import { monotoneCommands, type XScale } from '../../geometry'
@@ -25,9 +25,9 @@ interface Props {
 
 const PAD = 8
 
-function makeY(height: number, band: number) {
+function makeY(height: number, bandAbove: number, bandBelow: number) {
   const mid = height / 2
-  return (v: number) => mid - Math.max(-1, Math.min(1, v / band)) * (mid - PAD)
+  return (v: number) => mid - Math.max(-1, Math.min(1, v / (v >= 0 ? bandAbove : bandBelow))) * (mid - PAD)
 }
 
 export default function LineChart({ area, cfg, scale, height, nowMs, onDrillDown }: Props) {
@@ -46,7 +46,7 @@ export default function LineChart({ area, cfg, scale, height, nowMs, onDrillDown
 
   // Path computation memoised on (data, scale) — cursor movement never touches it.
   const paths = useMemo(() => {
-    const y = makeY(height, cfg.band)
+    const y = makeY(height, cfg.bandAbove, cfg.bandBelow)
     const times = [...byMs.keys()].sort((a, b) => a - b)
     // Split into runs of consecutive SPs; each run spans its SPs edge to edge (flat at the ends).
     const runs: number[][] = []
@@ -65,7 +65,7 @@ export default function LineChart({ area, cfg, scale, height, nowMs, onDrillDown
       fill += `${body}L${right},${mid}L${left},${mid}Z`
     }
     return { line, fill }
-  }, [byMs, scale, height, cfg.band, mid])
+  }, [byMs, scale, height, cfg.bandAbove, cfg.bandBelow, mid])
 
   const payloadFor = useCallback((ms: number) => byMs.get(ms) ?? null, [byMs])
   const pointer = useChartPointer({ scale, areaId: cfg.id, kind: 'line', payloadFor, onDrillDown })
@@ -82,7 +82,7 @@ export default function LineChart({ area, cfg, scale, height, nowMs, onDrillDown
       <line x1={0} x2={scale.width} y1={mid} y2={mid} stroke="#8C97A7" strokeDasharray="6 4" strokeWidth={1} />
       <path d={paths.line} fill="none" stroke="#D3DCE7" strokeWidth={1.8} />
       <CursorLine scale={scale} height={height} />
-      <LineCursorMarker byMs={byMs} scale={scale} height={height} band={cfg.band} />
+      <LineCursorMarker byMs={byMs} scale={scale} height={height} bandAbove={cfg.bandAbove} bandBelow={cfg.bandBelow} />
       <NowLine scale={scale} nowMs={nowMs} height={height} />
     </svg>
   )
@@ -98,15 +98,15 @@ const LineFills = memo(function LineFills({ fill, clipUp, clipDn }: { fill: stri
   )
 })
 
-function LineCursorMarker({ byMs, scale, height, band }: {
-  byMs: Map<number, LinePeriod>; scale: XScale; height: number; band: number
+function LineCursorMarker({ byMs, scale, height, bandAbove, bandBelow }: {
+  byMs: Map<number, LinePeriod>; scale: XScale; height: number; bandAbove: number; bandBelow: number
 }) {
   const cursorMs = useCursorMs()
   const p = cursorMs === null ? undefined : byMs.get(cursorMs)
   if (cursorMs === null || !p) return null
   const v = headroom(p)
   const cx = scale.x(cursorMs + SP_MS / 2)
-  const cy = makeY(height, band)(v)
+  const cy = makeY(height, bandAbove, bandBelow)(v)
   const above = v >= 0 && cy > 20
   return (
     <g pointerEvents="none">

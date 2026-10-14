@@ -5,7 +5,10 @@ import type { AreaId, AreaKind, HorizonId, StripAreaId } from './types'
 
 export interface LineAreaConfig {
   id: AreaId; label: string; ariaName: string; kind: 'line'
-  band: number   // fixed ± headroom scale, never autoscaled
+  // Fixed headroom scale, never autoscaled: values from 0 to +bandAbove fill the half above the
+  // requirement line, 0 to −bandBelow the half below it. Beyond that they clamp flat to the edge.
+  bandAbove: number
+  bandBelow: number
   tight: number  // headroom below this is amber
   unit: string   // config only — not shown on screen
 }
@@ -30,13 +33,13 @@ export type AreaConfig = LineAreaConfig | StripAreaConfig | IcAreaConfig
 
 // Display order is fixed (spec §8.0).
 export const AREA_CONFIG: AreaConfig[] = [
-  { id: 'posMargin',       label: '+ve MARGIN',      ariaName: '+ve margin',      kind: 'line',  band: 2000, tight: 500, unit: 'MW' },
-  { id: 'negMargin',       label: '−ve MARGIN',      ariaName: '−ve margin',      kind: 'line',  band: 2000, tight: 500, unit: 'MW' },
+  { id: 'posMargin',       label: '+ve MARGIN',      ariaName: '+ve margin',      kind: 'line',  bandAbove: 10000, bandBelow: 2000, tight: 500, unit: 'MW' },
+  { id: 'negMargin',       label: '−ve MARGIN',      ariaName: '−ve margin',      kind: 'line',  bandAbove: 2000, bandBelow: 2000, tight: 500, unit: 'MW' },
   { id: 'constraints',     label: 'CONSTRAINTS',     ariaName: 'Constraints',     kind: 'strip', noun: 'constraint', unit: '',   actionsSource: 'none' },
-  { id: 'inertia',         label: 'INERTIA',         ariaName: 'Inertia',         kind: 'line',  band: 40,   tight: 6,   unit: 'GVA·s' },
+  { id: 'inertia',         label: 'INERTIA',         ariaName: 'Inertia',         kind: 'line',  bandAbove: 40,   bandBelow: 40,   tight: 6,   unit: 'GVA·s' },
   { id: 'reserve',         label: 'RESERVE',         ariaName: 'Reserve',         kind: 'strip', noun: 'product', unit: 'MW', actionsSource: 'none' },
   { id: 'response',        label: 'RESPONSE',        ariaName: 'Response',        kind: 'strip', noun: 'product', unit: 'MW', actionsSource: 'none' },
-  { id: 'largestLoss',     label: 'LARGEST LOSS',    ariaName: 'Largest loss',    kind: 'line',  band: 1000, tight: 100, unit: 'MW' },
+  { id: 'largestLoss',     label: 'LARGEST LOSS',    ariaName: 'Largest loss',    kind: 'line',  bandAbove: 1000, bandBelow: 1000, tight: 100, unit: 'MW' },
   { id: 'interconnectors', label: 'INTERCONNECTORS', ariaName: 'Interconnectors', kind: 'ic',    band: 3000, amber: 1500, red: 2000, unit: 'MW' },
 ]
 

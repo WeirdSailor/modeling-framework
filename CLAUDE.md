@@ -290,7 +290,7 @@ These values are also persisted in a **localStorage cache** (see Standing Data C
 
 A second dashboard tab (Balancing section), placed after Dashboard. The existing Dashboard tab is unchanged. Spec: `Docs/Design/Dashboard/DASHBOARD_IMPLEMENTATION.md` (with `dashboard-handoff/` reference mockup + mock data). Data mapping and assumptions: `Docs/Design/Dashboard/DATA_MAPPING.md` — read it before changing any adapter.
 
-- **Rows** (fixed order): +ve MARGIN, −ve MARGIN, CONSTRAINTS, INERTIA, RESERVE, RESPONSE, LARGEST LOSS, INTERCONNECTORS. Three row types: line (headroom on a fixed ± band), strip (per-SP cell state + ▼/▲ action markers), IC (net-position swing bars on SP boundaries). Hand-built SVG — no Recharts here, by design.
+- **Rows** (fixed order): +ve MARGIN, −ve MARGIN, CONSTRAINTS, INERTIA, RESERVE, RESPONSE, LARGEST LOSS, INTERCONNECTORS. Three row types: line (headroom on a fixed scale: `bandAbove` above the requirement line, `bandBelow` below), strip (per-SP cell state + ▼/▲ action markers), IC (net-position swing bars on SP boundaries). Hand-built SVG — no Recharts here, by design.
 - **Data:** `HybridDashboardDataProvider` composes per-area sources. `AREA_SOURCES` in `src/dashboard2/dashboard.config.ts` switches any area between `'real'` and `'mock'` (`mock-data.json`). Real adapters (`data/realAdapters.ts`) read the store and existing fixtures:
   - +ve MARGIN = `emx` vs `demand × (1 + reservePct/100) + general_reserve requirement` (same as the existing Margin tile)
   - INERTIA / RESERVE (4 items) / RESPONSE (1 item) = `areaAvailability` vs `areaRequirements`
