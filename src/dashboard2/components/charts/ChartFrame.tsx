@@ -38,11 +38,19 @@ export function CursorLine({ scale, height }: { scale: XScale; height: number })
   return <line x1={x} x2={x} y1={0} y2={height} stroke="#9AA6B8" strokeDasharray="3 3" pointerEvents="none" />
 }
 
-/** Drawn last in every row so it sits above all content. Hidden when Now is outside the window. */
+/**
+ * Drawn last in every row so it sits above all content. Hidden when Now is outside the window.
+ * A 3.5px --bg halo underneath keeps it legible against amber/red cell outlines.
+ */
 export function NowLine({ scale, nowMs, height }: { scale: XScale; nowMs: number; height: number }) {
   if (nowMs < scale.startMs || nowMs > scale.endMs) return null
   const x = scale.x(nowMs)
-  return <line x1={x} x2={x} y1={0} y2={height} stroke="#E7EBF0" strokeWidth={1.5} pointerEvents="none" />
+  return (
+    <g pointerEvents="none">
+      <line x1={x} x2={x} y1={0} y2={height} stroke="#0D1117" strokeWidth={3.5} />
+      <line x1={x} x2={x} y1={0} y2={height} stroke="#E7EBF0" strokeWidth={1.5} />
+    </g>
+  )
 }
 
 /** Unique, url()-safe id for per-row clipPaths. */

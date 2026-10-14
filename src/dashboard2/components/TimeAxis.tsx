@@ -7,7 +7,7 @@ import type { XScale } from '../geometry'
 import { SP_MS, axisTicks, formatHHMM, formatWeekday, isLondonMidnight } from '../time'
 import { HEADER_HEIGHT, MIN_TICK_PX } from '../dashboard.config'
 import { useCursorMs } from '../state/cursorStore'
-import { CursorLine, PastShade, useChartPointer } from './charts/ChartFrame'
+import { CursorLine, NowLine, PastShade, useChartPointer } from './charts/ChartFrame'
 
 interface Props {
   scale: XScale
@@ -64,6 +64,7 @@ export default function TimeAxis({ scale, nowMs, tickMinutes }: Props) {
         )
       })}
       <CursorLine scale={scale} height={H} />
+      <NowLine scale={scale} nowMs={nowMs} height={H} />
       {cursorX !== null && cursorMs !== null && (
         <Badge x={clampBadge(cursorX, 52, scale.width)} w={52} label={formatHHMM(cursorMs)}
           fill="#2A3442" stroke="#9AA6B8" color="#E7EBF0" weight={600} />
