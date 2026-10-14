@@ -13,6 +13,11 @@ export interface StripAreaConfig {
   id: StripAreaId; label: string; ariaName: string; kind: 'strip'
   noun: string   // singular noun for the sub line ("constraint" / "product")
   unit: string
+  // Where ▼/▲ action markers come from when this row's cell states are real. No real action feed
+  // exists, so 'mock' overlays mock-data.json actions onto real states — which can claim actions that
+  // never happened. Default 'none'. A row whose AREA_SOURCES entry is 'mock' always keeps its own
+  // (internally consistent) mock actions.
+  actionsSource: 'none' | 'mock'
 }
 export interface IcAreaConfig {
   id: 'interconnectors'; label: string; ariaName: string; kind: 'ic'
@@ -27,10 +32,10 @@ export type AreaConfig = LineAreaConfig | StripAreaConfig | IcAreaConfig
 export const AREA_CONFIG: AreaConfig[] = [
   { id: 'posMargin',       label: '+ve MARGIN',      ariaName: '+ve margin',      kind: 'line',  band: 2000, tight: 500, unit: 'MW' },
   { id: 'negMargin',       label: '−ve MARGIN',      ariaName: '−ve margin',      kind: 'line',  band: 2000, tight: 500, unit: 'MW' },
-  { id: 'constraints',     label: 'CONSTRAINTS',     ariaName: 'Constraints',     kind: 'strip', noun: 'constraint', unit: '' },
+  { id: 'constraints',     label: 'CONSTRAINTS',     ariaName: 'Constraints',     kind: 'strip', noun: 'constraint', unit: '',   actionsSource: 'none' },
   { id: 'inertia',         label: 'INERTIA',         ariaName: 'Inertia',         kind: 'line',  band: 40,   tight: 6,   unit: 'GVA·s' },
-  { id: 'reserve',         label: 'RESERVE',         ariaName: 'Reserve',         kind: 'strip', noun: 'product', unit: 'MW' },
-  { id: 'response',        label: 'RESPONSE',        ariaName: 'Response',        kind: 'strip', noun: 'product', unit: 'MW' },
+  { id: 'reserve',         label: 'RESERVE',         ariaName: 'Reserve',         kind: 'strip', noun: 'product', unit: 'MW', actionsSource: 'none' },
+  { id: 'response',        label: 'RESPONSE',        ariaName: 'Response',        kind: 'strip', noun: 'product', unit: 'MW', actionsSource: 'none' },
   { id: 'largestLoss',     label: 'LARGEST LOSS',    ariaName: 'Largest loss',    kind: 'line',  band: 1000, tight: 100, unit: 'MW' },
   { id: 'interconnectors', label: 'INTERCONNECTORS', ariaName: 'Interconnectors', kind: 'ic',    band: 3000, amber: 1500, red: 2000, unit: 'MW' },
 ]
@@ -55,13 +60,6 @@ export const AREA_SOURCES: Record<AreaId, 'real' | 'mock'> = {
 // Real sources that are themselves fixtures (not live feeds) — listed under "Mock data" in the legend.
 export const REAL_SOURCE_IS_FIXTURE: Partial<Record<AreaId, boolean>> = {
   constraints: true,
-}
-
-// Where action markers come from when a strip area is on its real source (no real action feed exists).
-export const STRIP_ACTIONS_SOURCE: Record<StripAreaId, 'mock' | 'none'> = {
-  constraints: 'mock',
-  reserve:     'mock',
-  response:    'none',
 }
 
 // Headroom (MW) below which a reserve/response item is 'tight' (real adapters only).

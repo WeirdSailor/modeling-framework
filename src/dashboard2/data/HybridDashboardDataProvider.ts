@@ -2,11 +2,9 @@
 // AREA_SOURCES in dashboard.config.ts; an area on 'real' falls back to the mock if its adapter
 // has no mapping or throws.
 
-import {
-  AREA_CONFIG, AREA_SOURCES, REAL_SOURCE_IS_FIXTURE, STRIP_ACTIONS_SOURCE,
-} from '../dashboard.config'
+import { AREA_CONFIG, AREA_SOURCES, REAL_SOURCE_IS_FIXTURE } from '../dashboard.config'
 import type {
-  AreaData, DashboardData, DashboardDataProvider, MockSource, StripAreaData, StripAreaId, TimeWindow,
+  AreaData, DashboardData, DashboardDataProvider, MockSource, StripAreaData, TimeWindow,
 } from '../types'
 import { buildMockArea, mockForecastRunAt } from './MockDashboardDataProvider'
 import { buildRealArea, readRealContext, realDataLoadedAt } from './realAdapters'
@@ -37,7 +35,8 @@ export class HybridDashboardDataProvider implements DashboardDataProvider {
     const mockSources: MockSource[] = []
     let anyReal = false
 
-    for (const { id } of AREA_CONFIG) {
+    for (const cfg of AREA_CONFIG) {
+      const { id } = cfg
       let area: AreaData | null = null
       if (AREA_SOURCES[id] === 'real') {
         try {
@@ -56,7 +55,7 @@ export class HybridDashboardDataProvider implements DashboardDataProvider {
       anyReal = true
       if (REAL_SOURCE_IS_FIXTURE[id]) mockSources.push({ areaId: id, part: 'all' })
 
-      if (area.kind === 'strip' && STRIP_ACTIONS_SOURCE[id as StripAreaId] === 'mock') {
+      if (area.kind === 'strip' && cfg.kind === 'strip' && cfg.actionsSource === 'mock') {
         area = withMockActions(area, buildMockArea(id, window, nowMs) as StripAreaData)
         if (!REAL_SOURCE_IS_FIXTURE[id]) mockSources.push({ areaId: id, part: 'actions' })
       }

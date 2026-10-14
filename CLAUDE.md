@@ -296,7 +296,7 @@ A second dashboard tab (Balancing section), placed after Dashboard. The existing
   - INERTIA / RESERVE (4 items) / RESPONSE (1 item) = `areaAvailability` vs `areaRequirements`
   - CONSTRAINTS = the ConstraintsTile fixtures (dummy, so labelled as mock in the legend)
   - INTERCONNECTORS = Σ `sp.pn` over `I_*` BMUs (+ = import to GB)
-  - −ve MARGIN, LARGEST LOSS and strip action markers have no real source → mock.
+  - −ve MARGIN and LARGEST LOSS have no real source → mock. Strip action markers have no real source either; per-row `actionsSource` defaults to `'none'` (no markers) rather than overlaying mock actions on real states.
 - **Legend note** lists every area/part on mock or fixture data ("Mock data: …"); empty when everything is real.
 - **State:** time window, horizon (persisted to `localStorage` key `d2:horizon`), polling and cursor all live inside `src/dashboard2/state/` — not in Zustand and not in `page.tsx`. `page.tsx` only passes `reservePct`. Polls every 30s and refetches immediately when `settlementPeriods`, `areaRequirements` or `reservePct` change.
 - **Time:** UTC 30-minute SP iteration, displayed in Europe/London; handles 46/50-SP clock-change days (covered by tests). Missing SPs render as gaps, never zeros.
@@ -640,5 +640,5 @@ Units where all four of `sel`, `ndz`, `mnzt`, `mzt` are still `undefined` after 
 - **Inertia H constant is a flat proxy** — using 0.05 GVAs/MW for all synchronous units. Real per-unit H constants are available from Elexon dynamic parameters.
 - **Voltage proxy is national, not GSP-local** — the real voltage support model requires GSP-level filtering already present in the Voltage scenario. Out of scope for current prototype.
 - **Response sub-classification** — Dynamic Containment, Moderation, Regulation treated uniformly. No sub-type distinction yet.
-- **Dashboard 2 data gaps** — no real source for −ve margin, largest loss or strip actions (mock); no +/− reserve direction or LF/HF/pre-/post-fault response split in the store, so RESERVE has 4 upward items and RESPONSE has 1. CONSTRAINTS uses the dummy ConstraintsTile fixtures.
+- **Dashboard 2 data gaps** — no real source for −ve margin or largest loss (mock) or for strip actions (not shown); no +/− reserve direction or LF/HF/pre-/post-fault response split in the store, so RESERVE has 4 upward items and RESPONSE has 1. CONSTRAINTS uses the dummy ConstraintsTile fixtures.
 - **Dashboard 2 IC swings at day boundaries are unverified** — real data showed a large swing (~−4.8 GW) at local midnight, likely where confirmed PN hands over to the D-1 proxy for tomorrow's slots. Not confirmed.
