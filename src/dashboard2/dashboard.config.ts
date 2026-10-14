@@ -49,7 +49,11 @@ export const HEADER_HEIGHT = 34
 // ── Data sources ──────────────────────────────────────────────────────────
 // 'real' = the same store/fixtures the existing Dashboard tab reads; 'mock' = mock-data.json.
 // See Docs/Design/Dashboard/DATA_MAPPING.md for the mapping behind each 'real' adapter.
-export const AREA_SOURCES: Record<AreaId, 'real' | 'mock'> = {
+// These are the defaults; operators can override them per row in Config → Data (persisted to
+// localStorage under AREA_SOURCES_STORAGE_KEY, see state/areaSources.ts).
+export type AreaSource = 'real' | 'mock'
+export type AreaSources = Record<AreaId, AreaSource>
+export const AREA_SOURCES: AreaSources = {
   posMargin:       'real',
   negMargin:       'mock',
   constraints:     'real',
@@ -58,6 +62,14 @@ export const AREA_SOURCES: Record<AreaId, 'real' | 'mock'> = {
   response:        'real',
   largestLoss:     'mock',
   interconnectors: 'real',
+}
+
+export const AREA_SOURCES_STORAGE_KEY = 'd2:areaSources'
+
+// Areas with no real adapter — always mock, whatever AREA_SOURCES says.
+export const NO_REAL_SOURCE: Partial<Record<AreaId, boolean>> = {
+  negMargin:   true,
+  largestLoss: true,
 }
 
 // Real sources that are themselves fixtures (not live feeds) — listed under "Mock data" in the legend.

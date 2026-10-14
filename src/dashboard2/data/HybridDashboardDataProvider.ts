@@ -1,8 +1,8 @@
-// Composes real adapters and the mock into one DashboardData payload. The per-area choice is
-// AREA_SOURCES in dashboard.config.ts; an area on 'real' falls back to the mock if its adapter
-// has no mapping or throws.
+// Composes real adapters and the mock into one DashboardData payload. The per-area choice comes
+// from getSources() (defaults: AREA_SOURCES in dashboard.config.ts, overridable in Config → Data);
+// an area on 'real' falls back to the mock if its adapter has no mapping or throws.
 
-import { AREA_CONFIG, AREA_SOURCES, REAL_SOURCE_IS_FIXTURE } from '../dashboard.config'
+import { AREA_CONFIG, REAL_SOURCE_IS_FIXTURE, type AreaSources } from '../dashboard.config'
 import type {
   AreaData, DashboardData, DashboardDataProvider, MockSource, StripAreaData, TimeWindow,
 } from '../types'
@@ -23,14 +23,17 @@ function withMockActions(real: StripAreaData, mock: StripAreaData): StripAreaDat
 
 export class HybridDashboardDataProvider implements DashboardDataProvider {
   private readonly getReservePct: () => number
+  private readonly getSources: () => AreaSources
 
-  constructor(getReservePct: () => number) {
+  constructor(getReservePct: () => number, getSources: () => AreaSources) {
     this.getReservePct = getReservePct
+    this.getSources = getSources
   }
 
   async fetch(window: TimeWindow): Promise<DashboardData> {
     const nowMs = Date.now()
     const ctx = readRealContext(this.getReservePct(), nowMs)
+    const sources = this.getSources()
     const areas: AreaData[] = []
     const mockSources: MockSource[] = []
     let anyReal = false
@@ -38,7 +41,7 @@ export class HybridDashboardDataProvider implements DashboardDataProvider {
     for (const cfg of AREA_CONFIG) {
       const { id } = cfg
       let area: AreaData | null = null
-      if (AREA_SOURCES[id] === 'real') {
+      if (sources[id] === 'real') {
         try {
           area = buildRealArea(id, window, ctx)
         } catch (err) {

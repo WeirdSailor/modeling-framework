@@ -26,6 +26,7 @@ import GraphTab from '@/components/GraphTab'
 import RequirementsTab from '@/components/RequirementsTab'
 import Dashboard from '@/components/Dashboard'
 import OperationalDashboard from '@/dashboard2/components/OperationalDashboard'
+import { useAreaSources } from '@/dashboard2/state/areaSources'
 import AreaChart from '@/components/AreaChart'
 import type { AreaId } from '@/config/areas'
 import { AREAS, getArea } from '@/config/areas'
@@ -85,6 +86,7 @@ export default function Home() {
     })
   }, [])
   const [showConfig, setShowConfig] = useState(false)
+  const { sources: d2Sources, setSource: setD2Source, resetSources: resetD2Sources } = useAreaSources()
   const [showFeedback, setShowFeedback] = useState(false)
   const [showArchive, setShowArchive] = useState(true)
   const [toast, setToast] = useState<string | null>(null)
@@ -682,7 +684,7 @@ export default function Home() {
 
         {/* Dashboard 2 tab — cross-area operational awareness view */}
         {activeTab === 'dashboard2' && (
-          <OperationalDashboard reservePct={tweaks.reservePct} />
+          <OperationalDashboard reservePct={tweaks.reservePct} areaSources={d2Sources} />
         )}
 
         {/* Workspace tab */}
@@ -972,6 +974,9 @@ export default function Home() {
           historicalStartSp={historicalStartSp}
           onHistoricalStartSpChange={setHistoricalStartSp}
           onLoadHistorical={loadHistoricalData}
+          d2Sources={d2Sources}
+          onD2SourceChange={setD2Source}
+          onD2SourcesReset={resetD2Sources}
         />
       )}
 

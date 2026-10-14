@@ -6,7 +6,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { Inter } from 'next/font/google'
 import { useModellingStore } from '@/store/useModellingStore'
 import {
-  AREA_CONFIG, CUSTOM_TICK_CANDIDATES, HEADER_HEIGHT, MIN_TICK_PX, PRESET_TICK_MINUTES,
+  AREA_CONFIG, AREA_SOURCES, CUSTOM_TICK_CANDIDATES, type AreaSources, HEADER_HEIGHT, MIN_TICK_PX, PRESET_TICK_MINUTES,
 } from '../dashboard.config'
 import { createXScale } from '../geometry'
 import { SP_MS, floorToSp, pickTickStep } from '../time'
@@ -29,21 +29,24 @@ const defaultDrillDown = (e: DrillDownEvent) => console.debug('[dashboard2] dril
 
 interface Props {
   reservePct: number
+  areaSources?: AreaSources
   onDrillDown?: (e: DrillDownEvent) => void
 }
 
-export default function OperationalDashboard({ reservePct, onDrillDown = defaultDrillDown }: Props) {
+export default function OperationalDashboard({ reservePct, areaSources = AREA_SOURCES, onDrillDown = defaultDrillDown }: Props) {
   const { mode, window: win, nowMs, selectPreset, applyCustom, backToLive } = useTimeWindow()
 
-  // Provider reads reservePct lazily so it stays a stable instance.
+  // Provider reads reservePct and the area sources lazily so it stays a stable instance.
   const reservePctRef = useRef(reservePct)
   useEffect(() => { reservePctRef.current = reservePct }, [reservePct])
-  const provider = useMemo(() => new HybridDashboardDataProvider(() => reservePctRef.current), [])
+  const areaSourcesRef = useRef(areaSources)
+  useEffect(() => { areaSourcesRef.current = areaSources }, [areaSources])
+  const provider = useMemo(() => new HybridDashboardDataProvider(() => reservePctRef.current, () => areaSourcesRef.current), [])
 
-  // Refetch immediately when the shared store data (or the TR2 multiplier) changes.
+  // Refetch immediately when the shared store data, the TR2 multiplier or the area sources change.
   const settlementPeriods = useModellingStore(s => s.settlementPeriods)
   const areaRequirements = useModellingStore(s => s.areaRequirements)
-  const refreshKey = useMemo(() => ({ settlementPeriods, areaRequirements, reservePct }), [settlementPeriods, areaRequirements, reservePct])
+  const refreshKey = useMemo(() => ({ settlementPeriods, areaRequirements, reservePct, areaSources }), [settlementPeriods, areaRequirements, reservePct, areaSources])
   const { data, lastFetchFailed } = useDashboardData(provider, win.startMs, win.endMs, refreshKey)
 
   // Shared chart width (ResizeObserver on the axis chart cell); every row uses the same scale.

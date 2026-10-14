@@ -298,7 +298,7 @@ A second dashboard tab (Balancing section), placed after Dashboard. The existing
   - INTERCONNECTORS = Σ `sp.pn` over `I_*` BMUs (+ = import to GB)
   - −ve MARGIN and LARGEST LOSS have no real source → mock. Strip action markers have no real source either; per-row `actionsSource` defaults to `'none'` (no markers) rather than overlaying mock actions on real states.
 - **Legend note** lists every area/part on mock or fixture data ("Mock data: …"); empty when everything is real.
-- **State:** time window, horizon (persisted to `localStorage` key `d2:horizon`), polling and cursor all live inside `src/dashboard2/state/` — not in Zustand and not in `page.tsx`. `page.tsx` only passes `reservePct`. Polls every 30s and refetches immediately when `settlementPeriods`, `areaRequirements` or `reservePct` change.
+- **State:** time window, horizon (persisted to `localStorage` key `d2:horizon`), polling and cursor all live inside `src/dashboard2/state/` — not in Zustand and not in `page.tsx`. `page.tsx` only passes `reservePct` and `areaSources`. The per-row Real/Mock choice is overridable in **Config → Data → Dashboard 2 mock data** (`useAreaSources` in `src/dashboard2/state/areaSources.ts`, persisted to localStorage key `d2:areaSources`, merged over the `AREA_SOURCES` defaults; −ve MARGIN and LARGEST LOSS are locked to mock via `NO_REAL_SOURCE`). Polls every 30s and refetches immediately when `settlementPeriods`, `areaRequirements` or `reservePct` change.
 - **Time:** UTC 30-minute SP iteration, displayed in Europe/London; handles 46/50-SP clock-change days (covered by tests). Missing SPs render as gaps, never zeros.
 - **All thresholds, bands, poll intervals and source switches** are in `dashboard.config.ts` (placeholders pending SME tuning).
 

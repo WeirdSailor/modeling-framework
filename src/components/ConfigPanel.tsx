@@ -5,6 +5,10 @@ import { SCENARIOS, GSP_AREAS, type ScenarioId } from '@/config/scenarios'
 import { spToTime, dateToSettlementDate } from '@/utils/settlements'
 import StandingDataTab from '@/components/StandingDataTab'
 import { SegControl } from '@/components/SegControl'
+import {
+  AREA_CONFIG, NO_REAL_SOURCE, REAL_SOURCE_IS_FIXTURE, type AreaSource, type AreaSources,
+} from '@/dashboard2/dashboard.config'
+import type { AreaId } from '@/dashboard2/types'
 
 // ── TweakState (moved here from TweaksPanel) ──────────────────────────────────
 
@@ -17,7 +21,12 @@ export interface TweakState {
   chartInteractionMode: 'drag' | 'twoClick' | 'deficit'
 }
 
-function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
+function Toggle({ value, onChange, disabled, label }: {
+  value: boolean
+  onChange: (v: boolean) => void
+  disabled?: boolean
+  label?: string
+}) {
   return (
     <button
       type="button"
@@ -25,6 +34,9 @@ function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) =>
       data-on={value ? '1' : '0'}
       role="switch"
       aria-checked={value}
+      aria-label={label}
+      disabled={disabled}
+      style={disabled ? { opacity: 0.45 } : undefined}
       onClick={() => onChange(!value)}
     >
       <i />
@@ -244,7 +256,13 @@ function DataTab({
   historicalStartSp,
   onHistoricalStartSpChange,
   onLoadHistorical,
+  d2Sources,
+  onD2SourceChange,
+  onD2SourcesReset,
 }: {
+  d2Sources: AreaSources
+  onD2SourceChange: (id: AreaId, source: AreaSource) => void
+  onD2SourcesReset: () => void
   dataMode: 'real' | 'historical'
   onDataModeChange: (mode: 'real' | 'historical') => void
   historicalDate: string
@@ -339,6 +357,31 @@ function DataTab({
           </button>
         </>
       )}
+
+      <div className="twk-sect">Dashboard 2 mock data</div>
+      {AREA_CONFIG.map(cfg => {
+        const locked = NO_REAL_SOURCE[cfg.id] === true
+        const hint = locked
+          ? 'No real source — always mock'
+          : REAL_SOURCE_IS_FIXTURE[cfg.id] ? 'Real = dummy fixtures' : null
+        return (
+          <div key={cfg.id} className="twk-row twk-row-h">
+            <div className="twk-lbl" style={{ flexDirection: 'column', gap: 1 }}>
+              <span>{cfg.label}</span>
+              {hint && <span style={{ fontSize: 10.5, color: 'var(--text-faint)' }}>{hint}</span>}
+            </div>
+            <Toggle
+              label={`Mock data for ${cfg.ariaName}`}
+              value={locked || d2Sources[cfg.id] === 'mock'}
+              disabled={locked}
+              onChange={v => onD2SourceChange(cfg.id, v ? 'mock' : 'real')}
+            />
+          </div>
+        )
+      })}
+      <button className="btn btn-block" onClick={onD2SourcesReset} style={{ marginTop: 2 }}>
+        Reset to defaults
+      </button>
     </div>
   )
 }
@@ -358,6 +401,9 @@ interface Props {
   historicalStartSp: number
   onHistoricalStartSpChange: (sp: number) => void
   onLoadHistorical: (date: string, startSp: number) => void
+  d2Sources: AreaSources
+  onD2SourceChange: (id: AreaId, source: AreaSource) => void
+  onD2SourcesReset: () => void
 }
 
 type ConfigTab = 'tweaks' | 'scenarios' | 'data' | 'standing'
@@ -368,6 +414,7 @@ export default function ConfigPanel({
   historicalDate, onHistoricalDateChange,
   historicalStartSp, onHistoricalStartSpChange,
   onLoadHistorical,
+  d2Sources, onD2SourceChange, onD2SourcesReset,
 }: Props) {
   const panelRef = useRef<HTMLDivElement>(null)
   const offsetRef = useRef({ x: 16, y: 16 })
@@ -450,6 +497,9 @@ export default function ConfigPanel({
           historicalStartSp={historicalStartSp}
           onHistoricalStartSpChange={onHistoricalStartSpChange}
           onLoadHistorical={onLoadHistorical}
+          d2Sources={d2Sources}
+          onD2SourceChange={onD2SourceChange}
+          onD2SourcesReset={onD2SourcesReset}
         />
       )}
       {configTab === 'standing' && <StandingDataTab />}
