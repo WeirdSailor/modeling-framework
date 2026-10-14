@@ -45,8 +45,8 @@ function compute(cfg: AreaConfig, area: AreaData | undefined, startMs: number, e
     return {
       big: formatSwingMagnitude(abs),
       tone: tone === 'red' ? 'crit' : tone === 'amber' ? 'warn' : 'muted',
-      sub: 'largest swing',
-      aria: `${cfg.ariaName}, largest swing ${formatSwingMagnitude(abs)}`,
+      sub: s.estimated ? 'largest swing (est.)' : 'largest swing',
+      aria: `${cfg.ariaName}, largest swing ${formatSwingMagnitude(abs)}${s.estimated ? ', estimated' : ''}`,
     }
   }
   return null
