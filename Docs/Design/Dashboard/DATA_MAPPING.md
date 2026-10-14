@@ -45,6 +45,17 @@ The existing areas are Margin, Recovery Reserve, Freq. Control Reserve, General 
 - **Resolution:** all sources are already 30-minute, so no resampling is needed. A missing slot is left out of `periods`, so it renders as a gap and is never turned into a zero.
 - **Constraints fixture** timestamps are already true UTC (`floorToSpMs(now)`), so they're used as-is.
 
+## Known issue: the two dashboards show times an hour apart during BST
+
+The existing app labels Elexon settlement periods as if they were UTC (`spToStartTime`), but Elexon numbers SPs from **Europe/London** midnight. Dashboard 2 re-derives the true instant (see *Time conversion* above). The existing tabs are deliberately unchanged.
+
+During British Summer Time (late March to late October) this has two visible effects when comparing the tabs:
+
+- **Labels:** the existing app shows SP *n* as `(n−1)×30 min` and calls it **UTC**. Those digits are really the **London** start time. For example, SP 39 on 14 Oct is labelled "19:00 UTC", but it starts at 19:00 London, which is 18:00 UTC. Dashboard 2 shows the same SP at 19:00 London, so the digits match but the existing app's "UTC" is an hour off.
+- **Window / current period:** the existing app picks the current SP from the UTC clock (`dateToSp(now)`). Its rolling window therefore starts about **an hour behind real time**. At 17:55 London, the existing tabs start at the slot labelled "16:30" (sidebar: "16:30 → 16:00 UTC"), while Dashboard 2 starts at 17:30 London with Now at 17:55. The existing tabs' first hour is already in the past, and Dashboard 2 has no data for the last hour of its 24h view.
+
+In GMT the two tabs agree. This is the BST issue already listed in CLAUDE.md. Fixing it in the shared `settlements.ts` would change every existing screen, so it is out of scope here.
+
 ## Interconnector seams
 
 `fetchAllData` fills each slot from one of two sources:
