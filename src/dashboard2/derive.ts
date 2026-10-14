@@ -110,23 +110,33 @@ export function itemStateFromHeadroom(requirement: number, available: number, ti
 
 // ── IC row ───────────────────────────────────────────────────────────────
 
-export interface IcSwing { boundaryMs: number; swing: number }
+export interface IcSwing { boundaryMs: number; swing: number; estimated: boolean }
 
 /**
  * swing[b] = net[b] − net[b−1] for every SP b inside the window, plotted on b's start boundary.
- * Uses the SP before the window for the first boundary; no swing where either side is missing.
+ * Uses the SP before the window for the first boundary. No swing (a gap) where either side is missing,
+ * or across a seam: confirmed ↔ estimated, or estimates whose source SPs are not consecutive.
  */
 export function icSwings(periods: IcPeriod[], startMs: number, endMs: number): IcSwing[] {
-  const byStart = new Map<number, number>()
-  for (const p of periods) byStart.set(ms(p.spStart), p.netPositionMw)
+  const byStart = new Map<number, IcPeriod>()
+  for (const p of periods) byStart.set(ms(p.spStart), p)
   const out: IcSwing[] = []
-  for (const [t, net] of [...byStart].sort((a, b) => a[0] - b[0])) {
+  for (const [t, cur] of [...byStart].sort((a, b) => a[0] - b[0])) {
     if (t < startMs || t >= endMs) continue
     const prev = byStart.get(t - SP_MS)
-    if (prev === undefined) continue
-    out.push({ boundaryMs: t, swing: net - prev })
+    if (!prev || isIcSeam(prev, cur)) continue
+    out.push({ boundaryMs: t, swing: cur.netPositionMw - prev.netPositionMw, estimated: !!cur.estimated })
   }
   return out
+}
+
+/** True when a swing between two adjacent periods would compare data from different sources/times. */
+export function isIcSeam(prev: IcPeriod, cur: IcPeriod): boolean {
+  if (!!prev.estimated !== !!cur.estimated) return true
+  const ps = prev.sourceStart, cs = cur.sourceStart
+  if (ps === undefined && cs === undefined) return false
+  if (ps === undefined || cs === undefined) return true
+  return ms(cs) - ms(ps) !== SP_MS
 }
 
 export function largestSwing(swings: IcSwing[]): IcSwing | null {

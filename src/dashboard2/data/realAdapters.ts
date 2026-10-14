@@ -48,11 +48,25 @@ export function readRealContext(reservePct: number, nowMs: number): RealContext 
  * (`${date}T${(sp-1)*30 min}Z`); Elexon SPs are actually counted from London midnight.
  */
 export function slotStartMs(sp: SettlementPeriodData): number {
-  const labelled = Date.parse(sp.startTime)
-  if (!CORRECT_ELEXON_SP_TO_UTC) return labelled
-  const d = new Date(labelled)
-  const realSp = (d.getUTCHours() * 60 + d.getUTCMinutes()) / 30 + 1
-  return settlementSpStartUtc(sp.settlementDate, realSp)
+  return elexonSpStartMs(sp.settlementDate, elexonSpOf(sp))
+}
+
+/** The real Elexon SP number of a store slot, recovered from the startTime spToStartTime wrote. */
+function elexonSpOf(sp: SettlementPeriodData): number {
+  const d = new Date(sp.startTime)
+  return (d.getUTCHours() * 60 + d.getUTCMinutes()) / 30 + 1
+}
+
+/** Start instant of Elexon (date, sp): true UTC, or the app's UTC labelling when the correction is off. */
+function elexonSpStartMs(date: string, sp: number): number {
+  if (CORRECT_ELEXON_SP_TO_UTC) return settlementSpStartUtc(date, sp)
+  return Date.parse(`${date}T00:00:00.000Z`) + (sp - 1) * SP_MS
+}
+
+function addDays(date: string, days: number): string {
+  const d = new Date(`${date}T00:00:00.000Z`)
+  d.setUTCDate(d.getUTCDate() + days)
+  return d.toISOString().slice(0, 10)
 }
 
 interface Slot { startMs: number; sp: SettlementPeriodData }
@@ -156,8 +170,15 @@ function constraints(ctx: RealContext, w: { startMs: number; endMs: number }): S
 
 // ── Interconnectors: Σ PN over I_* BMUs (+ = import to GB) ────────────────
 
+// Unconfirmed slots (hasConfirmedPn = false) carry fetchAllData's D-1 proxy: yesterday's PN for the same
+// Elexon SP number — for today's AND tomorrow's slots alike. Each period records where its value really
+// comes from, so icSwings leaves a gap at the confirmed→estimate seam and at the midnight wrap inside the
+// estimates (today SP48 ← yesterday SP48, tomorrow SP1 ← yesterday SP1).
 function interconnectors(ctx: RealContext, w: { startMs: number; endMs: number }): IcAreaData {
   const periods: IcAreaData['periods'] = []
+  const first = ctx.settlementPeriods.reduce<SettlementPeriodData | undefined>(
+    (a, sp) => (!a || sp.settlementPeriod < a.settlementPeriod ? sp : a), undefined)
+  const proxyDate = first ? addDays(first.settlementDate, -1) : null // fetchAllData's yesterdayDate
   for (const { startMs, sp } of slotsIn(ctx, w.startMs - SP_MS, w.endMs)) {
     let net = 0
     let found = false
@@ -166,7 +187,10 @@ function interconnectors(ctx: RealContext, w: { startMs: number; endMs: number }
       net += pn
       found = true
     }
-    if (found) periods.push({ spStart: iso(startMs), netPositionMw: net })
+    if (!found) continue
+    const estimated = !sp.hasConfirmedPn
+    const sourceMs = estimated && proxyDate ? elexonSpStartMs(proxyDate, elexonSpOf(sp)) : startMs
+    periods.push({ spStart: iso(startMs), netPositionMw: net, estimated, sourceStart: iso(sourceMs) })
   }
   return { kind: 'ic', id: 'interconnectors', periods }
 }

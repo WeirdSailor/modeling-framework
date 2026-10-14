@@ -41,7 +41,14 @@ export interface StripAreaData {
   periods: StripPeriod[]
 }
 
-export interface IcPeriod { spStart: ISO; netPositionMw: number } // + = net import to GB
+export interface IcPeriod {
+  spStart: ISO
+  netPositionMw: number // + = net import to GB
+  estimated?: boolean   // true when the value is a proxy (e.g. D-1 PN), not a confirmed forecast
+  // Instant the value actually describes, when it differs from spStart (a D-1 proxy describes the same SP
+  // on an earlier day). Swings are only computed between periods whose sources are consecutive SPs.
+  sourceStart?: ISO
+}
 
 export interface IcAreaData {
   kind: 'ic'

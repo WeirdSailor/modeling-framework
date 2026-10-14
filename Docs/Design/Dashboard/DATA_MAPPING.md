@@ -32,7 +32,7 @@ The existing areas are Margin, Recovery Reserve, Freq. Control Reserve, General 
 | **RESERVE** | real | `areaAvailability[x]` and `areaRequirements[x][slot].requirement` for x ∈ `recovery_reserve`, `freq_control_reserve`, `general_reserve`, `contingency_reserve` | One item per reserve type. Per SP: requirement ≤ 0 is ok; `avail < req` is **violated**; `avail − req < STRIP_TIGHT_MW.reserve` is **tight**; otherwise ok. | There are 4 items, all upward. The source has no +/− direction. Actions (▼ unusable / ▲ allocated) have no source anywhere, so the row shows **no action markers** (`actionsSource: 'none'`). |
 | **RESPONSE** | real | `areaAvailability.response`, `areaRequirements.response[slot].requirement` | Same item-state rule, with `STRIP_TIGHT_MW.response`. | There is **1 item** ("Response"). The source has no LF/HF or pre/post-fault split. No action markers (`actionsSource: 'none'`). |
 | **LARGEST LOSS** | mock | `mock-data.json → areas.largestLoss` | Offsets are anchored to the current SP. | The app has no securable-loss or credible-loss data. |
-| **INTERCONNECTORS** | real | `sp.pn[bmUnit]` for every BMU id starting with `I_` | `netPositionMw = Σ pn` over `I_*` BMUs (+ is import to GB). The SP before the window is included when the store has it. | **Checked against Elexon:** on 2026‑10‑13 the Σ of `I_*` PN for SP 20/30/40 was −1,327 / −3,808 / +1,862 MW. The `INTOUTHH` outturn was −1,322 / −3,706 / +1,930 MW, so the sign and magnitude are right. Interconnectors are in `FETCH_EXCLUDED_FUEL_TYPES`, which only filters reference units. PN is unfiltered. Unconfirmed slots carry D‑1 PN, the same as the rest of the app. In offline/mock-PN mode there are no `I_*` units, so the row shows **No data**. |
+| **INTERCONNECTORS** | real | `sp.pn[bmUnit]` for every BMU id starting with `I_` | `netPositionMw = Σ pn` over `I_*` BMUs (+ is import to GB). The SP before the window is included when the store has it. | **Checked against Elexon:** on 2026‑10‑13 the Σ of `I_*` PN for SP 20/30/40 was −1,327 / −3,808 / +1,862 MW. The `INTOUTHH` outturn was −1,322 / −3,706 / +1,930 MW, so the sign and magnitude are right. Interconnectors are in `FETCH_EXCLUDED_FUEL_TYPES`, which only filters reference units. PN is unfiltered. Unconfirmed slots carry D‑1 PN, the same as the rest of the app; their bars are drawn faded ("IC estimate" in the legend), and no swing is computed across a seam (see **Interconnector seams** below). In offline/mock-PN mode there are no `I_*` units, so the row shows **No data**. |
 | *(Voltage)* | n/a | n/a | n/a | Voltage is in the existing dashboard but has no Dashboard 2 row. It isn't shown. |
 
 ## Time conversion
@@ -44,6 +44,24 @@ The existing areas are Margin, Recovery Reserve, Freq. Control Reserve, General 
 - **Window filter:** the adapters return only SPs with `window.start ≤ spStart < window.end`. Interconnectors also get the SP before the window.
 - **Resolution:** all sources are already 30-minute, so no resampling is needed. A missing slot is left out of `periods`, so it renders as a gap and is never turned into a zero.
 - **Constraints fixture** timestamps are already true UTC (`floorToSpMs(now)`), so they're used as-is.
+
+## Interconnector seams
+
+`fetchAllData` fills each slot from one of two sources:
+
+- **Confirmed** (`hasConfirmedPn = true`): Elexon PN for that slot's own settlement date and SP.
+- **Estimate** (`hasConfirmedPn = false`): the D‑1 proxy, which is `yesterdayDate`'s PN **for the same SP number**. This applies to today's unconfirmed slots *and* to every slot on tomorrow's date.
+
+A swing (`net[b] − net[b−1]`) is only meaningful when both values describe consecutive SPs. Two boundaries break that:
+
+1. **The confirmed → estimate frontier.** For example, at 16:55 UTC on 2026‑10‑14 the last confirmed slot was SP38 (18:30 London) at −1,152 MW, and the first estimate was SP39 (19:00), taken from 13 Oct SP39, at +1,862 MW. The **+3,014 MW "swing" at 19:00 was this seam**, not a real flow change.
+2. **Local midnight inside the estimates.** Today's SP48 comes from yesterday's SP48 (+33 MW), but tomorrow's SP1 comes from yesterday's SP1 (−4,772 MW). That's a wrap back to the *start* of the same day. The **−4,805 MW "swing" at 00:00 was this seam**.
+
+**Handling:**
+- Each real IC period carries `estimated` and `sourceStart`, the instant its value actually describes. For an estimate that's `settlementSpStartUtc(yesterdayDate, sp)`, where `yesterdayDate` is the store's first slot date − 1.
+- `icSwings` (`derive.ts`) skips a boundary when the estimated flags differ, or when the two `sourceStart`s are not exactly one SP apart.
+- A skipped boundary renders as a gap (no bar) and is excluded from "largest swing".
+- Swings between two estimates that are consecutive in their source data are kept, but drawn at 40% opacity. Mock data has no source info and is treated as continuous.
 
 ## Refresh cadence
 
@@ -61,4 +79,5 @@ The existing dashboard has no polling: the store only changes when data is loade
 5. **No action markers on real rows by default.** Each strip row has `actionsSource: 'none' | 'mock'` in `AREA_CONFIG`. Overlaying mock-data.json actions onto real (or fixture) cell states would claim actions that never happened, so every row defaults to `'none'`. If a row is set to `'mock'`, its actions only land on SPs that have real data, and the legend note lists it as "<ROW> actions". A row whose whole source is mock keeps its own mock actions, because those are consistent with its mock states.
 6. **The constraints fixture counts as mock in the legend**, because the existing source is dummy data. It still goes through the same builder as the ConstraintsTile, so the two dashboards agree.
 7. **Historical mode:** if historical data has been loaded, the store holds past slots. Real areas then show data only when a custom range covers those times. Preset windows show gaps for real areas.
-8. **The constraint fixture choice follows the existing tile's rule** (4h fixture for ≤ 8 SPs, 24h fixture otherwise). Switching between 2h/4h and 8h+ therefore changes the constraint picture, exactly as it does on the existing dashboard.
+8. **Estimated IC swings still count towards "largest swing"** (only seams are excluded). The worst-value block does not say whether the largest swing is an estimate. Check the bar's opacity.
+9. **The constraint fixture choice follows the existing tile's rule** (4h fixture for ≤ 8 SPs, 24h fixture otherwise). Switching between 2h/4h and 8h+ therefore changes the constraint picture, exactly as it does on the existing dashboard.

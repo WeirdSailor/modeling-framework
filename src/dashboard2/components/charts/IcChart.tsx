@@ -12,6 +12,7 @@ import { CursorLine, Grid, NowLine, PastShade, useChartPointer } from './ChartFr
 
 const TONE_COLOUR: Record<IcTone, string> = { red: '#FF6B4A', amber: '#F2B53C', normal: '#7D8A9C' }
 const PAD = 8
+export const IC_ESTIMATE_OPACITY = 0.4 // bars whose swing comes from estimated (D-1 proxy) data
 
 interface Props {
   area: IcAreaData | undefined
@@ -53,7 +54,7 @@ const Bars = memo(function Bars({ swings, scale, height, cfg }: {
   const y = (v: number) => mid - Math.max(-1, Math.min(1, v / cfg.band)) * (mid - PAD)
   return (
     <g>
-      {swings.map(({ boundaryMs, swing }) => {
+      {swings.map(({ boundaryMs, swing, estimated }) => {
         const x = scale.x(boundaryMs)
         const tone = icTone(Math.abs(swing), cfg.amber, cfg.red)
         const colour = TONE_COLOUR[tone]
@@ -61,7 +62,7 @@ const Bars = memo(function Bars({ swings, scale, height, cfg }: {
         const top = Math.min(end, mid)
         const h = Math.max(1, Math.abs(end - mid))
         return (
-          <g key={boundaryMs}>
+          <g key={boundaryMs} opacity={estimated ? IC_ESTIMATE_OPACITY : undefined}>
             <rect x={x - 4} y={swing >= 0 ? mid - h : mid} width={8} height={h} rx={1.5} fill={colour} />
             {tone !== 'normal' && (
               <text x={x + 8} y={swing > 0 ? top + 10 : end - 2} fontSize={11.5} fontWeight={600} fill={colour}>

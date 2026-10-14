@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   lineWorst, lineTone, cellState, cellVisual, aggregateActions, stripWorst, itemStateFromHeadroom,
-  icSwings, largestSwing, icTone,
+  icSwings, largestSwing, icTone, isIcSeam,
 } from '../derive.ts'
 
 const SP = 30 * 60 * 1000
@@ -84,10 +84,10 @@ test('IC swings use the SP before the window for the first boundary', () => {
   ]
   const s = icSwings(periods, T0, T0 + 4 * SP)
   assert.deepEqual(s, [
-    { boundaryMs: T0, swing: 100 },
-    { boundaryMs: T0 + SP, swing: 2300 },
+    { boundaryMs: T0, swing: 100, estimated: false },
+    { boundaryMs: T0 + SP, swing: 2300, estimated: false },
   ])
-  assert.deepEqual(largestSwing(s), { boundaryMs: T0 + SP, swing: 2300 })
+  assert.deepEqual(largestSwing(s), { boundaryMs: T0 + SP, swing: 2300, estimated: false })
   assert.equal(largestSwing([]), null)
 })
 
@@ -96,4 +96,29 @@ test('IC tone thresholds', () => {
   assert.equal(icTone(2000, 1500, 2000), 'red')
   assert.equal(icTone(1600, 1500, 2000), 'amber')
   assert.equal(icTone(1499, 1500, 2000), 'normal')
+})
+
+test('IC: no swing across the confirmed → estimate seam; estimate swings are flagged', () => {
+  const D = 24 * 3600_000
+  const periods = [
+    { spStart: at(0), netPositionMw: -1152, estimated: false, sourceStart: at(0) },
+    { spStart: at(1), netPositionMw: 1862, estimated: true, sourceStart: new Date(T0 + SP - D).toISOString() },
+    { spStart: at(2), netPositionMw: 2599, estimated: true, sourceStart: new Date(T0 + 2 * SP - D).toISOString() },
+  ]
+  const s = icSwings(periods, T0, T0 + 3 * SP)
+  assert.deepEqual(s, [{ boundaryMs: T0 + 2 * SP, swing: 737, estimated: true }])
+  assert.equal(largestSwing(s).swing, 737) // the +3,014 seam jump is excluded
+})
+
+test('IC: no swing across the midnight wrap inside D-1 estimates', () => {
+  // today SP48 <- yesterday SP48, tomorrow SP1 <- yesterday SP1: sources are 47 SPs apart, not 1.
+  const prev = { spStart: at(0), netPositionMw: 33, estimated: true, sourceStart: at(-48) }
+  const cur = { spStart: at(1), netPositionMw: -4772, estimated: true, sourceStart: at(-95) }
+  assert.equal(isIcSeam(prev, cur), true)
+  assert.deepEqual(icSwings([prev, cur], T0, T0 + 2 * SP), [])
+})
+
+test('IC: periods without source info (mock) are continuous', () => {
+  assert.equal(isIcSeam({ spStart: at(0), netPositionMw: 1 }, { spStart: at(1), netPositionMw: 2 }), false)
+  assert.equal(isIcSeam({ spStart: at(0), netPositionMw: 1, sourceStart: at(0) }, { spStart: at(1), netPositionMw: 2 }), true)
 })

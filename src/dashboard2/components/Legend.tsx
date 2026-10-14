@@ -4,6 +4,7 @@ import { AREA_CONFIG } from '../dashboard.config'
 import { arrowPoints } from '../geometry'
 import type { MockSource } from '../types'
 import { HATCH_FILL } from './charts/SvgDefs'
+import { IC_ESTIMATE_OPACITY } from './charts/IcChart'
 import styles from '../dashboard2.module.css'
 
 export function mockNote(sources: MockSource[]): string | null {
@@ -47,6 +48,10 @@ export default function Legend({ mockSources }: { mockSources: MockSource[] }) {
       <span className={styles.legendItem}>
         <svg width="12" height="14" aria-hidden="true"><rect x="2" y="1" width="8" height="12" rx="1.5" fill="#7D8A9C" /></svg>
         IC swing
+      </span>
+      <span className={styles.legendItem}>
+        <svg width="12" height="14" aria-hidden="true"><rect x="2" y="1" width="8" height="12" rx="1.5" fill="#7D8A9C" opacity={IC_ESTIMATE_OPACITY} /></svg>
+        IC estimate
       </span>
       {note && <span className={styles.legendNote}>{note}</span>}
     </div>
