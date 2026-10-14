@@ -2,12 +2,10 @@
 
 import { useEffect, useState } from 'react'
 import { POLL_INTERVAL_MS } from '../dashboard.config'
-import type { DashboardData, DashboardDataProvider } from '../types'
+import { applyFetchResult, type DataState } from '../derive'
+import type { DashboardDataProvider } from '../types'
 
-export interface DashboardDataState {
-  data: DashboardData | null // last good payload — kept while a fetch is in flight or after an error
-  lastFetchFailed: boolean
-}
+export type DashboardDataState = DataState
 
 /**
  * Polls the provider every POLL_INTERVAL_MS and immediately whenever the window or refreshKey
@@ -30,10 +28,10 @@ export function useDashboardData(
       const mine = ++seq
       try {
         const data = await provider.fetch(win)
-        if (!cancelled && mine === seq) setState({ data, lastFetchFailed: false })
+        if (!cancelled && mine === seq) setState(prev => applyFetchResult(prev, { ok: true, data }))
       } catch (err) {
         console.warn('[dashboard2] fetch failed', err)
-        if (!cancelled && mine === seq) setState(prev => ({ ...prev, lastFetchFailed: true }))
+        if (!cancelled && mine === seq) setState(prev => applyFetchResult(prev, { ok: false }))
       }
     }
 

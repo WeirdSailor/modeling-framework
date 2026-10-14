@@ -1,7 +1,7 @@
 // Pure derivations for Dashboard 2: headroom, strip cell state, action aggregation, worst-in-window,
 // IC swings. Type-only imports so this runs under `node --test` with type stripping.
 
-import type { IcPeriod, LinePeriod, SpState, StripAction, StripPeriod } from './types'
+import type { DashboardData, IcPeriod, LinePeriod, SpState, StripAction, StripPeriod } from './types'
 
 const SP_MS = 30 * 60 * 1000 // duplicated from time.ts to keep this module free of value imports
 
@@ -151,4 +151,24 @@ export function icTone(absSwing: number, amber: number, red: number): IcTone {
   if (absSwing >= red) return 'red'
   if (absSwing >= amber) return 'amber'
   return 'normal'
+}
+
+// ── Data status ──────────────────────────────────────────────────────────
+
+export interface DataState {
+  data: DashboardData | null // last good payload — kept while a fetch is in flight or after an error
+  lastFetchFailed: boolean
+}
+
+/** Applies a fetch outcome: success replaces the data; failure keeps the last good data and flags it. */
+export function applyFetchResult(prev: DataState, result: { ok: true; data: DashboardData } | { ok: false }): DataState {
+  return result.ok ? { data: result.data, lastFetchFailed: false } : { data: prev.data, lastFetchFailed: true }
+}
+
+/** Stale = the last fetch failed, or the data is older than staleMultiplier × pollMs (spec §7). */
+export function isStale(
+  updatedAtMs: number | null, nowMs: number, lastFetchFailed: boolean, pollMs: number, staleMultiplier: number,
+): boolean {
+  if (lastFetchFailed) return true
+  return updatedAtMs !== null && nowMs - updatedAtMs > staleMultiplier * pollMs
 }

@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   lineWorst, lineTone, cellState, cellVisual, aggregateActions, stripWorst, itemStateFromHeadroom,
-  icSwings, largestSwing, icTone, isIcSeam,
+  icSwings, largestSwing, icTone, isIcSeam, applyFetchResult, isStale,
 } from '../derive.ts'
 
 const SP = 30 * 60 * 1000
@@ -121,4 +121,22 @@ test('IC: no swing across the midnight wrap inside D-1 estimates', () => {
 test('IC: periods without source info (mock) are continuous', () => {
   assert.equal(isIcSeam({ spStart: at(0), netPositionMw: 1 }, { spStart: at(1), netPositionMw: 2 }), false)
   assert.equal(isIcSeam({ spStart: at(0), netPositionMw: 1, sourceStart: at(0) }, { spStart: at(1), netPositionMw: 2 }), true)
+})
+
+test('a failed fetch keeps the last good data on screen and flags the status', () => {
+  const good = { forecastRunAt: at(0), updatedAt: at(0), window: { start: at(0), end: at(2) }, areas: [], mockSources: [] }
+  const afterOk = applyFetchResult({ data: null, lastFetchFailed: false }, { ok: true, data: good })
+  const afterFail = applyFetchResult(afterOk, { ok: false })
+  assert.equal(afterFail.data, good)          // same payload object, still rendered
+  assert.equal(afterFail.lastFetchFailed, true)
+  const recovered = applyFetchResult(afterFail, { ok: true, data: { ...good, updatedAt: at(1) } })
+  assert.equal(recovered.lastFetchFailed, false)
+})
+
+test('Stale: on fetch failure, or after 2 missed polls', () => {
+  const poll = 30_000, t = Date.parse(at(0))
+  assert.equal(isStale(t, t + 1000, true, poll, 2), true)      // failed fetch → Stale immediately
+  assert.equal(isStale(t, t + 60_000, false, poll, 2), false)  // exactly 2 polls old → still Live
+  assert.equal(isStale(t, t + 60_001, false, poll, 2), true)   // older than 2 polls → Stale
+  assert.equal(isStale(null, t, false, poll, 2), false)        // nothing loaded yet
 })

@@ -5,6 +5,7 @@
 import { useEffect, useState } from 'react'
 import { POLL_INTERVAL_MS, STALE_MULTIPLIER } from '../dashboard.config'
 import { formatHHMM, formatHHMMSS } from '../time'
+import { isStale } from '../derive'
 import styles from '../dashboard2.module.css'
 
 interface Props {
@@ -27,7 +28,7 @@ export default function DataStatus({ isCustom, forecastRunAt, updatedAt, lastFet
   }, [])
 
   const updatedMs = updatedAt ? Date.parse(updatedAt) : null
-  const stale = lastFetchFailed || (updatedMs !== null && now - updatedMs > STALE_MULTIPLIER * POLL_INTERVAL_MS)
+  const stale = isStale(updatedMs, now, lastFetchFailed, POLL_INTERVAL_MS, STALE_MULTIPLIER)
 
   const dotClass = isCustom ? styles.dotCustom : stale ? styles.dotStale : ''
   const label = isCustom ? 'Custom range' : stale ? 'Stale' : 'Live'
