@@ -1,0 +1,78 @@
+// Composes real adapters and the mock into one DashboardData payload. The per-area choice is
+// AREA_SOURCES in dashboard.config.ts; an area on 'real' falls back to the mock if its adapter
+// has no mapping or throws.
+
+import {
+  AREA_CONFIG, AREA_SOURCES, REAL_SOURCE_IS_FIXTURE, STRIP_ACTIONS_SOURCE,
+} from '../dashboard.config'
+import type {
+  AreaData, DashboardData, DashboardDataProvider, MockSource, StripAreaData, StripAreaId, TimeWindow,
+} from '../types'
+import { buildMockArea, mockForecastRunAt } from './MockDashboardDataProvider'
+import { buildRealArea, readRealContext, realDataLoadedAt } from './realAdapters'
+
+/** Overlays mock actions onto real strip periods with the same spStart (never creates new SPs). */
+function withMockActions(real: StripAreaData, mock: StripAreaData): StripAreaData {
+  const actionsBySp = new Map(mock.periods.map(p => [Date.parse(p.spStart), p.actions]))
+  return {
+    ...real,
+    periods: real.periods.map(p => {
+      const extra = actionsBySp.get(Date.parse(p.spStart))
+      return extra && extra.length > 0 ? { ...p, actions: [...p.actions, ...extra] } : p
+    }),
+  }
+}
+
+export class HybridDashboardDataProvider implements DashboardDataProvider {
+  private readonly getReservePct: () => number
+
+  constructor(getReservePct: () => number) {
+    this.getReservePct = getReservePct
+  }
+
+  async fetch(window: TimeWindow): Promise<DashboardData> {
+    const nowMs = Date.now()
+    const ctx = readRealContext(this.getReservePct(), nowMs)
+    const areas: AreaData[] = []
+    const mockSources: MockSource[] = []
+    let anyReal = false
+
+    for (const { id } of AREA_CONFIG) {
+      let area: AreaData | null = null
+      if (AREA_SOURCES[id] === 'real') {
+        try {
+          area = buildRealArea(id, window, ctx)
+        } catch (err) {
+          console.warn(`[dashboard2] real adapter for ${id} failed — falling back to mock`, err)
+        }
+      }
+
+      if (!area) {
+        areas.push(buildMockArea(id, window, nowMs))
+        mockSources.push({ areaId: id, part: 'all' })
+        continue
+      }
+
+      anyReal = true
+      if (REAL_SOURCE_IS_FIXTURE[id]) mockSources.push({ areaId: id, part: 'all' })
+
+      if (area.kind === 'strip' && STRIP_ACTIONS_SOURCE[id as StripAreaId] === 'mock') {
+        area = withMockActions(area, buildMockArea(id, window, nowMs) as StripAreaData)
+        if (!REAL_SOURCE_IS_FIXTURE[id]) mockSources.push({ areaId: id, part: 'actions' })
+      }
+      areas.push(area)
+    }
+
+    const forecastRunAt = anyReal
+      ? realDataLoadedAt() ?? nowMs
+      : mockForecastRunAt(nowMs)
+
+    return {
+      forecastRunAt: new Date(forecastRunAt).toISOString(),
+      updatedAt: new Date(nowMs).toISOString(),
+      window,
+      areas,
+      mockSources,
+    }
+  }
+}

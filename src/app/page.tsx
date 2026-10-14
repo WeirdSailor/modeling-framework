@@ -25,12 +25,13 @@ import type { AsServicesFilter } from '@/components/BatteryFilters'
 import GraphTab from '@/components/GraphTab'
 import RequirementsTab from '@/components/RequirementsTab'
 import Dashboard from '@/components/Dashboard'
+import OperationalDashboard from '@/dashboard2/components/OperationalDashboard'
 import AreaChart from '@/components/AreaChart'
 import type { AreaId } from '@/config/areas'
 import { AREAS, getArea } from '@/config/areas'
 import { computeAreaStatus } from '@/utils/areaAggregates'
 
-type Tab = 'dashboard' | 'workspace' | 'chart' | 'committed' | 'redeclare' | 'graph' | 'requirements'
+type Tab = 'dashboard' | 'dashboard2' | 'workspace' | 'chart' | 'committed' | 'redeclare' | 'graph' | 'requirements'
 type BatteryTab = 'summary' | 'redeclare' | 'reliability'
 
 interface ConfirmState {
@@ -590,6 +591,12 @@ export default function Home() {
             Dashboard
           </button>
           <button
+            className={`tab-btn${activeTab === 'dashboard2' ? ' active' : ''}`}
+            onClick={() => setActiveTab('dashboard2')}
+          >
+            Dashboard 2
+          </button>
+          <button
             className={`tab-btn${activeTab === 'chart' ? ' active' : ''}`}
             onClick={() => setActiveTab('chart')}
           >
@@ -671,6 +678,11 @@ export default function Home() {
             dataOverrides={dataOverrides}
             onTileClick={handleDashboardTileClick}
           />
+        )}
+
+        {/* Dashboard 2 tab — cross-area operational awareness view */}
+        {activeTab === 'dashboard2' && (
+          <OperationalDashboard reservePct={tweaks.reservePct} />
         )}
 
         {/* Workspace tab */}

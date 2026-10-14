@@ -1,0 +1,233 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>
+:root{
+  --bg:#0D1117; --panel:#151A21; --panel2:#1A2028; --line:#262E39; --line2:#323B48;
+  --text:#E7EBF0; --muted:#8C97A7; --dim:#5D6878;
+  --crit:#FF6B4A; --warn:#F2B53C; --ok:#5AA9E6; --head:#D3DCE7;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:Inter,sans-serif;font-feature-settings:"tnum" 1;width:1920px;font-size:14px}
+.main{margin-top:16px}
+.top{height:56px;display:flex;align-items:center;gap:20px;padding:0 24px;border-bottom:1px solid var(--line);background:#0A0E13}
+.brand{font-weight:600;font-size:16px}
+.brand span{color:var(--muted);font-weight:400}
+.seg{display:flex;border:1px solid var(--line2);border-radius:6px;overflow:hidden}
+.seg div{padding:6px 14px;font-size:13px;color:var(--muted);border-right:1px solid var(--line2)}
+.seg div:last-child{border-right:none}
+.seg .on{background:#2A3442;color:var(--text);font-weight:600}
+.seg .cust{display:flex;align-items:center;gap:6px}
+.spacer{flex:1}
+.stat{display:flex;align-items:center;gap:14px;color:var(--muted);font-size:13px}
+.stat b{color:var(--text);font-weight:500}
+.stat .sep{width:1px;height:16px;background:var(--line2)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 3px rgba(90,169,230,.2)}
+.clock{font-size:18px;font-weight:600;letter-spacing:.5px;margin-left:6px}
+
+.summary{display:flex;margin:16px 24px;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+.summary .cell{padding:14px 22px;border-right:1px solid var(--line);display:flex;flex-direction:column;justify-content:center;gap:4px}
+.summary .cell:last-child{border-right:none}
+.summary .k{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px}
+.summary .v{font-size:22px;font-weight:600}
+.summary .v span{color:var(--muted);font-size:15px;font-weight:400}
+.counts{display:flex;gap:26px;align-items:center}
+.count{display:flex;align-items:center;gap:8px;font-size:22px;font-weight:600}
+.count small{font-size:13px;color:var(--muted);font-weight:400}
+
+.main{margin:16px 24px;border:1px solid var(--line);border-radius:10px;background:var(--panel);position:relative}
+.g{display:grid;grid-template-columns:320px 1fr}
+.g>div{min-width:0}
+.r{}
+.hdr{border-bottom:1px solid var(--line)}
+.lab{padding:0 20px;display:flex;flex-direction:row;justify-content:space-between;align-items:center;gap:12px;border-right:1px solid var(--line)}
+.nm{display:flex;align-items:center;gap:8px;font-size:17px;font-weight:600;letter-spacing:.3px}
+.dirc{font-size:12px;font-weight:500;color:var(--head);background:#2A3442;border-radius:4px;padding:2px 6px}
+.unit{font-size:12px;color:var(--dim)}
+.val{display:flex;flex-direction:column;align-items:flex-end;gap:1px}
+.val .b{font-size:20px;font-weight:700}
+.val .s{font-size:12px;color:var(--muted)}
+.hdr{background:var(--panel2)}
+.hdr .lab,.hdr .val{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px}
+.legend{display:flex;gap:24px;align-items:center;padding:12px 18px;color:var(--muted);font-size:12px}
+.legend i{display:inline-flex;align-items:center;gap:7px;font-style:normal}
+svg text{font-family:Inter,sans-serif}
+.tip{position:absolute;width:372px;background:#202833;border:1px solid #475366;border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,.5);padding:12px 14px;font-size:12.5px;z-index:5}
+.tip h4{font-size:13.5px;font-weight:600;margin-bottom:2px}
+.tip .sub{color:var(--muted);margin-bottom:8px}
+.tip .ln{display:flex;justify-content:space-between;padding:3px 0}
+.tip .sec{color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-size:11px;margin:8px 0 3px;border-top:1px solid var(--line2);padding-top:8px}
+.tip .link{margin-top:8px;color:var(--ok)}
+</style></head>
+<body>
+<svg width="0" height="0" style="position:absolute"><defs>
+  <pattern id="hatch" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+   <rect width="7" height="7" fill="rgba(255,107,74,.22)"/><line x1="0" y1="0" x2="0" y2="7" stroke="rgba(255,107,74,.8)" stroke-width="2"/></pattern>
+</defs></svg>
+
+<div class="top">
+  <div class="seg"><div>2h</div><div>4h</div><div>8h</div><div class="on">12h</div><div>24h</div><div class="cust">
+    <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="#8C97A7" stroke-width="1.4"><rect x="1.5" y="2.5" width="11" height="10" rx="1.5"/><line x1="1.5" y1="5.5" x2="12.5" y2="5.5"/><line x1="4.5" y1="1" x2="4.5" y2="4"/><line x1="9.5" y1="1" x2="9.5" y2="4"/></svg>Custom</div></div>
+  <div class="spacer"></div>
+  <div class="stat">
+    <div class="dot"></div><span><b>Live</b></span><div class="sep"></div>
+    <span>Forecast run <b>14:15</b></span><div class="sep"></div>
+    <span>Updated <b>14:25:00</b> (12s ago)</span>
+  </div>
+</div>
+
+
+<div class="main" id="main"></div>
+
+<script>
+// ---------- time model: window 14:00 -> 02:00, 24 SPs ----------
+const START=14, HRS=12, NSP=24, NOW=14+25/60-START, CURK=8; // cursor on SP starting 18:00
+const CW=1548; // chart column width, set after layout
+const hm=t=>{let m=Math.round(((START+t)*60))%1440;if(m<0)m+=1440;return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0')};
+const spn=k=>{let h=(START+k/2)%24;return Math.round(h*2)+1};
+const nf=v=>Math.round(Math.abs(v)).toLocaleString('en-GB');
+const sg=v=>(v<0?'−':'+')+nf(v);
+const dur=t=>{let m=Math.round(t*60/5)*5;return Math.floor(m/60)+'h'+String(m%60).padStart(2,'0')};
+
+// monotone cubic through knots
+function mono(K){const n=K.length,xs=K.map(k=>k[0]),ys=K.map(k=>k[1]),d=[],m=[];
+ for(let i=0;i<n-1;i++)d.push((ys[i+1]-ys[i])/(xs[i+1]-xs[i]));
+ m[0]=d[0];m[n-1]=d[n-2];for(let i=1;i<n-1;i++)m[i]=d[i-1]*d[i]<=0?0:(d[i-1]+d[i])/2;
+ for(let i=0;i<n-1;i++){if(d[i]==0){m[i]=m[i+1]=0;continue}const a=m[i]/d[i],b=m[i+1]/d[i],s=a*a+b*b;if(s>9){const t=3/Math.sqrt(s);m[i]=t*a*d[i];m[i+1]=t*b*d[i]}}
+ return x=>{x=Math.max(xs[0],Math.min(xs[n-1],x));let i=Math.min(n-2,Math.max(0,xs.findIndex((v,j)=>x>=v&&x<=xs[j+1])));const h=xs[i+1]-xs[i],t=(x-xs[i])/h,t2=t*t,t3=t2*t;
+  return (2*t3-3*t2+1)*ys[i]+(t3-2*t2+t)*h*m[i]+(-2*t3+3*t2)*ys[i+1]+(t3-t2)*h*m[i+1]}}
+
+// ---------- rows ----------
+const R=[
+ {type:'line',name:'+ve MARGIN',unit:'MW',band:2000,req:32000,tt:500,
+  k:[[0,1400],[1.5,1150],[2.6,0],[3.4,-400],[4.25,-670],[5,-300],[5.6,0],[7,900],[9,1600],[12,1500]]},
+ {type:'line',name:'−ve MARGIN',unit:'MW',band:2000,req:11300,tt:500,
+  k:[[0,1500],[3,1350],[6,1200],[8,1100],[9.5,950],[10.5,1050],[12,1300]]},
+ {type:'strip',name:'CONSTRAINTS',unit:'Active constraints',sub:'constraints',
+  cells:{5:{s:'man',a:[['d',180]]},6:{s:'tight'},7:{s:'red'},8:{s:'red'},9:{s:'tight'},17:{s:'man',a:[['d',90]]}},n:2},
+ {type:'line',name:'INERTIA',unit:'GVA·s',band:40,req:120,tt:6,
+  k:[[0,30],[3,22],[5,25],[8,12],[9.5,4],[10.5,6],[12,15]]},
+ {type:'strip',name:'RESERVE',unit:'All reserve products',sub:'products',
+  cells:{6:{s:'tight'},7:{s:'red',a:[['d',150]]},8:{s:'red',a:[['d',150],['u',100]]},9:{s:'tight',a:[['u',100]]}},n:2},
+ {type:'strip',name:'RESPONSE',unit:'All response products',sub:'products',
+  cells:{19:{s:'tight'},20:{s:'tight'}},n:1},
+ {type:'line',name:'LARGEST LOSS',unit:'Securable vs credible · MW',band:1000,req:1800,tt:100,
+  k:[[0,500],[2,380],[3.4,140],[4.3,60],[5.2,180],[8,400],[12,450]]},
+ {type:'ic',name:'INTERCONNECTORS',unit:'Net position change · MW',band:3000,
+  sw:{1:120,2:-200,3:300,4:-150,5:250,6:900,7:-300,8:200,9:-250,10:-1600,11:300,12:-200,13:150,14:400,15:-300,16:-700,17:200,18:2300,19:-400,20:300,21:-150,22:250,23:-100}},
+];
+
+// ---------- per-row SP states ----------
+const rank={ok:0,man:0,tight:1,red:2};
+R.forEach(r=>{
+  r.sp=Array(NSP).fill('ok');
+  if(r.type=='line'){
+    r.f=mono(r.k); r.pts=[];for(let t=0;t<=HRS+1e-9;t+=0.05)r.pts.push([t,r.f(t)]);
+    r.min=r.pts.reduce((a,b)=>b[1]<a[1]?b:a); r.tight=r.tt;
+    for(let k=0;k<NSP;k++){const ps=r.pts.filter(p=>p[0]>=k/2&&p[0]<=(k+1)/2);const mn=Math.min(...ps.map(p=>p[1]));
+      r.sp[k]=mn<0?'red':mn<r.tight?'tight':'ok'}
+  } else if(r.type=='strip'){for(const k in r.cells)r.sp[k]=r.cells[k].s;}
+  else {for(const b in r.sw){const v=Math.abs(r.sw[b]);r.sp[b]=v>=2000?'red':v>=1500?'tight':'ok'}}
+  r.sev=r.sp.reduce((a,s)=>rank[s]>rank[a]?s:a,'ok');
+  r.first=r.sp.findIndex(s=>s=='red');
+});
+const all=Array.from({length:NSP},(_,k)=>R.reduce((a,r)=>rank[r.sp[k]]>rank[a]?r.sp[k]:a,'ok'));
+
+// ---------- glyphs ----------
+const COL={red:'var(--crit)',tight:'var(--warn)',ok:'var(--ok)'};
+const icon=(s,z=14)=>s=='red'?`<svg width="${z}" height="${z}" viewBox="0 0 14 14"><polygon points="7,1 13.5,12.5 0.5,12.5" fill="var(--crit)"/></svg>`
+ :s=='tight'?`<svg width="${z}" height="${z}" viewBox="0 0 14 14"><polygon points="7,0.5 13.5,7 7,13.5 0.5,7" fill="var(--warn)"/></svg>`
+ :`<svg width="${z}" height="${z}" viewBox="0 0 14 14"><circle cx="7" cy="7" r="5.5" fill="var(--ok)"/></svg>`;
+const arrow=(x,y,d,c='#F2F5F8',s=1)=>d=='d'?`<polygon points="${x-5*s},${y-4*s} ${x+5*s},${y-4*s} ${x},${y+5*s}" fill="${c}"/>`:`<polygon points="${x-5*s},${y+4*s} ${x+5*s},${y+4*s} ${x},${y-5*s}" fill="${c}"/>`;
+
+// ---------- chart helpers ----------
+const X=t=>t/HRS*CW, SW=CW/NSP;
+function frame(H){
+  let s=`<rect x="0" y="0" width="${X(NOW)}" height="${H}" fill="rgba(255,255,255,.035)"/>`;
+  for(let k=1;k<NSP;k++) s+=`<line x1="${k*SW}" x2="${k*SW}" y1="0" y2="${H}" stroke="${k%2==0?'#28313D':'#1E252F'}"/>`;
+  return s;
+}
+const nowL=H=>`<line x1="${X(NOW)}" x2="${X(NOW)}" y1="0" y2="${H}" stroke="#E7EBF0" stroke-width="1.5"/>`;
+const overlay=H=>`<line x1="${(CURK+.5)*SW}" x2="${(CURK+.5)*SW}" y1="0" y2="${H}" stroke="#9AA6B8" stroke-dasharray="3 3"/>`;
+
+function lineChart(r,i,H){
+  const pad=8, Y=v=>H/2-Math.max(-1,Math.min(1,v/r.band))*(H/2-pad);
+  const line=r.pts.map((p,j)=>(j?'L':'M')+X(p[0]).toFixed(1)+' '+Y(p[1]).toFixed(1)).join('');
+  const area=line+`L${CW} ${H/2}L0 ${H/2}Z`;
+  let s=`<svg width="${CW}" height="${H}" style="display:block"><defs>
+   <clipPath id="up${i}"><rect x="0" y="0" width="${CW}" height="${H/2}"/></clipPath>
+   <clipPath id="dn${i}"><rect x="0" y="${H/2}" width="${CW}" height="${H/2}"/></clipPath></defs>`+frame(H);
+  s+=`<path d="${area}" fill="rgba(90,169,230,.12)" clip-path="url(#up${i})"/>`;
+  s+=`<path d="${area}" fill="url(#hatch)" clip-path="url(#dn${i})"/>`;
+  s+=`<line x1="0" x2="${CW}" y1="${H/2}" y2="${H/2}" stroke="#8C97A7" stroke-dasharray="6 4" stroke-width="1"/>`;
+  s+=`<path d="${line}" fill="none" stroke="var(--head)" stroke-width="1.8"/>`;
+  s+=overlay(H)+nowL(H);
+  const cv=r.f(CURK/2+0.25), cx=(CURK+.5)*SW;
+  s+=`<circle cx="${cx}" cy="${Y(cv)}" r="3.5" fill="var(--bg)" stroke="var(--head)" stroke-width="1.5"/>`;
+  s+=`<text x="${cx+7}" y="${cv<0||Y(cv)<20?Y(cv)+15:Y(cv)-7}" font-size="11.5" font-weight="600" fill="${cv<0?'#FF8A70':'#B9C3D1'}">${sg(cv)}</text>`;
+  return s+'</svg>';
+}
+function stripChart(r,H){
+  let s=`<svg width="${CW}" height="${H}" style="display:block">`+frame(H)+overlay(H);
+  const y=12,h=H-24;
+  for(let k=0;k<NSP;k++){const c=r.cells[k]||{s:'ok'},x=k*SW+2,w=SW-4;
+    const fill=c.s=='red'?'url(#hatch)':c.s=='tight'?'rgba(242,181,60,.30)':c.s=='man'?'#2C3746':'#1F2630';
+    const st=c.s=='red'?'rgba(255,107,74,.9)':c.s=='tight'?'rgba(242,181,60,.85)':c.s=='man'?'#5B6B82':'#2A323D';
+    s+=`<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="3" fill="${fill}" stroke="${st}"/>`;
+    if(c.a){const cy=y+h/2;
+      if(c.a.length==1){const [d,v]=c.a[0];s+=arrow(x+w/2-14,cy,d)+`<text x="${x+w/2-5}" y="${cy+4.5}" font-size="12" font-weight="600" fill="#F2F5F8">${v}</text>`}
+      else c.a.forEach(([d,v],j)=>{const yy=cy+(j?9:-9);s+=arrow(x+w/2-14,yy,d,'#F2F5F8',0.85)+`<text x="${x+w/2-5}" y="${yy+4.5}" font-size="12" font-weight="600" fill="#F2F5F8">${v}</text>`})}
+  }
+  return s+nowL(H)+'</svg>';
+}
+function icChart(r,H){
+  const pad=8,Y=v=>H/2-Math.max(-1,Math.min(1,v/r.band))*(H/2-pad);
+  let s=`<svg width="${CW}" height="${H}" style="display:block">`+frame(H);
+  s+=`<line x1="0" x2="${CW}" y1="${H/2}" y2="${H/2}" stroke="#56627A"/>`;
+  for(const b in r.sw){const v=r.sw[b],x=b*SW,a=Math.abs(v),st=a>=2000?'red':a>=1500?'tight':'ok';
+    const c=st=='red'?'var(--crit)':st=='tight'?'var(--warn)':'#7D8A9C';
+    s+=`<rect x="${x-4}" y="${Math.min(Y(v),H/2)}" width="8" height="${Math.abs(Y(v)-H/2)}" rx="1.5" fill="${c}"/>`;
+    if(st!='ok')s+=`<text x="${x+8}" y="${v>0?Y(v)+10:Y(v)-2}" font-size="11.5" font-weight="600" fill="${c}">${sg(v)}</text>`;}
+  s+=`<text x="${CW-6}" y="14" text-anchor="end" font-size="10.5" fill="#6B7789">▲ Import to GB</text>`;
+  s+=`<text x="${CW-6}" y="${H-6}" text-anchor="end" font-size="10.5" fill="#6B7789">▼ Export from GB</text>`;
+  return s+overlay(H)+nowL(H)+'</svg>';
+}
+
+// ---------- build ----------
+let h='';
+// axis
+let ax=`<svg width="${CW}" height="34" style="display:block">`;
+ax+=`<rect x="0" y="0" width="${X(NOW)}" height="34" fill="rgba(255,255,255,.035)"/>`;
+for(let t=1;t<HRS;t++){if(t==4)continue;const lb=hm(t);
+  ax+=lb=='00:00'?`<rect x="${X(t)-38}" y="7" width="76" height="20" rx="4" fill="#2A3442"/><text x="${X(t)}" y="21" text-anchor="middle" font-size="11.5" font-weight="600" fill="#E7EBF0">Thu 00:00</text>`
+   :`<text x="${X(t)}" y="21" text-anchor="middle" font-size="11.5" fill="#8C97A7">${lb}</text>`}
+ax+=`<rect x="${X(NOW)-34}" y="7" width="68" height="20" rx="4" fill="#E7EBF0"/><text x="${X(NOW)}" y="21" text-anchor="middle" font-size="11.5" font-weight="700" fill="#0D1117">Now 14:25</text>`;
+ax+=`<rect x="${(CURK+.5)*SW-26}" y="7" width="52" height="20" rx="4" fill="#2A3442" stroke="#9AA6B8"/><text x="${(CURK+.5)*SW}" y="21" text-anchor="middle" font-size="11.5" fill="#E7EBF0">18:00</text></svg>`;
+h+=`<div class="g r hdr" style="height:34px"><div class="lab"></div><div>${ax}</div></div>`;
+
+R.forEach((r,i)=>{
+  const H=r.type=='strip'?62:r.type=='ic'?96:84;
+  const chart=r.type=='line'?lineChart(r,i,H):r.type=='strip'?stripChart(r,H):icChart(r,H);
+  let v='';
+  if(r.type=='line'){const [t,m]=r.min;const c=m<0?'var(--crit)':m<r.tight?'var(--warn)':'var(--muted)';
+    v=`<div class="b" style="color:${c}">${sg(m)}</div><div class="s">req ${nf(r.req)}</div>`}
+  else if(r.type=='strip'){const red=r.sp.filter(s=>s=='red').length,tt=r.sp.filter(s=>s=='tight').length;
+    const fk=red?r.sp.findIndex(s=>s=='red'):r.sp.findIndex(s=>s=='tight');
+    v=red?`<div class="b" style="color:var(--crit)">${red} SPs</div><div class="s">${r.n} ${r.sub}</div>`
+      :`<div class="b" style="color:var(--warn)">${tt} SPs tight</div><div class="s">${r.n} ${r.sub.replace(/s$/,'')}</div>`}
+  else {let mb=Object.entries(r.sw).reduce((a,b)=>Math.abs(b[1])>Math.abs(a[1])?b:a);
+    v=`<div class="b" style="color:var(--crit)">${(Math.abs(mb[1])/1000).toFixed(1)} GW</div><div class="s">largest swing</div>`}
+  h+=`<div class="g r" id="row${i}"><div class="lab"><div class="nm">${r.name}</div><div class="val">${v}</div></div><div>${chart}</div></div>`;
+});
+h+=`<div class="legend">
+ <i><svg width="26" height="10"><line x1="0" y1="5" x2="26" y2="5" stroke="#8C97A7" stroke-dasharray="6 4"/></svg>Requirement</i>
+ <i><svg width="18" height="12"><rect width="18" height="12" fill="url(#hatch)"/></svg>Violated</i>
+ <i><svg width="18" height="12"><rect width="18" height="12" rx="2" fill="rgba(242,181,60,.30)" stroke="rgba(242,181,60,.85)"/></svg>Tight</i>
+ <i><svg width="18" height="12"><rect width="18" height="12" rx="2" fill="#2C3746" stroke="#5B6B82"/></svg>Managed by actions</i>
+ <i><svg width="12" height="12">${arrow(6,6,'d','#E7EBF0',0.9)}</svg>Unusable</i>
+ <i><svg width="12" height="12">${arrow(6,7,'u','#E7EBF0',0.9)}</svg>Allocated</i>
+ <i><svg width="12" height="14"><rect x="2" y="1" width="8" height="12" rx="1.5" fill="#7D8A9C"/></svg>IC swing</i>
+ <i style="margin-left:auto">Illustrative data</i></div>`;
+document.getElementById('main').innerHTML=h;
+
+</script>
+</body></html>

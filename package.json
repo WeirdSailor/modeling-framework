@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "test:dashboard2": "node --test \"src/dashboard2/__tests__/*.test.mjs\""
   },
   "dependencies": {
     "ag-grid-community": "^35.2.1",
