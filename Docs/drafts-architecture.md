@@ -30,9 +30,12 @@
 
 | # | Question | Status |
 |---|---|---|
+| D1 | Platform: PostgreSQL + API, or Firestore (the no-overlap rule needs database support) | Open (architect) |
+| D2 | Identity provider and where roles come from | Open (architect) |
 | D3 | What the committed plan means: one shared plan, or per-desk plans | Open (operators) |
 | D4 | Does commit need senior approval? | Open (operators) |
 | D6 | Who can edit or withdraw another operator's commitment? | Open (operators) |
+| D12 | Availability target: business hours or 24×7 | Open (organisation) |
 | D14 | Unit contribution: flat block or notice/ramp profile | Open |
 | D20 | Edit = load into sandbox + commit as supersede | Sign-off (operators, non-blocking) |
 | D21 | What a scenario may vary (forecasts and requirements only, or availability too) | Open |
@@ -125,6 +128,10 @@ Scenarios (§10) have no Git equivalent. They are the *environment* a change is 
 
 # Part A: Logical model and rules
 
+This part is **platform-independent**. It describes what the system does and the rules it enforces, whatever it is built with. Part B describes one way to build it.
+
+The full model (named drafts, sharing) is described first, because day one is a restricted form of it. §9 describes **day one: the sandbox**, and which parts of the full model it switches off.
+
 ## Design drivers
 
 Each rule in this design exists to solve a specific problem. Read these first.
@@ -137,10 +144,6 @@ Each rule in this design exists to solve a specific problem. Read these first.
 | One unit can't be committed twice with different values | **Overlap block:** the database rejects overlapping commitments for the same unit. Amend the existing one instead | D18, I3, §5.2 |
 | Amending a commitment mustn't show everyone a false shortfall | **Supersede:** Edit loads the commitment into the sandbox, and committing replaces it in one step, with no gap | D16, §4.3, §5.4 |
 | Everyone must see the same numbers | **One baseline:** computed from the same inputs and plan version for all operators, with one shared calculation library | N5, §6.1 |
-
-This part is **platform-independent**. It describes what the system does and the rules it enforces, whatever it is built with. Part B describes one way to build it.
-
-The full model (named drafts, sharing) is described first, because day one is a restricted form of it. §9 describes **day one: the sandbox**, and which parts of the full model it switches off.
 
 ## 1. Goals and requirements
 
