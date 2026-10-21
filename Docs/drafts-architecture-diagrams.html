@@ -260,7 +260,7 @@
         <text class="t-sub" x="90" y="310" text-anchor="middle">every render</text>
         <rect class="box" x="185" y="90" width="120" height="240" rx="6"/>
         <text class="t-title" x="245" y="130" text-anchor="middle">Client cache</text>
-        <text class="t-sub" x="245" y="146" text-anchor="middle">(Zustand)</text>
+        <text class="t-sub" x="245" y="146" text-anchor="middle">(server data)</text>
         <text class="t-sub" x="245" y="186" text-anchor="middle">my sandbox</text>
         <text class="t-sub" x="245" y="202" text-anchor="middle">drafts (Ph. 2–3)</text>
         <text class="t-sub" x="245" y="230" text-anchor="middle">snapshot + scenario</text>
@@ -287,8 +287,9 @@
         <text class="t-title" x="525" y="115" text-anchor="middle">Command handlers</text>
         <text class="t-sub" x="525" y="133" text-anchor="middle">check sign-in · validate · write · audit</text>
         <rect class="accent-box" x="395" y="180" width="260" height="60" rx="6"/>
-        <text class="t-title" x="525" y="205" text-anchor="middle">Baseline service</text>
-        <text class="t-sub" x="525" y="223" text-anchor="middle">@modelling/calc · keyed by scenario + plan</text>
+        <text class="t-title" x="525" y="201" text-anchor="middle">Baseline service</text>
+        <text class="t-sub" x="525" y="217" text-anchor="middle">@modelling/calc</text>
+        <text class="t-sub" x="525" y="232" text-anchor="middle">keyed by inputs + plan version</text>
         <rect class="box" x="395" y="270" width="260" height="60" rx="6"/>
         <text class="t-title" x="525" y="295" text-anchor="middle">Realtime (SSE)</text>
         <text class="t-mono t-sub" x="525" y="313" text-anchor="middle">plan.* · snapshot.* · scenario.*</text>
@@ -360,7 +361,7 @@
         <text class="t-sub" x="170" y="216">18:00–open</text>
         <text class="t-sub" x="270" y="216">250 MW</text>
         <text class="t-sub" x="340" y="216">Recovery Res.</text>
-        <text class="lbl" x="36" y="252">each row = one action · commit / share / discard act on the whole draft</text>
+        <text class="lbl" x="36" y="252">each row = one action · commit all or selected units (D15)</text>
 
         <rect class="draft2-box" x="540" y="50" width="440" height="173" rx="10"/>
         <text class="t-title t-draft2" x="556" y="76">Draft B</text>
@@ -498,17 +499,17 @@
         <text class="t-title" x="105" y="252" text-anchor="middle">Scenario (central)</text>
         <text class="t-sub" x="105" y="268" text-anchor="middle">demand · requirement values</text>
         <line class="edge edge-accent" x1="190" y1="245" x2="290" y2="174" marker-end="url(#f3-a)"/>
-        <text class="lbl t-accent" x="228" y="206" text-anchor="end">assumptions</text>
+        <text class="lbl t-accent" x="228" y="206" text-anchor="end">input values</text>
 
         <path class="edge" d="M345,70 V30 H855 V48" marker-end="url(#f3-a)"/>
         <text class="lbl" x="600" y="23" text-anchor="middle">solid line = stored baseline</text>
 
         <rect class="draft-box" x="500" y="60" width="170" height="56" rx="6"/>
         <text class="t-title t-draft" x="585" y="83" text-anchor="middle">Draft A</text>
-        <text class="t-sub" x="585" y="101" text-anchor="middle">2 units · slots 30–40</text>
+        <text class="t-sub" x="585" y="101" text-anchor="middle">2 units · 17:00–22:00</text>
         <rect class="draft2-box" x="500" y="140" width="170" height="56" rx="6"/>
         <text class="t-title t-draft2" x="585" y="163" text-anchor="middle">Draft B</text>
-        <text class="t-sub" x="585" y="181" text-anchor="middle">1 unit · slots 8–16</text>
+        <text class="t-sub" x="585" y="181" text-anchor="middle">1 unit · 06:00–10:00</text>
         <rect class="box-dash" x="500" y="220" width="170" height="56" rx="6"/>
         <text class="t-title t-sub" x="585" y="243" text-anchor="middle">Draft C (hidden)</text>
         <text class="t-sub" x="585" y="261" text-anchor="middle">toggled off · not drawn</text>
@@ -861,7 +862,7 @@
     <figure>
       <svg class="dg" viewBox="0 0 1000 280" role="img" aria-label="Operator A owns Draft A and can edit, commit and share it. Operator B, who it is shared with, sees the dotted line read-only and can duplicate it. Operator C, not shared, does not see it. Once committed, everyone sees it in the baseline.">
         <defs>
-          <marker id="f6-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker>
+          <marker id="f10-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker>
         </defs>
         <rect class="box" x="40" y="40" width="200" height="60" rx="8"/>
         <text class="t-title" x="140" y="66" text-anchor="middle">Operator A (owner)</text>
@@ -879,9 +880,9 @@
         <text class="t-title t-sub" x="860" y="121" text-anchor="middle">Operator C (not shared)</text>
         <text class="t-sub" x="860" y="139" text-anchor="middle">doesn't see it at all</text>
 
-        <line class="edge" x1="240" y1="70" x2="398" y2="110" marker-end="url(#f6-a)"/>
+        <line class="edge" x1="240" y1="70" x2="398" y2="110" marker-end="url(#f10-a)"/>
         <text class="lbl" x="330" y="70" text-anchor="middle">edit · commit · share</text>
-        <line class="edge edge-dash" x1="240" y1="180" x2="398" y2="140" marker-end="url(#f6-a)"/>
+        <line class="edge edge-dash" x1="240" y1="180" x2="398" y2="140" marker-end="url(#f10-a)"/>
         <text class="lbl" x="330" y="190" text-anchor="middle">view · duplicate to own</text>
         <line class="edge edge-warn edge-dash" x1="600" y1="125" x2="758" y2="125"/>
         <line class="x-warn" x1="673" y1="119" x2="685" y2="131"/>

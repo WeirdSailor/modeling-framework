@@ -8,12 +8,50 @@
 
 | Part | What it covers | Read if you want to… |
 |---|---|---|
-| **Mental model** (next section) | Drafts explained as GitHub pull requests: what to borrow and what not | get the idea in two minutes |
-| **A. Logical model and rules** (§1–10) | Platform-independent design: concepts, data model, lifecycle, the committed plan, calculation and comparison rules, permissions, **day one sandbox**, **scenarios (future)** | agree *what* the system does |
+| **Summary** (below) | The adopted design in five points, decisions that need people, the phase plan | get the one-page view |
+| **Mental model** | Drafts explained as GitHub pull requests: what to borrow and what not | get the idea in two minutes |
+| **A. Logical model and rules** (§1–10) | Platform-independent design: **design drivers** (why each rule exists), concepts, data model, lifecycle, the committed plan, calculation and comparison rules, permissions, **day one sandbox**, **scenarios (future)** | agree *what* the system does |
 | **B. Reference implementation** (§11–17) | One way to build it (PostgreSQL, API, live events), with assumptions marked | discuss *how* to build it |
 | **C. Delivery plan** (§18–20) | Phases, decisions, resolved conflicts, open items, risks | plan the work |
 
-**Releases at a glance:** Phase 1 (day one) = one private **sandbox** per operator, with the full committed-plan design. Phase 2 = multiple private drafts and side-by-side comparison. Phase 3 = sharing. Details in §18.
+---
+
+# Summary
+
+**The adopted design in five points**
+
+1. **Drafts store intent, not results.** A dotted line is the shared baseline plus the draft's extra units, computed in the browser with the same calculation library the server uses, so nothing is stored per draft (§6).
+2. **Day one is a sandbox.** Each operator has one private, server-persisted sandbox (one live, one historical) with partial commit, Edit-to-amend, pin and dashboard preview. Multiple drafts arrive in Phase 2, sharing in Phase 3 (§9, D25).
+3. **The committed plan is an immutable, versioned log.** Commit, supersede and withdraw add or close plan-action rows in one transaction. No unit can have two overlapping commitments, and amending never leaves a gap (D16, D18, §5).
+4. **The past never changes.** Each amended row takes effect from its own effective time, by default the next half-hour. Gate closure and notice time give warnings (D17, §4.4).
+5. **Inputs stay separate and are passed in explicitly:** facts from market participants, scenario input values (one central scenario for now), global planning policy (owned by a policy owner) and availability data. Multiple scenarios can be added later without a redesign (§10).
+
+**Decisions that need people**
+
+| # | Question | Status |
+|---|---|---|
+| D3 | What the committed plan means: one shared plan, or per-desk plans | Open (operators) |
+| D4 | Does commit need senior approval? | Open (operators) |
+| D6 | Who can edit or withdraw another operator's commitment? | Open (operators) |
+| D14 | Unit contribution: flat block or notice/ramp profile | Open |
+| D20 | Edit = load into sandbox + commit as supersede | Sign-off (operators, non-blocking) |
+| D21 | What a scenario may vary (forecasts and requirements only, or availability too) | Open |
+| D25 | Sandbox on day one (the document assumes adoption) | Proposed: needs stakeholder agreement |
+| C15 | Retention needed for complete history and replay | Open |
+| C16 | What "takes effect from a stated time" means for policy changes | Open (document assumes delivery-time) |
+| C17 | Who may edit availability data (with D9) | Open |
+
+**Phase plan**
+
+| Phase | Delivers |
+|---|---|
+| 0. Decide | Sign-off on the decisions above, platform, identity provider, data sources, hosting |
+| 1. Day one (1a → 1b → 1c) | 1a calculation library and seams (no back end) → 1b persisted sandbox, versioned committed plan, dashboard preview, scenario and policy stores → 1c hardening and rollout |
+| 2. Multiple drafts | Named private drafts, comparison table, preview together |
+| 3. Sharing | Share with users and desks, read-only view, duplicate |
+| 4. Extras | Approvals, comments, history UI, practice plan, unit profiles, multi-scenario working |
+
+Details in §18 (phases) and §19 (all decisions and open items).
 
 ---
 
@@ -86,6 +124,19 @@ Scenarios (§10) have no Git equivalent. They are the *environment* a change is 
 ---
 
 # Part A: Logical model and rules
+
+## Design drivers
+
+Each rule in this design exists to solve a specific problem. Read these first.
+
+| Problem | Decision that solves it | Where |
+|---|---|---|
+| Operators' work must survive refreshes, reloads, restarts and new market data | **Persistence:** sandboxes and drafts are stored server-side, as intent (units and times) rather than computed results | N1, §2.2, §9.5 |
+| A window must always mean the same real half-hour, whatever the date or clock change | **Absolute time:** every window is a UTC half-hour boundary. Slot positions exist only on screen | §2.2, §3 |
+| The past can't change: half-hours that have started or been delivered must stay as they were | **Effective time:** changes apply from an effective time that is never in the past, set per amended row. A row spanning it is split | D17, §4.4 |
+| One unit can't be committed twice with different values | **Overlap block:** the database rejects overlapping commitments for the same unit. Amend the existing one instead | D18, I3, §5.2 |
+| Amending a commitment mustn't show everyone a false shortfall | **Supersede:** Edit loads the commitment into the sandbox, and committing replaces it in one step, with no gap | D16, §4.3, §5.4 |
+| Everyone must see the same numbers | **One baseline:** computed from the same inputs and plan version for all operators, with one shared calculation library | N5, §6.1 |
 
 This part is **platform-independent**. It describes what the system does and the rules it enforces, whatever it is built with. Part B describes one way to build it.
 
@@ -243,7 +294,7 @@ erDiagram
 | *Optional (D14)* **Action profile** | action, half-hour, MW, source (generated / override) | Only if unit profiles are chosen |
 | *Optional (D19)* **Delivery status** | plan action → committed / instructed / delivered / lapsed, or a link to instruction records | Room left, not built in the first release |
 
-**Time model.** Starts and ends are UTC half-hour boundaries, and the end is exclusive. They are displayed as Europe/London settlement date + SP (tested rules exist in `src/dashboard2/time.ts`, including 46/50-SP days). An action whose end has passed is **expired**. It is excluded from **forward-looking** views (overlays, comparison, commit checks) but **kept in history views and the plan record**.
+**Time model.** Starts and ends are UTC half-hour boundaries, and the end is exclusive. They are displayed as Europe/London settlement date + SP, including clock-change days with 46 or 50 SPs (see the developer note). An action whose end has passed is **expired**. It is excluded from **forward-looking** views (overlays, comparison, commit checks) but **kept in history views and the plan record**.
 
 ---
 
@@ -1088,3 +1139,9 @@ Status: **Adopted** = built into this design. **Proposed** = recommended, awaiti
 | Effective-time warnings acknowledged by habit | Plans that can't be delivered | Warnings recorded in the audit trail and reviewed. Revisit making some hard rules after UAT |
 | Loaded-unit overlay maths wrong (baseline − old + new) | Misleading dotted lines | Dedicated golden tests |
 | Platform without exclusion constraints | Race conditions on commit | Make I3 support a requirement in D1 |
+
+---
+
+## Developer note
+
+- **Time helpers:** tested UTC ↔ settlement-period conversion, including 46/50-SP clock-change days, already exists in the current codebase at `src/dashboard2/time.ts`. Reuse it for the time model (§3) rather than rewriting it.
