@@ -98,7 +98,7 @@
 <main>
   <header>
     <h1>Drafts: proposed architecture in diagrams</h1>
-    <p>A visual companion to <code>Docs/drafts-architecture.md</code>. Each diagram answers one question. The written document has the detail, the decisions (D1–D28), the resolved conflicts (C1–C11) and the items still open (C12–C14).</p>
+    <p>A visual companion to <code>Docs/drafts-architecture.md</code>. Each diagram answers one question. The written document has the detail, the decisions (D1–D28), the resolved conflicts (C1–C14) and the items still open (C15–C17).</p>
     <p><strong>Releases:</strong> Phase 1 (day one) = one private sandbox per operator with the full committed-plan design · Phase 2 = multiple drafts and comparison · Phase 3 = sharing.</p>
     <p>Colour key: <span style="color:var(--accent)">blue</span> = new in the proposed design, <span style="color:var(--draft)">orange</span> / <span style="color:var(--draft2)">purple</span> = open drafts (dotted lines), <span style="color:var(--warn)">red</span> = a limitation or a rejected path.</p>
     <nav>
@@ -575,7 +575,7 @@
         <line class="edge edge-dash" x1="600" y1="180" x2="600" y2="248" marker-end="url(#fsb-a)"/>
         <text class="lbl" x="608" y="220">Pin</text>
       </svg>
-      <figcaption>The sandbox is saved on the server, so a refresh never loses work. Committed units move into a new <em>commitment record</em> and the sandbox keeps whatever wasn't selected. The pin is day one's answer to side-by-side comparison: one previous state as a faded line, plus a small "pinned vs now" panel. The sandbox's impact also shows on the dashboard tiles from day one. Each operator has one live and one historical sandbox. Phase 2 replaces it with multiple drafts and the comparison table.</figcaption>
+      <figcaption>The sandbox is saved on the server, so a refresh never loses work. Committed units move into a new <em>commitment record</em> and the sandbox keeps whatever wasn't selected. The pin is day one's answer to side-by-side comparison: one previous state as a faded line, plus a small "pinned vs now" panel. The sandbox's impact also shows on the dashboard tiles from day one. Each operator has one live and one historical sandbox. The historical one is for analysis and replay and cannot commit. Phase 2 replaces it with multiple drafts and the comparison table.</figcaption>
     </figure>
   </section>
 
@@ -885,7 +885,7 @@
   <!-- ───────────── 12. Data model ───────────── -->
   <section id="data-model">
     <h2>12. Data model: drafts hold intent, plan actions hold the record</h2>
-    <p>The sandbox is a row in <code>drafts</code> (<code>kind = sandbox</code>). On commit, actions become immutable <code>plan_actions</code> under a new commitment record. Demand and requirement values move into scenario tables, and reserve % and requirement rules into global planning policy: facts, input values and policy are kept apart.</p>
+    <p>The sandbox is a row in <code>drafts</code> (<code>kind = sandbox</code>). On commit, actions become immutable <code>plan_actions</code> under a new commitment record. Demand and requirement values move into scenario tables, reserve % and requirement rules into global planning policy, and contracted / constrained values into global availability data: facts, input values and policy are kept apart.</p>
     <figure>
       <svg class="dg" viewBox="0 0 1000 640" role="img" aria-label="Users own drafts, including the sandbox. Draft actions reference units, carry a list of reasons, and may replace a loaded plan action. On commit, actions are copied into immutable plan actions under a commitment record, stamped by plan events that also record the reference scenario. Sandbox pins hold one display-only state per user. Scenario tables hold demand, renewables and requirements; market snapshots hold facts only. Day one allows one open draft per user.">
         <defs>
@@ -898,7 +898,7 @@
         <text class="t-mono t-title" x="30" y="58">users</text>
         <text class="t-mono" x="30" y="83">id</text>
         <text class="t-mono t-sub" x="30" y="100">idp_subject (SSO)</text>
-        <text class="t-mono t-sub" x="30" y="117">role</text>
+        <text class="t-mono t-accent" x="30" y="117">roles (+ policy_owner)</text>
         <text class="t-mono t-sub" x="30" y="134">desk</text>
         <rect class="box" x="280" y="40" width="190" height="153" rx="6"/>
         <rect class="th" x="280" y="40" width="190" height="26" rx="6"/>
@@ -1006,7 +1006,7 @@
 
         <rect class="note" x="20" y="575" width="970" height="52" rx="6"/>
         <text x="505" y="596" text-anchor="middle"><tspan class="t-accent">Rules:</tspan> no two open <tspan class="t-mono">plan_actions</tspan> for the same unit overlap · day one: one open draft (sandbox) per user per context</text>
-        <text class="t-sub" x="505" y="615" text-anchor="middle">also: planning_policy (global, versioned) · commit_unit_snapshots · audit_events (append-only) · optional: action profiles (D14), instruction records (D19)</text>
+        <text class="t-sub" x="505" y="615" text-anchor="middle">also: planning_policy · area_contracted (facts) · area_constraint_overrides · commit_unit_snapshots · audit_events · optional: profiles (D14), instructions (D19)</text>
       </svg>
       <figcaption>The plan at any version N is a query: plan actions added at or before N and not yet removed by N. Edit copies plan actions into the sandbox with a <code>replaces_plan_action</code> link, so committing closes exactly those rows (and withdraws any loaded unit marked <code>is_removal</code>). Every plan event records the scenario and policy version it was validated against, and the plan itself is the same in every scenario. Dropping the one-open-draft-per-user index is the main model change for Phase 2.</figcaption>
     </figure>
@@ -1070,7 +1070,7 @@
         <text class="t-sub" x="74" y="72" text-anchor="middle">Phase 0</text>
         <text class="t-title" x="74" y="92" text-anchor="middle">Decide</text>
         <text class="t-sub" x="74" y="114" text-anchor="middle">sign-offs</text>
-        <text class="t-sub" x="74" y="130" text-anchor="middle">D1–D28 · C12–C14</text>
+        <text class="t-sub" x="74" y="130" text-anchor="middle">D1–D28 · C15–C17</text>
         <text class="lbl" x="74" y="158" text-anchor="middle">size S</text>
         <line class="edge" x1="139" y1="110" x2="149" y2="110" marker-end="url(#f12-a)"/>
         <rect class="accent-box" x="151" y="50" width="130" height="120" rx="8"/>
@@ -1112,7 +1112,7 @@
         <text class="t-sub" x="926" y="72" text-anchor="middle">Phase 4</text>
         <text class="t-title" x="926" y="92" text-anchor="middle">Extras</text>
         <text class="t-sub" x="926" y="114" text-anchor="middle">approvals · comments</text>
-        <text class="t-sub" x="926" y="130" text-anchor="middle">history UI · profiles</text>
+        <text class="t-sub" x="926" y="130" text-anchor="middle">practice plan · profiles</text>
         <text class="lbl" x="926" y="158" text-anchor="middle">optional</text>
       </svg>
       <figcaption>Sizes are relative (S/M/L) until Phase 0 is done. Phase 1a can start now in the prototype. After Phase 1, every operator has a saved sandbox, partial commit, Edit without gaps, a versioned plan, and scenario-ready calculations. Phase 2 lifts the one-sandbox rule and adds comparison. Phase 3 adds sharing.</figcaption>

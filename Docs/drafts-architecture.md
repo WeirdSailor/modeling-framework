@@ -363,7 +363,8 @@ The full model (named drafts, sharing) is described first, because day one is a 
 | **Pin** | A display-only copy of the sandbox's impact at one moment, kept as a reference line (§13.8) |
 | **Market snapshot** | **Facts**: an immutable copy of PN, MEL, MIL and standing data at a point in time |
 | **Scenario** | One coherent set of **input values**: demand, renewable forecasts and requirement values (§14). One live scenario ("central") until multi-scenario working is built, plus an "outturn" scenario of actuals for historical mode |
-| **Planning policy** | Global rules applied to every scenario: reserve % (TR2) and requirement rules. Versioned and audited. Not part of any scenario |
+| **Planning policy** | Global rules applied to every scenario: reserve % (TR2) and requirement rules. Versioned, audited, changed only by the **policy owner**, and never retroactive. Not part of any scenario |
+| **Availability data** | Global, audited area availability: **contracted** values (facts: contracts that exist) and **constraint overrides** (manual). Not part of any scenario (see D21) |
 | **Baseline** | Per half-hour totals for (scenario, policy, snapshot, plan version): units already running plus the committed plan |
 | **Overlay** | Baseline + the delta of the sandbox or a draft: the dotted line |
 
@@ -389,7 +390,7 @@ The full model (named drafts, sharing) is described first, because day one is a 
 | I6 | A unit appears at most once in a draft |
 | I7 | Every action has at least one reason |
 | I8 | **Day one:** each operator has at most one open draft **per context** (live, historical): their sandbox (lifted in Phase 2) |
-| I9 | No calculation reads forecasts, requirements or policy from global state. The scenario and the planning policy are always passed in |
+| I9 | No calculation reads forecasts, requirements, policy or availability data from global state. The scenario, the planning policy and the availability data are always passed in |
 | I10 | The committed plan is scenario-independent. Each plan change records the reference scenario and policy version it was validated against |
 
 ---
@@ -426,7 +427,9 @@ erDiagram
 | **Sandbox pin** | owner, pinned at, scenario, snapshot, plan version, per-area impact series | Display only. One per user. Never committable |
 | **Scenario** | name, source (generated / manual / **actual**), generator run, valid from/to, description, metadata (e.g. what makes it distinct), status (active / superseded / retired) | Imported and read-only. A new run creates new rows. One live "central" scenario until multi-scenario working, plus "outturn" (`actual`) for historical mode |
 | **Scenario inputs** | per half-hour demand, wind, solar, …; per half-hour and area **requirement values**, each with a source (manual / generated / actual) | Input values. Moved out of the market snapshot. Today's Requirements tab values are central-scenario inputs with source = manual |
-| **Planning policy** | reserve % (TR2), requirement rules, valid from, set by, reason | Global, applied to every scenario. Versioned and audited. Who may change it: C14 |
+| **Planning policy** | reserve % (TR2), requirement rules, valid from, set by, reason | Global, applied to every scenario. Versioned and audited. Changed only by the **policy owner** role. Takes effect from a stated time, never retroactively (see C16) |
+| **Contracted availability** | area, half-hour, contracted MW, valid from, set by | **Fact**: reflects contracts that exist. Global and audited, the same treatment as SR/QR services (D9) |
+| **Constraint override** | area, half-hour, constrained MW, valid from, set by, reason | **Manual availability override.** Global and audited in Phase 1. The first candidate to vary by scenario if D21 allows availability |
 | **Market snapshot** | time taken, kind, per unit PN / MEL / MIL, standing data | **Facts.** Immutable. No demand |
 | **Audit event** | actor, time, entity, command, before, after | Append-only |
 | *Optional (D14)* **Action profile** | action, half-hour, MW, source (generated / override) | Only if unit profiles are chosen |
@@ -517,7 +520,8 @@ Work done against a historical window carries `context = historical`:
 
 - Each operator has **one sandbox per context**, so one live and one historical (I8).
 - It is evaluated against an **outturn scenario** (`source = actual`). Recorded demand and renewables are treated as **facts** here, not assumptions (§14.4).
-- A historical sandbox **never commits to the live plan** (D10). Whether it can commit to a separate practice plan, or not at all, is still open (D10).
+- Requirement values are the ones **in force at the time**, recovered from retained central-scenario versions. Where no record exists (before go-live, or a gap), requirements are shown as **unavailable**, never invented. History is complete from go-live onwards (retention: C15).
+- A historical sandbox **cannot commit at all** on day one (D10). Its purpose is analysis and replay, and the pin covers comparison. A practice plan for training may be considered in Phase 4.
 
 ---
 
@@ -579,7 +583,7 @@ Committing does not instruct a unit. A production tool will eventually need to k
 
 - **Baseline** for (scenario, policy, snapshot, plan version): units already running (PN > 1 MW) plus open plan actions, **once per unit per half-hour**, evaluated against the scenario's demand and requirement values and the planning policy (reserve %, requirement rules).
 - **Overlay** for the sandbox or a draft: baseline + its units that aren't already counted in that half-hour.
-- **Explicit inputs.** Calculation functions take the scenario and the planning policy as arguments, e.g. `computeBaseline(snapshot, scenario, policy, plan)` and `applyDraft(baseline, scenario, policy, draft)`. Nothing reads "the forecast", "the requirement" or "the reserve %" from global or store state (I9).
+- **Explicit inputs.** Calculation functions take the scenario and the planning policy as arguments, e.g. `computeBaseline(snapshot, availability, scenario, policy, plan)` and `applyDraft(baseline, scenario, policy, draft)`. Nothing reads "the forecast", "the requirement", "the reserve %" or "the contracted MW" from global or store state (I9). Area availability is `max(0, contracted − constrained) + committed contributions`, as in the prototype, with contracted and constrained now coming from global availability data.
 - **One contribution function** answers "what does this action add in this half-hour?" for every area. Today it returns a flat block. It is the switch point for D14 (§10.4).
 
 ### 10.2 Rules
@@ -589,6 +593,7 @@ Committing does not instruct a unit. A production tool will eventually need to k
 - **Visibility:** draw only the user's own sandbox and drafts, plus (Phase 3) drafts shared with them, minus any they have hidden (fixes limitation 5).
 - **Expired actions** are excluded from forward-looking views and kept in history views (§7).
 - **Open-ended actions** run to the end of the displayed horizon.
+- **Missing requirement values** (e.g. historical half-hours with no record) are shown as **unavailable**: no requirement line and an "unknown" status, never treated as zero.
 - **Partial line with anchor points:** unchanged.
 
 ### 10.3 The moving baseline
@@ -698,7 +703,8 @@ The sandbox's impact is shown on the **dashboard** as well as the charts, from d
 | Edit (load + supersede) a commitment | ✅ | ❌ | ❌ | ✅ ³ | ❌ | ✅ | Phase 1 |
 | Withdraw a commitment | ✅ | ❌ | ❌ | ✅ ³ | ❌ | ✅ | Phase 1 |
 | See the committed plan, its history and blame | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Phase 1 |
-| Change planning policy (reserve %, requirement rules) | — | — | ❌ | ? (C14) | ❌ | ✅ | Phase 1 |
+| Change planning policy (reserve %, requirement rules) | — | — | ❌ | ❌ | ❌ | ❌ ⁴ | Phase 1 |
+| Edit contracted values / constraint overrides | — | — | ? | ? | ❌ | ? | Phase 1 (C17) |
 | Named drafts: create, edit, discard, restore, delete | ✅ | ❌ | ❌ | ❌ | ❌ | ✅ | Phase 2 |
 | See a named draft & overlay | ✅ | ✅ | ❌ | ❌ ¹ | ❌ | ✅ | Phase 2 / 3 |
 | Share / unshare | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | Phase 3 |
@@ -707,6 +713,7 @@ The sandbox's impact is shown on the **dashboard** as well as the charts, from d
 ¹ Option: senior operators see all open drafts (D7).
 ² Option: commit requires senior approval (D4).
 ³ Covers the case where the owner has gone off shift (D6). The senior loads the commitment into **their own** sandbox. A reason is mandatory.
+⁴ Only the dedicated **policy owner** role can change planning policy: not generic admins, not senior operators. Changes are versioned, take effect from a stated time (never retroactively), are audited, and push a live event so every screen shows that the policy changed.
 
 ---
 
@@ -860,8 +867,9 @@ How today's prototype maps onto this:
 - **Reserve %** (today a per-browser Config setting) becomes global **planning policy**: versioned, audited, the same for every operator and scenario.
 - **Requirement rules** are policy too.
 - **Requirement values** typed into the Requirements tab become inputs of the central scenario with `source = manual`. Later a generator may supply them per scenario.
-- **Contracted / constrained values** from the same tab: see C12.
-- **Historical mode** uses an **outturn** scenario (`source = actual`), so recorded demand is treated as fact. Its requirement values: see C13.
+- **Contracted values** from the same tab are **facts** (contracts that exist): global, audited availability data alongside SR/QR services. Not scenario inputs.
+- **Constrained values** are **manual availability overrides**: global and audited in Phase 1. If scenarios are ever allowed to vary availability (D21), constraints are the obvious first candidate.
+- **Historical mode** uses an **outturn** scenario (`source = actual`): actual demand and renewables, plus the requirement values in force at the time, recovered from retained central-scenario versions. Missing records show as unavailable.
 
 ### 14.5 Not to build now
 
@@ -882,7 +890,8 @@ This part describes **one way** to build Part B1, based on the prototype's stack
 |---|---|---|
 | Market data source (facts) | Public Elexon Insights API (as in the prototype) | **Internal operational data feeds.** The public API is a prototype convenience |
 | Scenario source (input values) | One "central" scenario: current demand forecast plus Requirements tab values (`source = manual`). An "outturn" scenario for historical mode | Scenario generator output (§14) |
-| Planning policy | Global config table (reserve %, requirement rules) | Same, owned by an operational authority (C14) |
+| Planning policy | Global config table (reserve %, requirement rules), changed only by the policy owner role | Same, owned by an operational authority |
+| Availability data | Global tables for contracted values and constraint overrides, edited from the Requirements tab | Contract and outage systems feeding the same tables |
 | Database | PostgreSQL | Organisation's standard relational database. The no-overlap rule (I3) needs equivalent support |
 | Live updates | Server-Sent Events | Organisation's messaging / push standard |
 | Front end | Existing Next.js app | Likely kept |
@@ -957,7 +966,7 @@ flowchart LR
 
 ## 17. Physical schema
 
-**`users`**: `id`, `idp_subject` (unique), `display_name`, `email`, `role` (`viewer | operator | senior_operator | admin`), `desk`.
+**`users`**: `id`, `idp_subject` (unique), `display_name`, `email`, `roles` (set of `viewer | operator | senior_operator | policy_owner | admin`), `desk`. Roles are a set because a policy owner may also be an operator.
 
 **`drafts`**
 
@@ -1010,7 +1019,9 @@ Constraints:
 **`scenarios`**: `id`, `name`, `source` (`generated | manual | actual`), `generator_run_id` null, `generated_at`, `valid_from`, `valid_to`, `description`, `metadata` (jsonb), `status` (`active | superseded | retired`).
 **`scenario_sp`**: `scenario_id`, `start_at`, `demand`, `wind`, `solar`, …
 **`scenario_requirements`**: `scenario_id`, `start_at`, `area`, `requirement` (MW / GVAs / MVAr), `source` (`manual | generated | actual`). Today's Requirements tab values are central-scenario rows with `source = manual`.
-**`planning_policy`**: `version` (PK), `reserve_pct`, `requirement_rules` (jsonb), `valid_from`, `set_by`, `reason`. Append-only: a change creates a new version. Applied to every scenario.
+**`planning_policy`**: `version` (PK), `reserve_pct`, `requirement_rules` (jsonb), `valid_from` (never earlier than the next half-hour: no retroactive change), `set_by` (policy owner), `reason`. Append-only: a change creates a new version. Applied to every scenario.
+
+**Outturn scenario** (`source = actual`): built from recorded demand and renewables plus the requirement values of the central-scenario version in force at each half-hour. Where none exists, requirement values are null (shown as unavailable), never zero. Complete from go-live onwards, which needs every central-scenario version to be retained (C15).
 
 **`market_snapshots`**, **`market_sp`** (`snapshot_id`, `start_at`, `has_confirmed_pn`; **no demand**), **`market_unit_sp`** (`pn`, `mel`, `mil`, `is_proxy`), **`bm_units`**: facts. Immutable, with retention for the latest N plus any referenced by a commit.
 
@@ -1020,9 +1031,14 @@ Phase 3: **`draft_shares`** (`draft_id`, `grantee_user_id` *or* `grantee_desk`, 
 
 Optional, only if chosen: **`draft_action_profiles`** / **`plan_action_profiles`** (D14). **`plan_action_instructions`** (D19).
 
-**Related global data** (`unit_redeclarations`, `unit_services`) moves here with the same audit treatment (scope: D9). Today's `area_requirements` values become central-scenario inputs (`source = manual`). Contracted / constrained values: see C12.
+**Related global data**, all append-only with `valid_from`, `set_by` and audit:
+- `unit_redeclarations`, `unit_services` (scope: D9).
+- **`area_contracted`**: `area`, `start_at`, `contracted` (facts).
+- **`area_constraint_overrides`**: `area`, `start_at`, `constrained`, `reason` (manual overrides).
 
-Baseline cache key: **(scenario_id, policy_version, snapshot_id, plan_seq)**.
+Today's `area_requirements` splits three ways: requirement values become central-scenario inputs (`source = manual`), contracted values go to `area_contracted`, and constrained values go to `area_constraint_overrides`. The baseline cache key gains the availability-data version.
+
+Baseline cache key: **(scenario_id, policy_version, availability_version, snapshot_id, plan_seq)**.
 
 ---
 
@@ -1091,7 +1107,7 @@ sequenceDiagram
 
 ### 18.6 New market data or scenario run
 
-Ingestion writes a snapshot and emits `snapshot.created`. Scenario import writes a new scenario version and emits `scenario.created`. A planning-policy change creates a new policy version and emits `policy.changed`. The API computes the baseline for (scenario, policy, snapshot, plan version). Clients refetch, and overlays recompute. The sandbox, drafts and plan are untouched. The pin is not recomputed (§13.8).
+Ingestion writes a snapshot and emits `snapshot.created`. Scenario import writes a new scenario version and emits `scenario.created`. A planning-policy change (policy owner only) creates a new version that takes effect from its stated time, never retroactively, and emits `policy.changed`, so every screen shows a "policy changed" notice. Changes to availability data emit `availability.changed`. The API computes the baseline for (scenario, policy, snapshot, plan version). Clients refetch, and overlays recompute. The sandbox, drafts and plan are untouched. The pin is not recomputed (§13.8).
 
 ---
 
@@ -1106,13 +1122,14 @@ Ingestion writes a snapshot and emits `snapshot.created`. Scenario import writes
 | `POST /sandbox/actions` · `PATCH/DELETE /sandbox/actions/{aid}` | Units (bulk add carries `If-Match` too) |
 | `POST /sandbox/clear` | Empty without committing |
 | `POST /sandbox/load` | Edit: load a commitment or plan actions (§18.2) |
-| `POST /sandbox/commit` | Commit all or selected units, supersede when loaded (§18.3) |
+| `POST /sandbox/commit` | Commit all or selected units, supersede when loaded (§18.3). Live sandbox only: rejected for historical |
 | `PUT / DELETE /sandbox/pin` | Pin (§18.5) |
 | `GET /commitments` · `GET /commitments/{id}` | Committed records (Committed tab) |
 | `POST /commitments/{id}/withdraw` | Withdraw (§18.4) |
 | `GET /plan?version=N` or `?at=…` · `GET /plan/blame?unit=…&at=…` · `GET /plan/events?since=N` | Plan, blame, history |
 | `GET /scenarios/current?context=…` · `GET /policy/current` | Central (or outturn) scenario · planning policy |
-| `PUT /policy` | Change planning policy: new version, audited (who may: C14) |
+| `PUT /policy` | Change planning policy: new version from a stated time, audited (policy owner role only) |
+| `PUT /availability/contracted` · `PUT /availability/constraints` | Edit contracted values / constraint overrides: new version, audited (who may: C17) |
 | `GET /snapshots/latest` · `/snapshots/{id}` | Facts |
 | `GET /baseline?scenario=…&policy=…&snapshot=…&planSeq=…` | Baseline and per-half-hour committed units |
 | `GET /audit?entity=…&id=…` | Audit trail |
@@ -1121,7 +1138,7 @@ Ingestion writes a snapshot and emits `snapshot.created`. Scenario import writes
 **Phase 2** adds `/drafts` (create, read, update, duplicate, discard, restore, delete, commit, load), working the same way as the sandbox endpoints. Comparison and the combined preview are client-side.
 **Phase 3** adds `/drafts/{id}/shares`.
 
-**Events:** day one `plan.committed`, `plan.superseded`, `plan.withdrawn`, `snapshot.created`, `scenario.created`, `policy.changed`. From Phase 3 also `draft.created`, `draft.updated`, `draft.deleted`, `draft.shared`, `draft.unshared`. Ids and versions only. Clients refetch what they need.
+**Events:** day one `plan.committed`, `plan.superseded`, `plan.withdrawn`, `snapshot.created`, `scenario.created`, `policy.changed`, `availability.changed`. From Phase 3 also `draft.created`, `draft.updated`, `draft.deleted`, `draft.shared`, `draft.unshared`. Ids and versions only. Clients refetch what they need.
 
 ---
 
@@ -1140,8 +1157,9 @@ Ingestion writes a snapshot and emits `snapshot.created`. Scenario import writes
 | Charts | One sandbox overlay (loaded units drawn as replacements). Faded pinned line |
 | Pinned vs now panel | Per-area worst headroom, pinned and current, with the pin's time |
 | Dashboard | Tiles show current-plan and with-sandbox figures (§11.4) |
-| Config | Reserve % leaves the per-browser Tweaks and becomes global planning policy (read-only for most users) |
-| Historical mode | A separate historical sandbox, evaluated against the outturn scenario, never committed to the live plan |
+| Config | Reserve % leaves the per-browser Tweaks and becomes global planning policy, editable only by the policy owner. Every screen shows a notice when policy changes |
+| Requirements tab | Requirement values edit the central scenario (`source = manual`). Contracted values edit global availability facts. Constrained values edit global availability overrides. All audited |
+| Historical mode | A separate historical sandbox, evaluated against the outturn scenario. **Commit disabled.** Requirements shown as unavailable where no record exists |
 | Committed tab | Groups by commitment. Per-reason cards count a unit under each reason, with a note that totals count it once |
 | Data loading | No direct market-data fetching, no `clearAllDrafts()`. Subscribe to plan, snapshot and scenario events |
 
@@ -1173,11 +1191,11 @@ The phases follow the sandbox brief's release plan. The earlier build steps are 
 | **0. Decide** | Resolve open decisions and the remaining open items (§23.3). Confirm platform, identity provider, data feeds, hosting. Start operator sign-off on D20 | Architect + product owner sign-off | S |
 | **1. Day one: sandbox** | | | **L** overall |
 | 1a. Groundwork (in this repo, no back end) | Absolute-time actions. Extract `@modelling/calc` with tests. Single contribution function (D14 seam). **Scenario and planning policy as explicit inputs, one central scenario, facts separated from input values and policy** (§14.4). Per-SP dedup. Visibility fix. Reasons as a list | Tests pass. Chart output unchanged for existing scenarios | M |
-| 1b. Back end and committed plan | Database, Planning API, SSO. **Persisted sandbox** (one per user per context): clear, partial commit, load from plan (Edit, row level), pin with "pinned vs now", drift check, **dashboard with-sandbox figures**. `plan_actions` / `plan_events`, supersede, withdraw, per-row effective times and warnings, no-overlap constraint, live plan events. Market-data ingestion, scenario tables (central + outturn), planning policy. Plan-at-version and blame queries. Audit | Simultaneous commits of the same unit: one succeeds. Edit never produces a gap. Withdraw never changes the past. Refresh never loses sandbox work | L |
+| 1b. Back end and committed plan | Database, Planning API, SSO. **Persisted sandbox** (one per user per context): clear, partial commit, load from plan (Edit, row level), pin with "pinned vs now", drift check, **dashboard with-sandbox figures**. `plan_actions` / `plan_events`, supersede, withdraw, per-row effective times and warnings, no-overlap constraint, live plan events. Market-data ingestion, scenario tables (central + outturn), planning policy with the policy owner role, availability data (contracted values, constraint overrides). Plan-at-version and blame queries. Audit | Simultaneous commits of the same unit: one succeeds. Edit never produces a gap. Withdraw never changes the past. Refresh never loses sandbox work | L |
 | 1c. Harden and roll out | Observability, security review, load and disaster-recovery tests, operator UAT, shadow run | UAT sign-off. Runbook written | M |
 | **2. Multiple private drafts** | Drop the one-per-user index. Named drafts, sidebar list, colours, show/hide, discard / restore / delete / duplicate. **Comparison table and preview together** | Operators compare two options side by side across all areas | M |
 | **3. Sharing** | `draft_shares` (users and desks), read-only view, duplicate to own, draft live events, permissions | Two users on two machines share and see updates < 2 s | M |
-| **4. Enhancements** (optional) | Commit approval, review comments, history and blame UI, freeze market data, instruction/delivery tracking (D19), unit profiles (if D14 = B), multi-scenario capabilities (§14.3) | Per feature | — |
+| **4. Enhancements** (optional) | Commit approval, review comments, history and blame UI, freeze market data, instruction/delivery tracking (D19), unit profiles (if D14 = B), multi-scenario capabilities (§14.3), a practice plan for training (D10) | Per feature | — |
 
 ## 23. Decisions and flagged conflicts
 
@@ -1195,9 +1213,9 @@ Status: **Adopted** = built into this design. **Proposed** = recommended, awaiti
 | D6 | Who can edit or withdraw others' commitments | Owner only / owner + senior | Owner + senior (via their own sandbox), reason mandatory | Open (operators) |
 | D7 | Supervisor visibility of open named drafts | Private unless shared / seniors see all | Private unless shared (see also D28) | Open (operators) |
 | D8 | Share targets | Individuals / individuals + desks | Both. Desk shares follow desk membership | Proposed (Phase 3) |
-| D9 | Scope of redeclarations and SR/QR services | Global / per draft / per user | Global, audited | Open (operators) |
-| D10 | Historical-mode work | Commits to a separate practice plan / never committable | **Never commits to the live plan** (confirmed). Whether a separate practice plan exists is still open | Partly decided |
-| D11 | Snapshot cadence and retention | e.g. 5 min, keep 24 h + referenced | As suggested | Proposed |
+| D9 | Scope of redeclarations and SR/QR services | Global / per draft / per user | Global, audited. Contracted values and constraint overrides already get this treatment (C12) | Open (operators) |
+| D10 | Historical-mode work | Commits to a separate practice plan / never committable | **Historical sandboxes can't commit at all on day one.** They are for analysis and replay, and the pin covers comparison. A practice plan for training can be considered in Phase 4 | Decided |
+| D11 | Snapshot cadence and retention | e.g. 5 min, keep 24 h + referenced | As suggested. Retention for historical replay: see C15 | Proposed |
 | D12 | Availability target | Business hours / 24×7 | 24×7 | Open (organisation) |
 | D13 | Dashboard preview of sandbox impact | Day one / later | **Day one**: tiles show current-plan and with-sandbox figures (§11.4) | Adopted (C1) |
 | D14 | How each unit's contribution is modelled (§10.4) | Flat block / unit profile | Answer the §10.4 questions first. Phase 1 keeps both possible | Open |
@@ -1207,10 +1225,10 @@ Status: **Adopted** = built into this design. **Proposed** = recommended, awaiti
 | D18 | Same unit in two commitments | Latest wins / highest wins / block | Block (database-enforced). Amend via Edit (supersede). Reasons as a list cover multi-purpose use | Adopted |
 | D19 | Instruction and delivery tracking | Out of scope / leave room / build | Leave room in the model | Adopted (room only) |
 | D20 | "Edit" on committed drafts | Reopen for editing (mutable) / Edit = load into sandbox + commit as supersede | **Load into the sandbox (warn if not empty), commit as supersede.** Familiar flow, immutable record | **Sign-off** (operators, non-blocking) |
-| D21 | What a scenario may vary | Forecasts and requirements only / also unit availability (e.g. a trip) | Open. If availability is included, model a scenario as overrides on the base snapshot, using the same delta pattern as drafts | Open |
+| D21 | What a scenario may vary | Forecasts and requirements only / also unit availability (e.g. a trip) | Open. If availability is included, model a scenario as overrides on the base snapshot, using the same delta pattern as drafts. **Constraints are the obvious first candidate**: they are already manual overrides (C12) | Open |
 | D22 | Scenario sources | Generated only / generated + manual what-if | Both. Manual what-if scenarios clearly labelled | Proposed |
 | D23 | Reference scenario for commit validation | Always central / operator selects | Central in Phase 1. Recorded on every plan event | Proposed |
-| D24 | Scenario lifetime | Per generator run / rolling | Per run, versioned. Old runs retained if referenced by a commit | Proposed |
+| D24 | Scenario lifetime | Per generator run / rolling | Per run, versioned. Old runs retained if referenced by a commit. **Central-scenario versions may need longer retention** for historical requirement values (C15) | Proposed |
 | D25 | Day-one draft model | Sandbox (one per user) / full multiple drafts | Sandbox, built on the full draft model | **Proposed.** Needs stakeholder agreement. This document assumes adoption |
 | D26 | What happens to uncommitted units on commit | — | **Retired: merged into D15** | Retired |
 | D27 | Comparison on day one | None / pin one previous state | Pin one previous state. Comparison table and preview together in Phase 2 | Adopted |
@@ -1231,14 +1249,17 @@ Status: **Adopted** = built into this design. **Proposed** = recommended, awaiti
 | C9 | Requirements and reserve % vs scenarios | **Policy separated from values.** Reserve % and requirement rules are global planning policy, applied to every scenario. Operator-entered requirement values are central-scenario inputs (`source = manual`). Later a generator may supply values per scenario | §6, §7, §10.1, §14.4, §17 |
 | C10 | Historical mode vs one sandbox per user | **One sandbox per user per context.** Historical mode uses an **outturn** scenario (`source = actual`). Historical sandboxes never commit to the live plan | I8, §8.5, §17, D10 |
 | C11 | Phase numbering | **Confirmed:** Phase 1 sandbox (1a–1c), 2 multiple drafts, 3 sharing, 4 extras | §22 |
+| C12 | Where contracted and constrained values go | **Contracted = facts**: global, audited availability data alongside SR/QR services (as D9). **Constrained = manual availability overrides**: global, audited in Phase 1. Constraints noted under D21 as the first candidate for scenario-varied availability | §6, §7, §10.1, §14.4, §17, D21 |
+| C13 | Requirement values for the outturn scenario | **Requirements in force at the time**, recovered from retained central-scenario versions. Shown as **unavailable** where no record exists, never invented. Complete from go-live | §8.5, §10.2, §14.4, §17 |
+| C14 | Who may change planning policy | A dedicated **policy owner** role (not generic admin). Senior operators can't. Changes are versioned, take effect from a stated time (never retroactively), audited, and push a live event | §6, §7, §12, §17–§20 |
 
-### 23.3 Still open (raised by the resolutions)
+### 23.3 Still open (raised by the latest resolutions)
 
 | # | Question | Context | Current assumption in this document |
 |---|---|---|---|
-| **C12** | Where do **contracted** and **constrained** values go? | The Requirements tab holds three columns: requirement, contracted, constrained. The C9 resolution covers requirement values only | Not placed. Most likely central-scenario inputs with `source = manual`, like requirement values, but they describe availability rather than need, so this needs confirming |
-| **C13** | What **requirement values** does the outturn scenario use? | Outturn demand and renewables are recorded facts, but historical requirement values may not have been recorded | Not decided. Options: values as recorded at the time (needs history), today's central values, or none |
-| **C14** | **Who may change planning policy** (reserve %, requirement rules)? | Reserve % was a per-browser setting. As global policy, a change moves every operator's margin figures | Admin only, senior operators undecided (§12). Every change is versioned and audited |
+| **C15** | **Retention for complete history.** "History complete from go-live" (C13) needs every central-scenario version kept, but D24 keeps only versions a commit references. Historical replay also needs past market facts, and D11 keeps snapshots for only 24 h plus referenced ones | C13, D11, D24 | Not decided. Likely: keep every central-scenario version (or at least its requirement values) from go-live, and either keep market snapshots longer or re-ingest past facts from source for replay |
+| **C16** | **What "takes effect from a stated time" means for policy.** (a) A wall-clock switch-over: until the stated time every half-hour uses the old policy, and after it every half-hour uses the new one. (b) By delivery time: half-hours starting at or after the stated time use the new policy, earlier ones keep the old, and both are visible immediately | C14 | Assumes **(b)**, with the stated time no earlier than the next half-hour. Historical replay uses the policy in force at each half-hour. Needs confirming |
+| **C17** | **Who may edit availability data** (contracted values, constraint overrides)? Today anyone can, via the Requirements tab | C12, D9 | Not decided (§12 shows "?"). Likely operators with a mandatory reason, but it should be settled together with D9 |
 
 ## 24. Risks
 
@@ -1252,7 +1273,7 @@ Status: **Adopted** = built into this design. **Proposed** = recommended, awaiti
 | Scenario seams skipped under time pressure | Redesign when scenarios arrive | Seams are in Phase 1a exit criteria (scenario passed explicitly, demand out of market data) |
 | Operators surprised that Edit loads into the sandbox alongside existing work | Confusion about what a commit contains | Non-empty warning, "editing committed" marking showing each unit's effective time, D20 sign-off |
 | Per-row effective times confuse operators | Changes take effect at unexpected times | Default next half-hour for every row. Effective time shown on each amended unit and in the commit dialog |
-| Global reserve % surprises operators used to setting it per browser | Disagreement over margin figures | Communicate the change, show the policy version on charts, restrict who can change it (C14) |
+| Global reserve % surprises operators used to setting it per browser | Disagreement over margin figures | Communicate the change, show the policy version on charts, "policy changed" notice on every screen, policy owner role only |
 | Blocking clashes frustrates operators who need a unit for several purposes | Workarounds | Reasons as a list. Edit-to-add-reason flow. Clash message names the commitment to edit |
 | Effective-time warnings acknowledged by habit | Plans that can't be delivered | Warnings recorded in the audit trail and reviewed. Revisit making some hard rules after UAT |
 | Loaded-unit overlay maths wrong (baseline − old + new) | Misleading dotted lines | Dedicated golden tests |
@@ -1275,6 +1296,6 @@ Status: **Adopted** = built into this design. **Proposed** = recommended, awaiti
 | Draft header: share popover, owner gating, actions | `src/components/DraftDetails.tsx` |
 | Handlers, confirm modals, `hiddenDraftIds`, `clearAllDrafts` on load | `src/app/page.tsx` |
 | Dashboard (committed-only tile data) | `src/components/Dashboard.tsx` |
-| Requirements tab (operator-entered values: central-scenario inputs, `source = manual`; contracted / constrained: C12) | `src/components/RequirementsTab.tsx`, `src/services/requirementsSync.ts` |
+| Requirements tab (requirement values → central scenario, `source = manual`; contracted → availability facts; constrained → availability overrides) | `src/components/RequirementsTab.tsx`, `src/services/requirementsSync.ts` |
 | Reserve % for TR2 (per-browser Tweaks setting today; becomes planning policy) | `src/app/page.tsx` (`reservePct`), `src/components/ConfigPanel.tsx` |
 | Tested UTC ↔ settlement-period time helpers (reuse in production) | `src/dashboard2/time.ts` |
