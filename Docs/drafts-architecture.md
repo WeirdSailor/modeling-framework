@@ -1,6 +1,6 @@
 # Drafts: Current Implementation and Production Architecture
 
-**Status:** the current state is described as of October 2026 (commit `5a9ef13`). The target architecture is a **proposal for discussion**. It incorporates the architecture review, the **sandbox brief** (day one = one private sandbox per operator, §13) and the **scenarios brief** (design seams for multiple scenarios, §14). Decisions are tracked in §23.1, and conflicts that still need a decision are flagged in §23.2.
+**Status:** the current state is described as of October 2026 (commit `5a9ef13`). The target architecture is a **proposal for discussion**. It incorporates the architecture review, the **sandbox brief** (day one = one private sandbox per operator, §13) and the **scenarios brief** (design seams for multiple scenarios, §14). Decisions are tracked in §23.1. Conflicts raised while merging the briefs, and their resolutions, are in §23.2. Items still open are in §23.3.
 **Audience:** product owner and solution architect.
 **Diagrams:** open [`drafts-architecture-diagrams.html`](drafts-architecture-diagrams.html) in a browser for a visual walkthrough.
 
@@ -320,7 +320,7 @@ The full model (named drafts, sharing) is described first, because day one is a 
 | F6 | A committed draft can be **edited** (familiar flow, implemented as load + supersede, without a gap) or **withdrawn**. Both apply from an effective time and never change the past | Phase 1 |
 | F7 | The owner can share a draft with named operators or a desk. Recipients see it read-only and can duplicate it | Phase 3 |
 | F8 | Committed-data drift indicators (↑/↓ against the commit snapshot) continue to work | Phase 1 |
-| F9 *(optional)* | Preview work in progress on Dashboard / Dashboard 2 tiles | **Flagged: C1** |
+| F9 | The sandbox's impact is shown on the **dashboard** as well as the charts (§11.4) | Phase 1 |
 | F10 | Compare options side by side across all areas (§11.1) | Phase 2 |
 | F11 | Preview two or more drafts combined, read-only (§11.2) | Phase 2 |
 | F12 *(new)* | One private, persisted **sandbox** per operator, with clear, partial commit and load-from-plan (§13) | Phase 1 |
@@ -334,7 +334,7 @@ The full model (named drafts, sharing) is described first, because day one is a 
 | N2 | **Real multi-user.** Operators on different machines see commits within seconds (and shared drafts from Phase 3) |
 | N3 | **Identity.** Single sign-on. No self-selected identity |
 | N4 | **Authorisation enforced server-side** |
-| N5 | **Consistency.** All operators compute the baseline from the same scenario, market data and committed plan version |
+| N5 | **Consistency.** All operators compute the baseline from the same scenario, planning policy, market data and committed plan version |
 | N6 | **Audit and history.** Every command is recorded. The committed plan at any past version can be reconstructed exactly |
 | N7 | **Concurrency safety.** Commits and edits never silently overwrite each other. Two commitments for the same unit and half-hour can never both exist |
 | N8 | **Time correctness.** Actions refer to real half-hours (UTC), including clock-change days (46/50 SPs). The past is never changed |
@@ -359,21 +359,22 @@ The full model (named drafts, sharing) is described first, because day one is a 
 | **Load from plan** | Copy committed plan actions into the sandbox so they can be changed. Behind the **Edit** button |
 | **Supersede** | Atomically close loaded plan actions from the effective time and add their replacements |
 | **Withdraw** | Close a commitment's plan actions from an effective time onward (the prototype's "Uncommit") |
-| **Effective time** | The half-hour boundary from which a plan change takes effect. Never in the past |
+| **Effective time** | The half-hour boundary from which a change to an existing plan-action row takes effect. Set **per row**. Never in the past |
 | **Pin** | A display-only copy of the sandbox's impact at one moment, kept as a reference line (§13.8) |
 | **Market snapshot** | **Facts**: an immutable copy of PN, MEL, MIL and standing data at a point in time |
-| **Scenario** | **Assumptions**: one coherent set of demand, renewable forecasts and requirements (§14). Exactly one ("central") until multi-scenario working is built |
-| **Baseline** | Per half-hour totals for (scenario, snapshot, plan version): units already running plus the committed plan |
+| **Scenario** | One coherent set of **input values**: demand, renewable forecasts and requirement values (§14). One live scenario ("central") until multi-scenario working is built, plus an "outturn" scenario of actuals for historical mode |
+| **Planning policy** | Global rules applied to every scenario: reserve % (TR2) and requirement rules. Versioned and audited. Not part of any scenario |
+| **Baseline** | Per half-hour totals for (scenario, policy, snapshot, plan version): units already running plus the committed plan |
 | **Overlay** | Baseline + the delta of the sandbox or a draft: the dotted line |
 
 ### 6.2 Principles
 
 1. **Drafts are intent, not results.** They are re-applied to whatever the current baseline is, and nothing is stored per draft.
 2. **The committed plan is a versioned log, not mutable state.** It changes only by adding plan actions or closing them, never by editing them.
-3. **Baseline + delta.** The baseline is computed once per (scenario, snapshot, plan version). Each draft is a delta on top of it.
+3. **Baseline + delta.** The baseline is computed once per (scenario, policy, snapshot, plan version). Each draft is a delta on top of it.
 4. **Absolute time.** Every action uses UTC half-hour boundaries. Slot indices exist only on screen.
 5. **Commands, not raw writes.** Intent-level commands are validated and applied atomically, with an audit record and an event.
-6. **One calculation library**, with the scenario and the contribution model (D14) as explicit inputs.
+6. **One calculation library**, with the scenario, the planning policy and the contribution model (D14) as explicit inputs.
 7. **Day one restricts, later phases lift.** The sandbox, single scenario and lack of sharing are restrictions on the full model, never separate mechanisms.
 
 ### 6.3 Invariants (always true)
@@ -387,9 +388,9 @@ The full model (named drafts, sharing) is described first, because day one is a 
 | I5 | No command changes a half-hour that has already started: effective times are never in the past (D17) |
 | I6 | A unit appears at most once in a draft |
 | I7 | Every action has at least one reason |
-| I8 | **Day one:** each operator has at most one open draft, their sandbox (lifted in Phase 2) |
-| I9 | No calculation reads forecasts or requirements from global state. The scenario is always passed in |
-| I10 | The committed plan is scenario-independent. Each plan change records the reference scenario it was validated against |
+| I8 | **Day one:** each operator has at most one open draft **per context** (live, historical): their sandbox (lifted in Phase 2) |
+| I9 | No calculation reads forecasts, requirements or policy from global state. The scenario and the planning policy are always passed in |
+| I10 | The committed plan is scenario-independent. Each plan change records the reference scenario and policy version it was validated against |
 
 ---
 
@@ -408,22 +409,24 @@ erDiagram
   USER ||--o| SANDBOX_PIN : pins
   UNIT ||--o{ DRAFT_ACTION : "used by"
   UNIT ||--o{ PLAN_ACTION : "committed as"
-  SCENARIO ||--o{ SCENARIO_INPUT : "demand, renewables, requirements"
+  SCENARIO ||--o{ SCENARIO_INPUT : "demand, renewables, requirement values"
+  PLANNING_POLICY ||--o{ PLAN_EVENT : "version applied"
   MARKET_SNAPSHOT ||--o{ MARKET_DATA : "PN, MEL, MIL"
 ```
 
 | Entity | Key attributes | Notes |
 |---|---|---|
 | **User** | identity, role, desk | From SSO |
-| **Draft** | owner, **kind** (`sandbox` / `draft`), name, description, status, default window, context (live / historical), version (concurrency), last-evaluated impact (drift check), source (the sandbox a commitment came from) | Status: `draft` (open), `committed`, `superseded`, `withdrawn`, `discarded` |
-| **Draft action** | unit, start, end (empty = open-ended), output, **reasons (list, ≥ 1)**, event type, note, **replaces** (the plan action it was loaded from, if any), **removal** flag (a loaded unit the operator deleted, to be withdrawn at commit) | Unique per (draft, unit) |
+| **Draft** | owner, **kind** (`sandbox` / `draft`), name, description, status, default window, context (live / historical), version (concurrency), last-evaluated impact (drift check), source (the sandbox a commitment came from) | Status: `draft` (open), `committed`, `superseded`, `withdrawn`, `discarded`. A commitment with only some rows closed shows as **partly amended** |
+| **Draft action** | unit, start, end (empty = open-ended), output, **reasons (list, ≥ 1)**, event type, note, **replaces** (the plan-action row it was loaded from, if any), **effective time** (loaded or removed units only; default next half-hour), **removal** flag (a loaded unit the operator deleted, to be withdrawn at commit) | Unique per (draft, unit) |
 | **Draft share** | draft, grantee (user **or** desk), permission (view) | Phase 3. Desk shares follow desk membership |
 | **Plan action** | source commitment and action, unit, start, end, output, reasons, event type, `added_in`, `removed_in`, `split_from` | Immutable (I2). See §9 |
-| **Plan event** | plan version, time, actor, type (`commit`, `supersede`, `withdraw`), commitment, effective time, reason, acknowledged warnings, **reference scenario**, impact summary | Append-only. One per plan change |
+| **Plan event** | plan version, time, actor, type (`commit`, `supersede`, `withdraw`), commitment, change reason, per-row changes (row closed, its effective time, replacement), acknowledged warnings, **reference scenario**, **policy version**, impact summary | Append-only. One per plan change |
 | **Commit unit snapshot** | commitment, unit, MEL, SEL, NDZ, MZT, MNZT, prices | Drives ↑/↓ drift arrows and indicative cost |
 | **Sandbox pin** | owner, pinned at, scenario, snapshot, plan version, per-area impact series | Display only. One per user. Never committable |
-| **Scenario** | name, source (generated / manual), generator run, valid from/to, description, metadata (e.g. what makes it distinct), status (active / superseded / retired) | Imported and read-only. A new run creates new rows. One "central" scenario until multi-scenario working |
-| **Scenario inputs** | per half-hour demand, wind, solar, …; per half-hour and area requirement | **Assumptions.** Moved out of the market snapshot |
+| **Scenario** | name, source (generated / manual / **actual**), generator run, valid from/to, description, metadata (e.g. what makes it distinct), status (active / superseded / retired) | Imported and read-only. A new run creates new rows. One live "central" scenario until multi-scenario working, plus "outturn" (`actual`) for historical mode |
+| **Scenario inputs** | per half-hour demand, wind, solar, …; per half-hour and area **requirement values**, each with a source (manual / generated / actual) | Input values. Moved out of the market snapshot. Today's Requirements tab values are central-scenario inputs with source = manual |
+| **Planning policy** | reserve % (TR2), requirement rules, valid from, set by, reason | Global, applied to every scenario. Versioned and audited. Who may change it: C14 |
 | **Market snapshot** | time taken, kind, per unit PN / MEL / MIL, standing data | **Facts.** Immutable. No demand |
 | **Audit event** | actor, time, entity, command, before, after | Append-only |
 | *Optional (D14)* **Action profile** | action, half-hour, MW, source (generated / override) | Only if unit profiles are chosen |
@@ -452,7 +455,7 @@ The full model (Phase 2 onwards). The day-one sandbox uses a subset (§13.6).
 
 - **Draft / sandbox**: editable by the owner. Dotted line.
 - **Committed**: a commitment. Its plan actions are in the plan. Its contents **never change** (I4) and it **never returns to draft**. To change it, load it into the sandbox (§8.3).
-- **Superseded / Withdrawn**: all of its plan actions have been closed (by supersede or withdraw). Earlier half-hours stay in the plan record. If only some of them are closed, it stays *committed* with a "partly amended" badge (see C3).
+- **Superseded / Withdrawn**: all of its plan actions have been closed (by supersede or withdraw). Earlier half-hours stay in the plan record. If only some of them are closed, it stays *committed* and shows as **partly amended** (amendment works on individual plan-action rows).
 - **Discarded** (Phase 2): a named draft set aside. Restorable. Can be deleted.
 - **Expired** is a display flag on any draft whose actions are all in the past.
 
@@ -462,10 +465,10 @@ The full model (Phase 2 onwards). The day-one sandbox uses a subset (§13.6).
 |---|---|---|---|
 | Add / change / remove units, reasons, window | Sandbox or draft (owner) | None | Phase 1 |
 | **Clear sandbox** | Sandbox | None. Loaded units go back to being untouched commitments | Phase 1 |
-| **Commit** (all, or selected units) | Sandbox or draft | Adds plan actions from the effective time (§8.4). Selected units move into a new **commitment**. Unselected units stay | Phase 1 |
-| **Edit** = load from plan | A commitment (or some of its units, see C3) | None until commit. Loaded units are copied into the sandbox, linked to the plan actions they replace. **Warns if the sandbox isn't empty** | Phase 1 |
-| Commit with loaded units (= **supersede**) | Sandbox | One transaction: closes the loaded plan actions from the effective time (split at T), adds the replacements, and withdraws loaded units the operator deleted. One new plan version | Phase 1 |
-| **Withdraw** | Commitment | Closes its plan actions from the effective time. New plan version | Phase 1 |
+| **Commit** (all, or selected units) | Sandbox or draft | Adds plan actions for the selected units' own windows (§8.4). Selected units move into a new **commitment**. Unselected units stay | Phase 1 |
+| **Edit** = load from plan | A whole commitment, or individual committed units | None until commit. Loaded units are copied into the sandbox, each linked to the plan-action row it replaces, with its own effective time (default next half-hour). **Warns if the sandbox isn't empty** | Phase 1 |
+| Commit with loaded units (= **supersede**) | Sandbox | One transaction: closes each loaded plan action from **its own** effective time (split there), adds the replacements, and withdraws loaded units the operator deleted. One new plan version | Phase 1 |
+| **Withdraw** | Commitment, or selected rows of it | Closes the rows, each from its own effective time (default next half-hour). New plan version | Phase 1 |
 | **Pin** / unpin | Sandbox | None (display only) | Phase 1 |
 | Create / rename / duplicate / discard / restore / delete named drafts | Draft (owner) | None | Phase 2 |
 | Share / unshare | Draft (owner) | None | Phase 3 |
@@ -474,11 +477,11 @@ The full model (Phase 2 onwards). The day-one sandbox uses a subset (§13.6).
 
 Operators keep a familiar **Edit** button on committed drafts. Under the sandbox model:
 
-1. **Edit loads the commitment into the operator's sandbox.** If the sandbox already has content, the operator is **warned** first ("Your sandbox has 3 units. Loading Draft A will add to them, and they will be committed together"), and can cancel, clear first, or continue (see C4).
-2. Loaded units are copies, each linked to the plan action it replaces. **The commitment stays in the plan** while the operator works, so nobody sees a gap or a false shortfall.
+1. **Edit loads the commitment, or individual committed units, into the operator's sandbox.** If the sandbox already has content, the operator is **warned** first ("Your sandbox has 3 units. Loading Draft A adds its units alongside them"), and can cancel, clear first, or continue. Mixing is safe: each amended unit carries its own effective time, new units keep their own windows, and reasons are per unit.
+2. Loaded units are copies, each linked to the plan-action row it replaces and given an **effective time** (default: next half-hour, editable per unit). **The commitment stays in the plan** while the operator works, so nobody sees a gap or a false shortfall.
 3. The dotted line shows **the plan with the loaded actions replaced** by the sandbox's version, not "plan plus a second copy" (§10.2).
 4. Deleting a loaded unit marks it for removal: it is shown struck through and is withdrawn at commit.
-5. **Commit** performs a supersede (one transaction, one plan version). **Clear** cancels, and the commitment is untouched.
+5. **Commit** performs a supersede (one transaction, one plan version). If only some of a commitment's units were amended, it shows as **partly amended**. **Clear** cancels, and the commitment is untouched.
 6. If someone else changes the same plan actions first (e.g. a senior operator), committing fails with a clear message, and the operator reloads.
 
 From Phase 2, Edit could instead open the commitment in a new named draft. Revisit with D20.
@@ -487,24 +490,34 @@ Committed records stay immutable while the operator flow stays familiar. **This 
 
 ### 8.4 Effective-time rules (D17)
 
-Every command that changes the plan (commit, supersede, withdraw) takes effect from an **effective time**: a half-hour boundary.
+The effective time is the half-hour boundary from which a change to an **existing** plan-action row takes effect. It is set **per amended row**, not per commit:
+
+- **Loaded (amended) units** and **withdrawn units** each carry their own effective time. Default: the start of the next half-hour. The operator can move any of them later.
+- **New units** have no effective time. They use their own windows.
 
 | Rule | Type | Detail |
 |---|---|---|
-| **Never in the past** | **Hard**: rejected | The effective time must be ≥ now. The earliest allowed value is therefore the **start of the next half-hour**, because the current one has already started. Default = earliest allowed. The operator may choose a later boundary |
-| **Within gate closure** | Warning: acknowledge to continue | Effective time earlier than gate closure for that half-hour (≈ 1 hour before delivery) |
-| **Within unit notice time** | Warning: acknowledge to continue | For units being added or extended: effective time earlier than now + the unit's NDZ (notice to deviate from zero) |
+| **Never in the past** | **Hard**: rejected | No change may touch a half-hour that has already started. An effective time must be ≥ now, so the earliest allowed is the **start of the next half-hour**. A new unit's window is clipped to start no earlier than that, and a window entirely in the past can't be committed (it has expired) |
+| **Within gate closure** | Warning: acknowledge to continue | The change (an effective time, or a new unit's start) falls before gate closure for that half-hour (≈ 1 hour before delivery) |
+| **Within unit notice time** | Warning: acknowledge to continue | For units being added or extended: the change starts earlier than now + the unit's NDZ (notice to deviate from zero) |
 | *Minimum run / off time* (if D14 = profiles) | Warning | Window shorter than MNZT, or a gap shorter than MZT |
 
 Acknowledged warnings are stored on the plan event and in the audit trail.
 
-How the effective time applies:
-- **New units:** action parts before the effective time are clipped off. An action entirely before it can't be committed (it has expired).
-- **Loaded or withdrawn plan actions:** those entirely before the effective time are untouched. Those entirely after it are closed. An action spanning it is **split**: the original is closed, and a new plan action covering start → effective time is added (`split_from` links them). The past stays in the plan exactly as it was.
+How an effective time T applies to an existing plan-action row:
+- Entirely before T: untouched.
+- Entirely after T: closed.
+- Spanning T: **split**. The original is closed, and a new plan action covering start → T is added (`split_from` links them). The past stays in the plan exactly as it was.
+
+Because effective times are per row, one commit can amend several units from different times, add new units and withdraw others, all as one plan version. That is why loading into a non-empty sandbox only needs a warning.
 
 ### 8.5 Historical mode
 
-Work done against a historical snapshot carries `context = historical`. It behaves like live work for modelling, but **can never change the live plan**. Whether it can be committed to a per-user sandbox plan is D10. How this fits with one sandbox per user is flagged as C10.
+Work done against a historical window carries `context = historical`:
+
+- Each operator has **one sandbox per context**, so one live and one historical (I8).
+- It is evaluated against an **outturn scenario** (`source = actual`). Recorded demand and renewables are treated as **facts** here, not assumptions (§14.4).
+- A historical sandbox **never commits to the live plan** (D10). Whether it can commit to a separate practice plan, or not at all, is still open (D10).
 
 ---
 
@@ -564,15 +577,15 @@ Committing does not instruct a unit. A production tool will eventually need to k
 
 ### 10.1 Baseline + delta, with explicit inputs
 
-- **Baseline** for (scenario, snapshot, plan version): units already running (PN > 1 MW) plus open plan actions, **once per unit per half-hour**, evaluated against the scenario's demand and requirements.
+- **Baseline** for (scenario, policy, snapshot, plan version): units already running (PN > 1 MW) plus open plan actions, **once per unit per half-hour**, evaluated against the scenario's demand and requirement values and the planning policy (reserve %, requirement rules).
 - **Overlay** for the sandbox or a draft: baseline + its units that aren't already counted in that half-hour.
-- **Explicit inputs.** Calculation functions take the scenario as an argument, e.g. `computeBaseline(snapshot, scenario, plan)` and `applyDraft(baseline, scenario, draft)`. Nothing reads "the forecast" or "the requirement" from global or store state (I9).
+- **Explicit inputs.** Calculation functions take the scenario and the planning policy as arguments, e.g. `computeBaseline(snapshot, scenario, policy, plan)` and `applyDraft(baseline, scenario, policy, draft)`. Nothing reads "the forecast", "the requirement" or "the reserve %" from global or store state (I9).
 - **One contribution function** answers "what does this action add in this half-hour?" for every area. Today it returns a flat block. It is the switch point for D14 (§10.4).
 
 ### 10.2 Rules
 
 - **No double counting per half-hour**, for margin and all areas (fixes prototype limitation 7).
-- **Loaded units are drawn as replacements.** For a sandbox containing loaded units, the overlay is *baseline − the loaded plan actions' contribution (from the effective time) + the sandbox's contribution*. The calculation library computes the loaded contribution with the same function and subtracts it. Loaded units marked for removal subtract and add nothing.
+- **Loaded units are drawn as replacements.** For a sandbox containing loaded units, the overlay is *baseline − the loaded plan actions' contribution (each from its own effective time) + the sandbox's contribution*. The calculation library computes the loaded contribution with the same function and subtracts it. Loaded units marked for removal subtract and add nothing.
 - **Visibility:** draw only the user's own sandbox and drafts, plus (Phase 3) drafts shared with them, minus any they have hidden (fixes limitation 5).
 - **Expired actions** are excluded from forward-looking views and kept in history views (§7).
 - **Open-ended actions** run to the end of the displayed horizon.
@@ -668,11 +681,11 @@ Select two or more drafts and choose **Preview together**. You get one extra ove
 ### 11.3 The moving baseline while comparing
 
 - **Drift check at commit (Phase 1):** the sandbox records the impact it had when last edited (scenario, snapshot, plan version, per-area worst headroom). The commit dialog recomputes against the latest data and flags a **material change**, e.g. an area's status changes or headroom moves by more than a configurable threshold.
-- **Freeze market data (optional, later):** hold the display on one market snapshot while weighing options, with a banner saying so. Commit always validates against the latest data. (This was called "pin a snapshot" before. It is renamed so it isn't confused with the sandbox **pin**, see C7.)
+- **Freeze market data (optional, later):** hold the display on one market snapshot while weighing options, with a banner saying so. Commit always validates against the latest data. (Renamed from "pin a snapshot" so it isn't confused with the sandbox **pin**.)
 
-### 11.4 Dashboard preview
+### 11.4 Dashboard preview (day one, D13)
 
-Showing work in progress on the Dashboard tiles is **flagged as C1**. The sandbox brief puts it on day one, while D13 says later.
+The sandbox's impact is shown on the **dashboard** as well as the charts, from day one. Each tile shows the current-plan figure and the with-sandbox figure, computed with the same overlay calculation. How Dashboard 2 shows it should follow Dashboard 2's own design spec.
 
 ---
 
@@ -685,6 +698,7 @@ Showing work in progress on the Dashboard tiles is **flagged as C1**. The sandbo
 | Edit (load + supersede) a commitment | ✅ | ❌ | ❌ | ✅ ³ | ❌ | ✅ | Phase 1 |
 | Withdraw a commitment | ✅ | ❌ | ❌ | ✅ ³ | ❌ | ✅ | Phase 1 |
 | See the committed plan, its history and blame | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Phase 1 |
+| Change planning policy (reserve %, requirement rules) | — | — | ❌ | ? (C14) | ❌ | ✅ | Phase 1 |
 | Named drafts: create, edit, discard, restore, delete | ✅ | ❌ | ❌ | ❌ | ❌ | ✅ | Phase 2 |
 | See a named draft & overlay | ✅ | ✅ | ❌ | ❌ ¹ | ❌ | ✅ | Phase 2 / 3 |
 | Share / unshare | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | Phase 3 |
@@ -700,7 +714,7 @@ Showing work in progress on the Dashboard tiles is **flagged as C1**. The sandbo
 
 ### 13.1 What it is
 
-Each operator has **one private working area**, the sandbox. They add and remove candidate units and see the impact immediately as dotted lines on the charts, across all operational areas (and on the dashboard, see C1). When they commit, the selected units go into the committed plan, and the sandbox keeps whatever wasn't selected, ready for the next piece of work.
+Each operator has **one private working area**, the sandbox. They add and remove candidate units and see the impact immediately as dotted lines on the charts and as with-sandbox figures on the dashboard, across all operational areas. When they commit, the selected units go into the committed plan, and the sandbox keeps whatever wasn't selected, ready for the next piece of work.
 
 For the operator: one draft at a time, play freely, commit, carry on.
 
@@ -710,7 +724,7 @@ A sandbox is **not a separate mechanism**. It is a draft (`kind = sandbox`) with
 
 | Restriction | Day one | Lifted in |
 |---|---|---|
-| One open draft per user | Enforced (partial unique index) | Phase 2 (multiple private drafts) |
+| One open draft per user per context (live, historical) | Enforced (partial unique index) | Phase 2 (multiple private drafts) |
 | Private, never shared | Enforced | Phase 3 (sharing) |
 | Committed units leave the sandbox | Behaviour of the commit command | Stays. In Phase 2 a named draft closes when fully committed |
 
@@ -742,9 +756,10 @@ The hardest part of the architecture is the committed plan, and the sandbox does
 1. **Persisted server-side.** "Temporary" means "committed units leave", not "lost on refresh, reload or new market data". Losing work to a page reload would damage operator trust.
 2. **Clear sandbox.** One command to empty it without committing.
 3. **Partial commit (D15).** The operator selects which sandbox units to commit. Those go into the plan, and **the rest stay in the sandbox**. The default is commit all.
-4. **Commit dialog.** Name and description for the commitment, effective time, warnings to acknowledge, clashes, impact against the current baseline, and a flag if it has changed since the sandbox was last edited.
+4. **Commit dialog.** Name and description for the commitment, an effective time per amended unit (default next half-hour), warnings to acknowledge, clashes, impact against the current baseline, and a flag if it has changed since the sandbox was last edited.
 5. **Load from plan (Edit).** Load a commitment into the sandbox to amend it, committed as a supersede. Warns if the sandbox isn't empty (§8.3).
-6. **Pin** one previous state (§13.8).
+6. **Pin** one previous state, with a "pinned vs now" panel (§13.8).
+7. **Dashboard.** Tiles show the sandbox's impact alongside the current plan (§11.4).
 
 ### 13.6 Sandbox lifecycle
 
@@ -759,9 +774,9 @@ The hardest part of the architecture is the committed plan, and the sandbox does
                                                 Commit selected → stays in [ Has work ] with the unselected units
 ```
 
-### 13.7 What commit does to the sandbox (recorded choice; see C5)
+### 13.7 What commit does to the sandbox (confirmed)
 
-The sandbox brief left a choice: remove the committed actions from the sandbox, or close the sandbox and open a new one. This document records a third option, which keeps the audit trail clearest:
+The sandbox brief left a choice between removing committed actions from the sandbox and closing it to open a new one. The confirmed approach is a third option, which keeps the audit trail clearest:
 
 - The **selected actions move into a new commitment record**: a draft row with `kind = draft`, `status = committed`, named in the commit dialog, with `source = this sandbox`. Plan actions point at this record.
 - The **sandbox row stays open** with the unselected units. It keeps a stable identity, and the one-per-user index is never briefly violated.
@@ -774,7 +789,7 @@ The main value of multiple drafts is comparing competing options. With one sandb
 
 - **Pin** keeps the current sandbox impact as a faded reference line on the charts, while the operator keeps editing.
 - **One pinned state per user.** Pinning again replaces it.
-- A small **"Pinned vs now" panel** shows per-area worst headroom for both. The sandbox brief kept these figures in the comparison table, which is now Phase 2, hence this panel (C6).
+- A small **"Pinned vs now" panel** shows per-area worst headroom for both. This is the confirmed day-one form of comparison. The full comparison table comes in Phase 2.
 - It is **display state only**: stored per user, not a draft, never committable.
 - It is **not recomputed** when data changes. It is a recorded picture of the moment it was pinned, labelled with its time, and the panel shows when it has become stale.
 
@@ -806,8 +821,8 @@ Two things vary independently:
 | Stored as | Intent (units, times, settings) | A coherent bundle of input values |
 
 ```
-result = evaluate(scenario, market snapshot, committed plan, draft)
-          assumptions     facts             what we've done   what we might do
+result = evaluate(scenario,      policy,        market snapshot,  committed plan,   draft)
+                  input values   global rules   facts             what we've done   what we might do
 ```
 
 Because drafts store intent, the same draft can be evaluated against any scenario unchanged. Multi-scenario working is therefore a grid: **drafts × scenarios**.
@@ -821,7 +836,7 @@ Mostly from a **scenario generator**. A scenario is only useful if it is:
 
 Credibility and distinctness are the generator's job. The tool **consumes** scenarios and does not generate them.
 
-A lesser, second source: **manual what-if scenarios**, where an operator applies an alternative profile (e.g. a different wind percentile). These must be labelled as user-defined and not credibility-assured. (The scenarios brief calls these "manual sandbox scenarios". They are renamed here so they aren't confused with the operator's sandbox, see C8.)
+A lesser, second source: **manual what-if scenarios**, where an operator applies an alternative profile (e.g. a different wind percentile). These must be labelled as user-defined and not credibility-assured. (Renamed from the brief's "manual sandbox scenarios" so they aren't confused with the operator's sandbox.)
 
 ### 14.3 Future capabilities (not to build now)
 
@@ -833,14 +848,20 @@ A lesser, second source: **manual what-if scenarios**, where an operator applies
 ### 14.4 Seams to build in now (Phase 1, cheap, no regret)
 
 1. **Scenario is a first-class entity with exactly one instance** ("central"). Forecasts and requirements carry a scenario id.
-2. **Separate facts from assumptions.** PN, MEL, MIL and standing data are facts and stay in the market snapshot. Demand, renewable forecasts and requirements are assumptions and belong to the scenario. **Demand moves out of `market_sp`.**
-3. **The scenario is an explicit argument to `@modelling/calc`** (§10.1, I9). This is the most important seam, the same pattern as D14.
-4. **Baseline cache keyed by (scenario, snapshot, plan version).**
-5. **The committed plan is scenario-independent.** Each plan event records the reference scenario it was validated against (I10).
+2. **Separate facts, input values and policy.** PN, MEL, MIL and standing data are facts and stay in the market snapshot. Demand, renewable forecasts and requirement **values** belong to the scenario. Reserve % and requirement **rules** are **planning policy**: global config, applied to every scenario. **Demand moves out of `market_sp`.**
+3. **The scenario and the policy are explicit arguments to `@modelling/calc`** (§10.1, I9). This is the most important seam, the same pattern as D14.
+4. **Baseline cache keyed by (scenario, policy, snapshot, plan version).**
+5. **The committed plan is scenario-independent.** Each plan event records the reference scenario and policy version it was validated against (I10).
 6. **Impact results keyed by scenario** wherever they are computed or cached: overlays, the pin, the drift check, and the commit-time impact in the audit record.
 7. **Scenarios are imported, versioned and read-only.** A new generator run creates new rows rather than editing old ones, the same immutability principle as plan actions.
 
-Open questions that touch today's prototype are flagged as C9: operator-entered requirements and the reserve % setting are both assumptions.
+How today's prototype maps onto this:
+
+- **Reserve %** (today a per-browser Config setting) becomes global **planning policy**: versioned, audited, the same for every operator and scenario.
+- **Requirement rules** are policy too.
+- **Requirement values** typed into the Requirements tab become inputs of the central scenario with `source = manual`. Later a generator may supply them per scenario.
+- **Contracted / constrained values** from the same tab: see C12.
+- **Historical mode** uses an **outturn** scenario (`source = actual`), so recorded demand is treated as fact. Its requirement values: see C13.
 
 ### 14.5 Not to build now
 
@@ -860,7 +881,8 @@ This part describes **one way** to build Part B1, based on the prototype's stack
 | Area | Assumption in this document | Likely in a real system |
 |---|---|---|
 | Market data source (facts) | Public Elexon Insights API (as in the prototype) | **Internal operational data feeds.** The public API is a prototype convenience |
-| Scenario source (assumptions) | One "central" scenario built from the current demand forecast and the Requirements tab | Scenario generator output (§14) |
+| Scenario source (input values) | One "central" scenario: current demand forecast plus Requirements tab values (`source = manual`). An "outturn" scenario for historical mode | Scenario generator output (§14) |
+| Planning policy | Global config table (reserve %, requirement rules) | Same, owned by an operational authority (C14) |
 | Database | PostgreSQL | Organisation's standard relational database. The no-overlap rule (I3) needs equivalent support |
 | Live updates | Server-Sent Events | Organisation's messaging / push standard |
 | Front end | Existing Next.js app | Likely kept |
@@ -888,7 +910,7 @@ flowchart LR
     ScIn["Scenario import"]
     API --- Calc2
   end
-  DB[("PostgreSQL<br/>drafts, plan actions, plan events,<br/>scenarios, snapshots, audit")]
+  DB[("PostgreSQL<br/>drafts, plan actions, plan events,<br/>scenarios, policy, snapshots, audit")]
   Feed["Market data source<br/>(Elexon in prototype)"]
   Gen["Scenario source<br/>(central forecast now,<br/>generator later)"]
   Client -- "sign in" --> IdP
@@ -913,7 +935,7 @@ flowchart LR
 | **Live events** | Pushes events to connected clients. SSE is enough because all writes go through the API |
 | **Market-data ingestion** | Pulls facts on a schedule (e.g. every 5 minutes) and writes immutable snapshots |
 | **Scenario import** | Writes immutable scenario rows. One central scenario until multi-scenario working |
-| **`@modelling/calc`** | Pure functions with explicit scenario input: contribution, baseline, overlay (including loaded-unit replacement), pin impact, comparison, status, time helpers. Golden-tested |
+| **`@modelling/calc`** | Pure functions with explicit scenario and policy inputs: contribution, baseline, overlay (including loaded-unit replacement), pin impact, comparison, status, time helpers. Golden-tested |
 | **PostgreSQL** | System of record. Enforces I3 with an exclusion constraint and I8 with a partial unique index |
 | **Identity provider** | SSO, user id, role and desk claims |
 
@@ -923,7 +945,7 @@ flowchart LR
 |---|---|---|
 | Time to first version | Medium | **Fast** |
 | **Enforce "no overlapping commitments" (I3)** | **Native**: exclusion constraint, race-free | Not native. Needs per-unit lock documents and careful transactions |
-| One sandbox per user (I8) | Partial unique index | Document id = user id |
+| One sandbox per user per context (I8) | Partial unique index | Document id = user id + context |
 | Atomic supersede across many rows | One SQL transaction | Possible, with document-count limits |
 | History / blame queries | SQL over plan actions | Needs denormalisation or export |
 | Permission enforcement | API + row-level security | Security rules |
@@ -945,9 +967,9 @@ flowchart LR
 | `kind` | enum `sandbox \| draft` | Default `sandbox`. Commitment records are `draft` |
 | `name`, `description` | text | Required on commitment records (from the commit dialog) |
 | `color` | text null | Phase 2 |
-| `status` | enum `draft \| committed \| superseded \| withdrawn \| discarded` | `draft` = open |
+| `status` | enum `draft \| committed \| superseded \| withdrawn \| discarded` | `draft` = open. "Partly amended" is derived: committed with some plan-action rows closed |
 | `owner_id` | uuid FK users | |
-| `context`, `historical_snapshot_id` | enum `live \| historical`, uuid null | §8.5, C10 |
+| `context`, `historical_snapshot_id` | enum `live \| historical`, uuid null | §8.5. Historical work uses the outturn scenario |
 | `window_start`, `window_end` | timestamptz | Default window for new actions |
 | `source_draft_id` | uuid null | The sandbox a commitment came from, or the draft a duplicate came from |
 | `version` | int | Optimistic concurrency. Every write, including bulk action edits, carries `If-Match` |
@@ -957,9 +979,9 @@ flowchart LR
 | `last_evaluated` | jsonb null | Scenario, snapshot, plan seq, per-area worst headroom at last edit (drift check) |
 | `created_at`, `updated_at` | timestamptz | |
 
-Index **(day one only, I8):** `CREATE UNIQUE INDEX one_open_draft_per_user ON drafts (owner_id) WHERE status = 'draft'`. Dropping it is the main model change for Phase 2. See C10 for historical mode.
+Index **(day one only, I8):** `CREATE UNIQUE INDEX one_open_draft_per_user_context ON drafts (owner_id, context) WHERE status = 'draft'`: one live and one historical sandbox per user. Dropping it is the main model change for Phase 2.
 
-**`draft_actions`**: `id`, `draft_id`, `bm_unit_id`, `start_at`, `end_at` (null = open-ended, exclusive), `output_mw`, `reasons` (`reason_code[]`, `CHECK (cardinality(reasons) >= 1)`), `operation_type`, `note`, **`replaces_plan_action_id`** (uuid null: set when loaded from the plan), **`is_removal`** (bool: a loaded unit the operator deleted, withdrawn at commit), `created_at`, `created_by`. `UNIQUE (draft_id, bm_unit_id)`.
+**`draft_actions`**: `id`, `draft_id`, `bm_unit_id`, `start_at`, `end_at` (null = open-ended, exclusive), `output_mw`, `reasons` (`reason_code[]`, `CHECK (cardinality(reasons) >= 1)`), `operation_type`, `note`, **`replaces_plan_action_id`** (uuid null: set when loaded from the plan), **`effective_at`** (timestamptz null: for loaded or removed units; default next half-hour), **`is_removal`** (bool: a loaded unit the operator deleted, withdrawn at commit), `created_at`, `created_by`. `UNIQUE (draft_id, bm_unit_id)`.
 
 **`plan_actions`** (the committed plan)
 
@@ -979,15 +1001,16 @@ Constraints:
 - **No overlap (I3):** `EXCLUDE USING gist (bm_unit_id WITH =, tstzrange(start_at, end_at, '[)') WITH &&) WHERE (removed_in_seq IS NULL)` (requires `btree_gist`). Two simultaneous commits for the same unit can't both succeed.
 - **Immutability (I2):** no UPDATE grant except through a function that sets `removed_in_seq` from null. No DELETE grant.
 
-**`plan_events`**: `seq` (bigserial = plan version), `at`, `actor_id`, `type` (`commit | supersede | withdraw`), `draft_id` (the commitment), `effective_at`, `reason`, `acknowledged_warnings` (jsonb), **`reference_scenario_id`**, `impact` (jsonb: per-area impact at commit, keyed by scenario). Append-only.
+**`plan_events`**: `seq` (bigserial = plan version), `at`, `actor_id`, `type` (`commit | supersede | withdraw`), `draft_id` (the commitment), `reason`, `changes` (jsonb: each closed row, its effective time and replacement), `acknowledged_warnings` (jsonb), **`reference_scenario_id`**, **`policy_version`**, `impact` (jsonb: per-area impact at commit, keyed by scenario). Append-only.
 
 **`commit_unit_snapshots`**: `draft_id`, `bm_unit_id`, `mel`, `sel`, `ndz`, `mzt`, `mnzt`, `price_to_sel`, `price_to_mel`.
 
-**`sandbox_pins`**: `owner_id` PK, `pinned_at`, `scenario_id`, `snapshot_id`, `plan_seq`, `impact` (jsonb: per-area series and worst headroom).
+**`sandbox_pins`**: (`owner_id`, `context`) PK, `pinned_at`, `scenario_id`, `snapshot_id`, `plan_seq`, `impact` (jsonb: per-area series and worst headroom).
 
-**`scenarios`**: `id`, `name`, `source` (`generated | manual`), `generator_run_id` null, `generated_at`, `valid_from`, `valid_to`, `description`, `metadata` (jsonb), `status` (`active | superseded | retired`).
+**`scenarios`**: `id`, `name`, `source` (`generated | manual | actual`), `generator_run_id` null, `generated_at`, `valid_from`, `valid_to`, `description`, `metadata` (jsonb), `status` (`active | superseded | retired`).
 **`scenario_sp`**: `scenario_id`, `start_at`, `demand`, `wind`, `solar`, …
-**`scenario_requirements`**: `scenario_id`, `start_at`, `area`, `requirement` (MW / GVAs / MVAr).
+**`scenario_requirements`**: `scenario_id`, `start_at`, `area`, `requirement` (MW / GVAs / MVAr), `source` (`manual | generated | actual`). Today's Requirements tab values are central-scenario rows with `source = manual`.
+**`planning_policy`**: `version` (PK), `reserve_pct`, `requirement_rules` (jsonb), `valid_from`, `set_by`, `reason`. Append-only: a change creates a new version. Applied to every scenario.
 
 **`market_snapshots`**, **`market_sp`** (`snapshot_id`, `start_at`, `has_confirmed_pn`; **no demand**), **`market_unit_sp`** (`pn`, `mel`, `mil`, `is_proxy`), **`bm_units`**: facts. Immutable, with retention for the latest N plus any referenced by a commit.
 
@@ -997,9 +1020,9 @@ Phase 3: **`draft_shares`** (`draft_id`, `grantee_user_id` *or* `grantee_desk`, 
 
 Optional, only if chosen: **`draft_action_profiles`** / **`plan_action_profiles`** (D14). **`plan_action_instructions`** (D19).
 
-**Related global data** (`unit_redeclarations`, `unit_services`) moves here with the same audit treatment (scope: D9). Today's `area_requirements` becomes scenario input. See C9.
+**Related global data** (`unit_redeclarations`, `unit_services`) moves here with the same audit treatment (scope: D9). Today's `area_requirements` values become central-scenario inputs (`source = manual`). Contracted / constrained values: see C12.
 
-Baseline cache key: **(scenario_id, snapshot_id, plan_seq)**.
+Baseline cache key: **(scenario_id, policy_version, snapshot_id, plan_seq)**.
 
 ---
 
@@ -1023,7 +1046,7 @@ No events go to other users: the sandbox is private. A version mismatch (the sam
 
 ### 18.2 Load a commitment into the sandbox (Edit)
 
-`POST /sandbox/load {draftId | planActionIds[]}`. If the sandbox isn't empty and the request doesn't carry `confirmNonEmpty`, the API returns 409 with the current contents and the client shows the warning. Otherwise it copies each open plan action into the sandbox as an action with `replaces_plan_action_id` set. Nothing changes in the plan.
+`POST /sandbox/load {draftId | planActionIds[]}`. If the sandbox isn't empty and the request doesn't carry `confirmNonEmpty`, the API returns 409 with the current contents and the client shows the warning. Otherwise it copies each open plan action into the sandbox as an action with `replaces_plan_action_id` set and `effective_at` defaulting to the next half-hour. Nothing changes in the plan.
 
 ### 18.3 Commit (all or selected; supersede when loaded units are included)
 
@@ -1034,23 +1057,23 @@ sequenceDiagram
   participant D as PostgreSQL
   participant R as Live events
   participant All as All browsers
-  U->>A: POST /sandbox/commit {actionIds?, name, description, effectiveAt?, reason?, acknowledgeWarnings?} If-Match
+  U->>A: POST /sandbox/commit {actionIds?, name, description, reason?, acknowledgeWarnings?} If-Match (effective times are on the actions)
   A->>D: BEGIN; lock sandbox FOR UPDATE; lock loaded plan actions
   A->>A: Rights. Loaded plan actions still open? (else 409: changed by someone else)
-  A->>A: Effective time ≥ next half-hour? (hard: else 422)
+  A->>A: Every effective time and new-unit start ≥ next half-hour? (hard: else 422)
   A->>A: Gate-closure / notice warnings
   alt warnings not acknowledged
     A-->>U: 409 {warnings} → confirm dialog
   else
-    A->>D: Close loaded plan actions of selected (and removal) units from effective time (split spanning rows)
+    A->>D: Close loaded plan actions of selected (and removal) units, each from its own effective time (split spanning rows)
     A->>D: Create commitment record; move selected actions into it
-    A->>D: Insert plan actions clipped to effective time (no-overlap constraint)
+    A->>D: Insert plan actions for the selected units' windows (no-overlap constraint)
     alt overlap with another commitment
       D-->>A: exclusion violation → ROLLBACK
       A-->>U: 409 {clashes: unit, commitment, owner} "Edit that commitment instead"
     else
-      A->>D: Unit snapshots, plan_event (seq N+1, reference scenario, impact), audit; COMMIT
-      A->>A: Recompute baseline (scenario, snapshot, N+1)
+      A->>D: Unit snapshots, plan_event (seq N+1, reference scenario, policy version, changes, impact), audit; COMMIT
+      A->>A: Recompute baseline (scenario, policy, snapshot, N+1)
       A-->>U: 200 (sandbox now holds the unselected units)
       A->>R: plan.committed / plan.superseded {seq N+1}
       R-->>All: refetch baseline, solid lines update
@@ -1060,7 +1083,7 @@ sequenceDiagram
 
 ### 18.4 Withdraw
 
-`POST /commitments/{id}/withdraw {effectiveAt?, reason, acknowledgeWarnings?}`. Same transaction pattern, closing the commitment's open plan actions (splitting at the effective time), with no new actions. Emits `plan.withdrawn`.
+`POST /commitments/{id}/withdraw {rows?: [{planActionId, effectiveAt?}], reason, acknowledgeWarnings?}`. Withdraws the whole commitment or selected rows, each from its own effective time (default next half-hour), splitting where needed, with no new actions. Emits `plan.withdrawn`.
 
 ### 18.5 Pin
 
@@ -1068,7 +1091,7 @@ sequenceDiagram
 
 ### 18.6 New market data or scenario run
 
-Ingestion writes a snapshot and emits `snapshot.created`. Scenario import writes a new scenario version and emits `scenario.created`. The API computes the baseline for (scenario, snapshot, plan version). Clients refetch, and overlays recompute. The sandbox, drafts and plan are untouched. The pin is not recomputed (§13.8).
+Ingestion writes a snapshot and emits `snapshot.created`. Scenario import writes a new scenario version and emits `scenario.created`. A planning-policy change creates a new policy version and emits `policy.changed`. The API computes the baseline for (scenario, policy, snapshot, plan version). Clients refetch, and overlays recompute. The sandbox, drafts and plan are untouched. The pin is not recomputed (§13.8).
 
 ---
 
@@ -1079,7 +1102,7 @@ Ingestion writes a snapshot and emits `snapshot.created`. Scenario import writes
 | Method & path | Purpose |
 |---|---|
 | `GET /me` | Current user, role, desk |
-| `GET /sandbox` · `PATCH /sandbox` | Read sandbox / update name, window (`If-Match`) |
+| `GET /sandbox?context=live\|historical` · `PATCH /sandbox` | Read sandbox / update name, window (`If-Match`) |
 | `POST /sandbox/actions` · `PATCH/DELETE /sandbox/actions/{aid}` | Units (bulk add carries `If-Match` too) |
 | `POST /sandbox/clear` | Empty without committing |
 | `POST /sandbox/load` | Edit: load a commitment or plan actions (§18.2) |
@@ -1088,16 +1111,17 @@ Ingestion writes a snapshot and emits `snapshot.created`. Scenario import writes
 | `GET /commitments` · `GET /commitments/{id}` | Committed records (Committed tab) |
 | `POST /commitments/{id}/withdraw` | Withdraw (§18.4) |
 | `GET /plan?version=N` or `?at=…` · `GET /plan/blame?unit=…&at=…` · `GET /plan/events?since=N` | Plan, blame, history |
-| `GET /scenarios/current` | The central scenario |
+| `GET /scenarios/current?context=…` · `GET /policy/current` | Central (or outturn) scenario · planning policy |
+| `PUT /policy` | Change planning policy: new version, audited (who may: C14) |
 | `GET /snapshots/latest` · `/snapshots/{id}` | Facts |
-| `GET /baseline?scenario=…&snapshot=…&planSeq=…` | Baseline and per-half-hour committed units |
+| `GET /baseline?scenario=…&policy=…&snapshot=…&planSeq=…` | Baseline and per-half-hour committed units |
 | `GET /audit?entity=…&id=…` | Audit trail |
 | `GET /events` (SSE) | Live events |
 
 **Phase 2** adds `/drafts` (create, read, update, duplicate, discard, restore, delete, commit, load), working the same way as the sandbox endpoints. Comparison and the combined preview are client-side.
 **Phase 3** adds `/drafts/{id}/shares`.
 
-**Events:** day one `plan.committed`, `plan.superseded`, `plan.withdrawn`, `snapshot.created`, `scenario.created`. From Phase 3 also `draft.created`, `draft.updated`, `draft.deleted`, `draft.shared`, `draft.unshared`. Ids and versions only. Clients refetch what they need.
+**Events:** day one `plan.committed`, `plan.superseded`, `plan.withdrawn`, `snapshot.created`, `scenario.created`, `policy.changed`. From Phase 3 also `draft.created`, `draft.updated`, `draft.deleted`, `draft.shared`, `draft.unshared`. Ids and versions only. Clients refetch what they need.
 
 ---
 
@@ -1111,10 +1135,13 @@ Ingestion writes a snapshot and emits `snapshot.created`. Scenario import writes
 | Time | Timestamps instead of slot indices |
 | Sidebar | Signed-in user. **Sandbox panel** (unit count, Clear, Pin) instead of the draft list. Committed list with **Edit** and **Withdraw** |
 | Selected table | Shows the sandbox. Reasons as a multi-select. Checkboxes for partial commit (default all). Loaded units marked "editing committed", removed loaded units struck through |
-| Commit dialog | Name and description, effective-time picker (default and earliest = next half-hour), warnings to acknowledge, clashes, drift since last edit |
+| Commit dialog | Name and description, effective time per amended unit (default and earliest = next half-hour), warnings to acknowledge, clashes, drift since last edit |
 | Edit on a committed draft | Loads it into the sandbox, with a warning if the sandbox isn't empty |
 | Charts | One sandbox overlay (loaded units drawn as replacements). Faded pinned line |
 | Pinned vs now panel | Per-area worst headroom, pinned and current, with the pin's time |
+| Dashboard | Tiles show current-plan and with-sandbox figures (§11.4) |
+| Config | Reserve % leaves the per-browser Tweaks and becomes global planning policy (read-only for most users) |
+| Historical mode | A separate historical sandbox, evaluated against the outturn scenario, never committed to the live plan |
 | Committed tab | Groups by commitment. Per-reason cards count a unit under each reason, with a note that totals count it once |
 | Data loading | No direct market-data fetching, no `clearAllDrafts()`. Subscribe to plan, snapshot and scenario events |
 
@@ -1126,12 +1153,12 @@ Ingestion writes a snapshot and emits `snapshot.created`. Scenario import writes
 
 | Concern | Approach |
 |---|---|
-| **Performance** | Overlays, pin and comparison in the browser (< 50 ms typical). Baseline cached per (scenario, snapshot, plan version). Live propagation < 2 s |
+| **Performance** | Overlays, pin, dashboard figures and comparison in the browser (< 50 ms typical). Baseline cached per (scenario, policy, snapshot, plan version). Live propagation < 2 s |
 | **Availability** | Stateless API (≥ 2 instances), highly available database with point-in-time recovery. Read-only fallback with a banner if the API is unreachable |
 | **Security** | TLS, SSO tokens, row-level security, least-privilege roles, no UPDATE/DELETE on plan and audit tables. Plans are operationally sensitive |
 | **Audit** | Plan actions, plan events and audit events are append-only. Retention agreed with compliance |
 | **Observability** | Commit latency, clash and warning rates, ingestion and scenario freshness, alerts on stale data |
-| **Testing** | Golden tests for the calculation library (baseline, overlay, loaded-unit replacement, dedup, clock-change days, scenario passed explicitly). Database tests for the no-overlap constraint, the one-sandbox index and split logic. Multi-user end-to-end tests: simultaneous commits of the same unit (exactly one succeeds), owner and senior loading the same commitment (the second commit is rejected), partial commit with loaded units |
+| **Testing** | Golden tests for the calculation library (baseline, overlay, loaded-unit replacement, dedup, clock-change days, scenario passed explicitly). Database tests for the no-overlap constraint, the one-sandbox index and split logic. Multi-user end-to-end tests: simultaneous commits of the same unit (exactly one succeeds), owner and senior loading the same commitment (the second commit is rejected), partial commit with loaded units, one commit amending rows at different effective times plus new units |
 
 ---
 
@@ -1143,20 +1170,20 @@ The phases follow the sandbox brief's release plan. The earlier build steps are 
 
 | Phase | Scope | Exit criteria | Size |
 |---|---|---|---|
-| **0. Decide** | Resolve open decisions and flagged conflicts (§23). Confirm platform, identity provider, data feeds, hosting. Start operator sign-off on D20 | Architect + product owner sign-off | S |
+| **0. Decide** | Resolve open decisions and the remaining open items (§23.3). Confirm platform, identity provider, data feeds, hosting. Start operator sign-off on D20 | Architect + product owner sign-off | S |
 | **1. Day one: sandbox** | | | **L** overall |
-| 1a. Groundwork (in this repo, no back end) | Absolute-time actions. Extract `@modelling/calc` with tests. Single contribution function (D14 seam). **Scenario as an explicit input, one central scenario, facts separated from assumptions** (§14.4). Per-SP dedup. Visibility fix. Reasons as a list | Tests pass. Chart output unchanged for existing scenarios | M |
-| 1b. Back end and committed plan | Database, Planning API, SSO. **Persisted sandbox** (one per user): clear, partial commit, load from plan (Edit), pin, drift check. `plan_actions` / `plan_events`, supersede, withdraw, effective-time rules and warnings, no-overlap constraint, live plan events. Market-data ingestion and scenario tables (one scenario). Plan-at-version and blame queries. Audit | Simultaneous commits of the same unit: one succeeds. Edit never produces a gap. Withdraw never changes the past. Refresh never loses sandbox work | L |
+| 1a. Groundwork (in this repo, no back end) | Absolute-time actions. Extract `@modelling/calc` with tests. Single contribution function (D14 seam). **Scenario and planning policy as explicit inputs, one central scenario, facts separated from input values and policy** (§14.4). Per-SP dedup. Visibility fix. Reasons as a list | Tests pass. Chart output unchanged for existing scenarios | M |
+| 1b. Back end and committed plan | Database, Planning API, SSO. **Persisted sandbox** (one per user per context): clear, partial commit, load from plan (Edit, row level), pin with "pinned vs now", drift check, **dashboard with-sandbox figures**. `plan_actions` / `plan_events`, supersede, withdraw, per-row effective times and warnings, no-overlap constraint, live plan events. Market-data ingestion, scenario tables (central + outturn), planning policy. Plan-at-version and blame queries. Audit | Simultaneous commits of the same unit: one succeeds. Edit never produces a gap. Withdraw never changes the past. Refresh never loses sandbox work | L |
 | 1c. Harden and roll out | Observability, security review, load and disaster-recovery tests, operator UAT, shadow run | UAT sign-off. Runbook written | M |
 | **2. Multiple private drafts** | Drop the one-per-user index. Named drafts, sidebar list, colours, show/hide, discard / restore / delete / duplicate. **Comparison table and preview together** | Operators compare two options side by side across all areas | M |
 | **3. Sharing** | `draft_shares` (users and desks), read-only view, duplicate to own, draft live events, permissions | Two users on two machines share and see updates < 2 s | M |
-| **4. Enhancements** (optional) | Commit approval, review comments, history and blame UI, freeze market data, instruction/delivery tracking (D19), unit profiles (if D14 = B), multi-scenario capabilities (§14.3), dashboard preview (if not day one, C1) | Per feature | — |
+| **4. Enhancements** (optional) | Commit approval, review comments, history and blame UI, freeze market data, instruction/delivery tracking (D19), unit profiles (if D14 = B), multi-scenario capabilities (§14.3) | Per feature | — |
 
 ## 23. Decisions and flagged conflicts
 
 ### 23.1 Decisions
 
-Status: **Adopted** = built into this design. **Proposed** = recommended, awaiting agreement. **Open** = needs an answer. **Sign-off** = adopted, pending operator confirmation, not blocking. **Flagged** = conflicts with something else in the design, see §23.2.
+Status: **Adopted** = built into this design. **Proposed** = recommended, awaiting agreement. **Open** = needs an answer. **Sign-off** = adopted, pending operator confirmation, not blocking. **Partly decided** = part confirmed, part still open. **Retired** = merged into another decision. Conflicts resolved while merging the briefs are recorded in §23.2.
 
 | # | Decision | Options | Recommendation | Status |
 |---|---|---|---|---|
@@ -1169,41 +1196,49 @@ Status: **Adopted** = built into this design. **Proposed** = recommended, awaiti
 | D7 | Supervisor visibility of open named drafts | Private unless shared / seniors see all | Private unless shared (see also D28) | Open (operators) |
 | D8 | Share targets | Individuals / individuals + desks | Both. Desk shares follow desk membership | Proposed (Phase 3) |
 | D9 | Scope of redeclarations and SR/QR services | Global / per draft / per user | Global, audited | Open (operators) |
-| D10 | Historical-mode work | Sandbox commits / never committable | Sandbox only (see C10) | Open |
+| D10 | Historical-mode work | Commits to a separate practice plan / never committable | **Never commits to the live plan** (confirmed). Whether a separate practice plan exists is still open | Partly decided |
 | D11 | Snapshot cadence and retention | e.g. 5 min, keep 24 h + referenced | As suggested | Proposed |
 | D12 | Availability target | Business hours / 24×7 | 24×7 | Open (organisation) |
-| D13 | Dashboard preview of work in progress | Day one / later | Was "later". **Conflicts with the sandbox brief** | **Flagged (C1)** |
+| D13 | Dashboard preview of sandbox impact | Day one / later | **Day one**: tiles show current-plan and with-sandbox figures (§11.4) | Adopted (C1) |
 | D14 | How each unit's contribution is modelled (§10.4) | Flat block / unit profile | Answer the §10.4 questions first. Phase 1 keeps both possible | Open |
-| D15 | Partial commit | Commit all only / commit selected units | **Selected units are committed. Unselected units stay in the sandbox. Default commit all** | Adopted (see C2) |
+| D15 | Partial commit | Commit all only / commit selected units | **Selected units are committed. Unselected units stay in the sandbox. Default commit all** | Adopted (D26 merged into it) |
 | D16 | How a commitment is amended | Uncommit → edit → recommit / atomic supersede | Atomic supersede, via load into the sandbox | Adopted |
-| D17 | Effective time of plan changes | Whole window / from effective time | From effective time. **Hard:** never in the past (earliest = next half-hour). **Warnings:** gate closure, unit notice time | Adopted |
+| D17 | Effective time of plan changes | Whole window / from effective time | From an effective time **per amended row** (default next half-hour). New units use their own windows. **Hard:** never in the past. **Warnings:** gate closure, unit notice time | Adopted (C4) |
 | D18 | Same unit in two commitments | Latest wins / highest wins / block | Block (database-enforced). Amend via Edit (supersede). Reasons as a list cover multi-purpose use | Adopted |
 | D19 | Instruction and delivery tracking | Out of scope / leave room / build | Leave room in the model | Adopted (room only) |
 | D20 | "Edit" on committed drafts | Reopen for editing (mutable) / Edit = load into sandbox + commit as supersede | **Load into the sandbox (warn if not empty), commit as supersede.** Familiar flow, immutable record | **Sign-off** (operators, non-blocking) |
 | D21 | What a scenario may vary | Forecasts and requirements only / also unit availability (e.g. a trip) | Open. If availability is included, model a scenario as overrides on the base snapshot, using the same delta pattern as drafts | Open |
-| D22 | Scenario sources | Generated only / generated + manual what-if | Both, manual ones clearly labelled (see C8 for naming) | Proposed |
+| D22 | Scenario sources | Generated only / generated + manual what-if | Both. Manual what-if scenarios clearly labelled | Proposed |
 | D23 | Reference scenario for commit validation | Always central / operator selects | Central in Phase 1. Recorded on every plan event | Proposed |
 | D24 | Scenario lifetime | Per generator run / rolling | Per run, versioned. Old runs retained if referenced by a commit | Proposed |
-| D25 | Day-one draft model | Sandbox (one per user) / full multiple drafts | Sandbox, built on the full draft model. **This document now assumes it** | Proposed |
-| D26 | What happens to uncommitted units on commit | Sandbox emptied / unselected units stay | Unselected units stay. Commit all is the default | **Flagged (C2): duplicate of D15** |
+| D25 | Day-one draft model | Sandbox (one per user) / full multiple drafts | Sandbox, built on the full draft model | **Proposed.** Needs stakeholder agreement. This document assumes adoption |
+| D26 | What happens to uncommitted units on commit | — | **Retired: merged into D15** | Retired |
 | D27 | Comparison on day one | None / pin one previous state | Pin one previous state. Comparison table and preview together in Phase 2 | Adopted |
 | D28 | Can a senior see another operator's sandbox | No / yes, read-only | No on day one (consistent with D7) | Proposed |
 
-### 23.2 Flagged conflicts (not resolved; need a decision)
+### 23.2 Conflicts raised while merging the briefs (resolved)
 
-| # | Conflict | Where | What this document currently does | Needs |
-|---|---|---|---|---|
-| **C1** | The sandbox brief shows sandbox impact **on the dashboard** on day one. D13 (from the earlier review) put dashboard preview **later** | §11.4, D13, F9 | Charts on day one. The dashboard is left undecided | Product decision: day one or Phase 4 |
-| **C2** | **D26 duplicates D15.** Both now say "unselected units stay in the sandbox" | D15, D26 | Both rows kept | Agree to retire D26 (or D15) |
-| **C3** | **What Edit replaces.** The sandbox brief allows loading a single committed action. The previous design superseded whole commitments | §8.2, §8.3, §17 | Proposes per-action tracking (`replaces_plan_action_id`, `is_removal`) so either works, and makes commitment status derived ("partly amended" while some plan actions stay open) | Confirm action-level loading and the "partly amended" status |
-| **C4** | **Loading into a non-empty sandbox** (warning only, as instructed) means new work and amendments are committed together: one effective time, one reason, one plan event. Two different commitments can also be loaded at once | §8.3, §13.5 | Allows it after the warning | Confirm, or require loaded and new work to be committed separately |
-| **C5** | **What commit does to the sandbox row.** The brief offered "remove actions from the sandbox" or "close it and open a new one" and asked for the choice to be recorded | §13.7 | Records a third option: committed actions move into a new commitment record, and the sandbox row stays open | Confirm |
-| **C6** | **Pin figures.** The brief keeps pinned per-area figures in the comparison table, but the table is now Phase 2 | §13.8 | Adds a small "Pinned vs now" panel on day one | Confirm the panel |
-| **C7** | **Two "pins".** The earlier "pin a market snapshot" (freeze data while comparing) clashes in name with the sandbox pin | §11.3 | Renamed the former "freeze market data" and moved it to Phase 4 | Confirm naming |
-| **C8** | **Two "sandboxes".** The scenarios brief's "manual sandbox scenarios" clash with the operator's sandbox | §14.2, D22 | Renamed to "manual what-if scenarios" | Confirm naming |
-| **C9** | **Requirements and reserve % are assumptions.** Today operators type requirements into the Requirements tab (shared via Firestore), and TR2 uses a reserve % set in Config. The scenarios brief puts requirements in generated scenarios | §14.4, §17 | Treats today's Requirements tab values as the central scenario's requirements. Reserve % is not yet placed | Decide: operator overrides on a scenario, a manual what-if scenario, or retired once a generator exists. Same for reserve % |
-| **C10** | **Historical mode vs one sandbox per user.** The one-per-user index blocks a historical sandbox while the live sandbox has work. Historical demand is outturn (a fact), which doesn't fit "demand is an assumption" | §8.5, §17, D10 | Index is per user only | Decide: index per (user, context), or no historical what-if on day one. Decide how outturn fits the scenario model |
-| **C11** | **Phase numbering changed.** The earlier plan had build phases 1–6. It now follows the brief's releases (1 sandbox, 2 multiple drafts, 3 sharing), with build steps as 1a–1c | §22 | Applied throughout, including the mental model and diagrams | Confirm |
+| # | Conflict | Resolution | Applied in |
+|---|---|---|---|
+| C1 | Sandbox brief showed impact on the dashboard on day one; D13 said later | **Day one.** Dashboard tiles show with-sandbox figures | D13, F9, §11.4, §13.5, Phase 1b |
+| C2 | D26 duplicated D15 | **Keep D15, retire D26** | D15, D26 |
+| C3 | Loading a single committed unit vs whole commitments | **Row level.** Each sandbox action records the plan-action row it replaces. "Partly amended" status on the commitment | §8.1–8.3, §17 |
+| C4 | Loading into a non-empty sandbox mixed new work and amendments under one effective time | **Effective time per amended row** (default next half-hour). New units use their own windows. Reasons are per action. **Warning only** | §8.3, §8.4, §17, §18, D17 |
+| C5 | What commit does to the sandbox row | **Confirmed:** committed units go into a new immutable commitment record. The sandbox keeps the rest | §13.7 |
+| C6 | Pin figures without a comparison table | **Confirmed:** "pinned vs now" panel on day one | §13.8 |
+| C7 | Two meanings of "pin" | **Confirmed:** "freeze market data" for the snapshot hold | §11.3 |
+| C8 | Two meanings of "sandbox" | **Confirmed:** "manual what-if scenarios" | §14.2, D22 |
+| C9 | Requirements and reserve % vs scenarios | **Policy separated from values.** Reserve % and requirement rules are global planning policy, applied to every scenario. Operator-entered requirement values are central-scenario inputs (`source = manual`). Later a generator may supply values per scenario | §6, §7, §10.1, §14.4, §17 |
+| C10 | Historical mode vs one sandbox per user | **One sandbox per user per context.** Historical mode uses an **outturn** scenario (`source = actual`). Historical sandboxes never commit to the live plan | I8, §8.5, §17, D10 |
+| C11 | Phase numbering | **Confirmed:** Phase 1 sandbox (1a–1c), 2 multiple drafts, 3 sharing, 4 extras | §22 |
+
+### 23.3 Still open (raised by the resolutions)
+
+| # | Question | Context | Current assumption in this document |
+|---|---|---|---|
+| **C12** | Where do **contracted** and **constrained** values go? | The Requirements tab holds three columns: requirement, contracted, constrained. The C9 resolution covers requirement values only | Not placed. Most likely central-scenario inputs with `source = manual`, like requirement values, but they describe availability rather than need, so this needs confirming |
+| **C13** | What **requirement values** does the outturn scenario use? | Outturn demand and renewables are recorded facts, but historical requirement values may not have been recorded | Not decided. Options: values as recorded at the time (needs history), today's central values, or none |
+| **C14** | **Who may change planning policy** (reserve %, requirement rules)? | Reserve % was a per-browser setting. As global policy, a change moves every operator's margin figures | Admin only, senior operators undecided (§12). Every change is versioned and audited |
 
 ## 24. Risks
 
@@ -1215,7 +1250,9 @@ Status: **Adopted** = built into this design. **Proposed** = recommended, awaiti
 | Day one without multiple drafts feels limiting | Operators compare options in their heads | Pin with "Pinned vs now". Phase 2 prioritised before sharing |
 | Sandbox built as a shortcut (UI-only list or separate table) | Rewrite in Phase 2 | Sandbox is a draft row (`kind = sandbox`). Code review against §13.2 |
 | Scenario seams skipped under time pressure | Redesign when scenarios arrive | Seams are in Phase 1a exit criteria (scenario passed explicitly, demand out of market data) |
-| Operators surprised that Edit loads into the sandbox (and mixes with existing work) | Unintended combined commits | Non-empty warning, clear "editing committed" marking, D20 sign-off, C4 |
+| Operators surprised that Edit loads into the sandbox alongside existing work | Confusion about what a commit contains | Non-empty warning, "editing committed" marking showing each unit's effective time, D20 sign-off |
+| Per-row effective times confuse operators | Changes take effect at unexpected times | Default next half-hour for every row. Effective time shown on each amended unit and in the commit dialog |
+| Global reserve % surprises operators used to setting it per browser | Disagreement over margin figures | Communicate the change, show the policy version on charts, restrict who can change it (C14) |
 | Blocking clashes frustrates operators who need a unit for several purposes | Workarounds | Reasons as a list. Edit-to-add-reason flow. Clash message names the commitment to edit |
 | Effective-time warnings acknowledged by habit | Plans that can't be delivered | Warnings recorded in the audit trail and reviewed. Revisit making some hard rules after UAT |
 | Loaded-unit overlay maths wrong (baseline − old + new) | Misleading dotted lines | Dedicated golden tests |
@@ -1238,5 +1275,6 @@ Status: **Adopted** = built into this design. **Proposed** = recommended, awaiti
 | Draft header: share popover, owner gating, actions | `src/components/DraftDetails.tsx` |
 | Handlers, confirm modals, `hiddenDraftIds`, `clearAllDrafts` on load | `src/app/page.tsx` |
 | Dashboard (committed-only tile data) | `src/components/Dashboard.tsx` |
-| Requirements tab (operator-entered requirements, today's "scenario" input, C9) | `src/components/RequirementsTab.tsx`, `src/services/requirementsSync.ts` |
+| Requirements tab (operator-entered values: central-scenario inputs, `source = manual`; contracted / constrained: C12) | `src/components/RequirementsTab.tsx`, `src/services/requirementsSync.ts` |
+| Reserve % for TR2 (per-browser Tweaks setting today; becomes planning policy) | `src/app/page.tsx` (`reservePct`), `src/components/ConfigPanel.tsx` |
 | Tested UTC ↔ settlement-period time helpers (reuse in production) | `src/dashboard2/time.ts` |
