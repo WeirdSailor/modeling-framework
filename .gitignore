@@ -48,3 +48,6 @@ serviceAccountKey.json
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# GSD plugin auto-checkpoint (regenerated every session)
+.planning/HANDOFF.json
