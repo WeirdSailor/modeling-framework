@@ -98,7 +98,8 @@
 <main>
   <header>
     <h1>Drafts: proposed architecture in diagrams</h1>
-    <p>A visual companion to <code>Docs/drafts-architecture.md</code>. Each diagram answers one question. The written document has the detail, the open decisions and the reasoning.</p>
+    <p>A visual companion to <code>Docs/drafts-architecture.md</code>. Each diagram answers one question. The written document has the detail, the decisions (D1–D28) and the flagged conflicts (C1–C11).</p>
+    <p><strong>Releases:</strong> Phase 1 (day one) = one private sandbox per operator with the full committed-plan design · Phase 2 = multiple drafts and comparison · Phase 3 = sharing.</p>
     <p>Colour key: <span style="color:var(--accent)">blue</span> = new in the proposed design, <span style="color:var(--draft)">orange</span> / <span style="color:var(--draft2)">purple</span> = open drafts (dotted lines), <span style="color:var(--warn)">red</span> = a limitation or a rejected path.</p>
     <nav>
       <a href="#today-vs-proposed">1. Today vs proposed</a>
@@ -106,13 +107,15 @@
       <a href="#inside-draft">3. Inside a draft</a>
       <a href="#unit-contribution">4. Open decision: unit contribution</a>
       <a href="#dotted-line">5. How the dotted line works</a>
-      <a href="#compare">6. Comparing options</a>
-      <a href="#commit">7. Commit flow</a>
-      <a href="#lifecycle">8. Lifecycle</a>
-      <a href="#supersede">9. Edit = supersede</a>
-      <a href="#sharing">10. Sharing</a>
-      <a href="#data-model">11. Data model</a>
-      <a href="#phases">12. Delivery phases</a>
+      <a href="#sandbox">6. Day one: sandbox</a>
+      <a href="#compare">7. Comparing options (Ph. 2)</a>
+      <a href="#commit">8. Commit flow</a>
+      <a href="#lifecycle">9. Lifecycle</a>
+      <a href="#supersede">10. Edit = supersede</a>
+      <a href="#sharing">11. Sharing (Ph. 3)</a>
+      <a href="#data-model">12. Data model</a>
+      <a href="#scenarios">13. Scenarios (future)</a>
+      <a href="#phases">14. Delivery phases</a>
     </nav>
   </header>
 
@@ -212,7 +215,7 @@
         <text x="926" y="350" text-anchor="middle">SSO identity provider</text>
         <line class="edge" x1="926" y1="275" x2="926" y2="323" marker-end="url(#f1-a)"/>
         <text class="lbl" x="934" y="303">sign in</text>
-        <text class="t-accent" x="745" y="442" text-anchor="middle">Drafts saved · shared across machines · one baseline for all</text>
+        <text class="t-accent" x="745" y="442" text-anchor="middle">Work saved · commits seen by all · one baseline</text>
       </svg>
       <figcaption>The UI and the in-browser calculation stay as they are. What's new is the blue server tier. It saves drafts, enforces who can do what, records an audit trail, and pushes "something changed" events so every operator's screen updates within seconds. Market data is fetched once on the server instead of separately by every browser.</figcaption>
     </figure>
@@ -245,9 +248,9 @@
         <rect class="box" x="185" y="90" width="120" height="240" rx="6"/>
         <text class="t-title" x="245" y="130" text-anchor="middle">Client cache</text>
         <text class="t-sub" x="245" y="146" text-anchor="middle">(Zustand)</text>
-        <text class="t-sub" x="245" y="186" text-anchor="middle">my drafts</text>
-        <text class="t-sub" x="245" y="202" text-anchor="middle">shared drafts</text>
-        <text class="t-sub" x="245" y="230" text-anchor="middle">market snapshot</text>
+        <text class="t-sub" x="245" y="186" text-anchor="middle">my sandbox</text>
+        <text class="t-sub" x="245" y="202" text-anchor="middle">drafts (Ph. 2–3)</text>
+        <text class="t-sub" x="245" y="230" text-anchor="middle">snapshot + scenario</text>
         <text class="t-sub" x="245" y="258" text-anchor="middle">baseline v.N</text>
         <line class="edge" x1="145" y1="125" x2="183" y2="125" marker-end="url(#f2-a)"/>
         <text class="lbl" x="164" y="117" text-anchor="middle">edits</text>
@@ -272,10 +275,10 @@
         <text class="t-sub" x="525" y="133" text-anchor="middle">check sign-in · validate · write · audit</text>
         <rect class="accent-box" x="395" y="180" width="260" height="60" rx="6"/>
         <text class="t-title" x="525" y="205" text-anchor="middle">Baseline service</text>
-        <text class="t-sub" x="525" y="223" text-anchor="middle">@modelling/calc · cached per plan version</text>
+        <text class="t-sub" x="525" y="223" text-anchor="middle">@modelling/calc · keyed by scenario + plan</text>
         <rect class="box" x="395" y="270" width="260" height="60" rx="6"/>
         <text class="t-title" x="525" y="295" text-anchor="middle">Realtime (SSE)</text>
-        <text class="t-mono t-sub" x="525" y="313" text-anchor="middle">draft.* · plan.* · snapshot.*</text>
+        <text class="t-mono t-sub" x="525" y="313" text-anchor="middle">plan.* · snapshot.* · scenario.*</text>
 
         <!-- Server ↔ DB -->
         <line class="edge" x1="655" y1="110" x2="743" y2="110" marker-end="url(#f2-a)"/>
@@ -288,13 +291,13 @@
         <text class="t-title" x="746" y="62">PostgreSQL</text>
         <rect class="box" x="745" y="80" width="220" height="55" rx="6"/>
         <text class="t-title" x="855" y="103" text-anchor="middle">Drafts</text>
-        <text class="t-sub" x="855" y="121" text-anchor="middle">drafts · draft_actions · draft_shares</text>
+        <text class="t-sub" x="855" y="121" text-anchor="middle">drafts · draft_actions · sandbox_pins</text>
         <rect class="box" x="745" y="148" width="220" height="55" rx="6"/>
         <text class="t-title" x="855" y="171" text-anchor="middle">Committed plan</text>
         <text class="t-sub" x="855" y="189" text-anchor="middle">plan_actions · plan_events · snapshots</text>
         <rect class="box" x="745" y="216" width="220" height="55" rx="6"/>
-        <text class="t-title" x="855" y="239" text-anchor="middle">Market data</text>
-        <text class="t-sub" x="855" y="257" text-anchor="middle">snapshots · per half-hour · bm_units</text>
+        <text class="t-title" x="855" y="239" text-anchor="middle">Facts &amp; scenarios</text>
+        <text class="t-sub" x="855" y="257" text-anchor="middle">snapshots · bm_units · scenarios</text>
         <rect class="box" x="745" y="284" width="220" height="50" rx="6"/>
         <text class="t-title" x="855" y="305" text-anchor="middle">Audit</text>
         <text class="t-sub" x="855" y="322" text-anchor="middle">audit_events (append-only)</text>
@@ -377,9 +380,9 @@
         <text class="t-sub" x="500" y="333" text-anchor="middle">window · output · reasons (list) · event · note</text>
         <rect class="note" x="686" y="290" width="294" height="58" rx="8"/>
         <text class="t-title" x="833" y="314" text-anchor="middle">One commitment per unit at a time</text>
-        <text class="t-sub" x="833" y="333" text-anchor="middle">overlap blocked · edit that draft instead</text>
+        <text class="t-sub" x="833" y="333" text-anchor="middle">overlap blocked · Edit the commitment</text>
       </svg>
-      <figcaption>New rows copy the draft's default window and can then be changed one by one. Each row can carry several reasons (DRAXX-1 serves Margin <em>and</em> Inertia), so one commitment can cover several needs. CNQPS-2 is in both drafts, which is fine while they are open. Both could even be committed, because their times don't overlap. Two commitments for the same unit at the same time are blocked, and the way to change one is to edit the draft that holds it. Unit names and figures are illustrative.</figcaption>
+      <figcaption>On day one the container is the operator's <strong>sandbox</strong>, and named drafts like these arrive in Phase 2. New rows copy the default window and can then be changed one by one. Each row can carry several reasons (DRAXX-1 serves Margin <em>and</em> Inertia), so one commitment can cover several needs. CNQPS-2 is in both drafts, which is fine while they are open. Both could even be committed, because their times don't overlap. Two commitments for the same unit at the same time are blocked, and the way to change one is to Edit that commitment. Unit names and figures are illustrative.</figcaption>
     </figure>
   </section>
 
@@ -465,7 +468,7 @@
         <text class="t-title" x="105" y="98" text-anchor="middle">Market snapshot</text>
         <text class="t-sub" x="105" y="118" text-anchor="middle">48 half-hours</text>
         <text class="t-sub" x="105" y="134" text-anchor="middle">× ~1,500 units</text>
-        <text class="t-sub" x="105" y="150" text-anchor="middle">PN · MEL · demand</text>
+        <text class="t-sub" x="105" y="150" text-anchor="middle">PN · MEL (facts)</text>
         <line class="edge" x1="190" y1="120" x2="258" y2="120" marker-end="url(#f3-a)"/>
         <text class="lbl" x="224" y="112" text-anchor="middle">once</text>
         <rect class="box" x="260" y="70" width="170" height="100" rx="6"/>
@@ -478,6 +481,11 @@
         <text class="t-sub" x="345" y="268" text-anchor="middle">plan actions · any operator</text>
         <line class="edge" x1="345" y1="230" x2="345" y2="172" marker-end="url(#f3-a)"/>
         <text class="lbl" x="353" y="205">added in</text>
+        <rect class="accent-box" x="20" y="230" width="170" height="50" rx="6"/>
+        <text class="t-title" x="105" y="252" text-anchor="middle">Scenario (central)</text>
+        <text class="t-sub" x="105" y="268" text-anchor="middle">demand · requirements</text>
+        <line class="edge edge-accent" x1="190" y1="245" x2="290" y2="174" marker-end="url(#f3-a)"/>
+        <text class="lbl t-accent" x="228" y="206" text-anchor="end">assumptions</text>
 
         <path class="edge" d="M345,70 V30 H855 V48" marker-end="url(#f3-a)"/>
         <text class="lbl" x="600" y="23" text-anchor="middle">solid line = stored baseline</text>
@@ -520,14 +528,61 @@
         <text class="t-sub" x="585" y="315" text-anchor="middle">A draft holds only unit ids + times</text>
         <text class="t-sub" x="855" y="315" text-anchor="middle">Recomputed every render, in the browser</text>
       </svg>
-      <figcaption>A draft line exists only over the half-hours the draft affects. One anchor point either side (the dots) joins it to the solid line. A unit that is already running, or already in a committed draft, adds nothing, so nothing is counted twice. Committing Draft A copies its actions into the committed plan, so the solid line rises and the dotted line disappears.</figcaption>
+      <figcaption>A draft line exists only over the half-hours the draft affects. One anchor point either side (the dots) joins it to the solid line. A unit that is already running, or already in a committed draft, adds nothing, so nothing is counted twice. Committing Draft A copies its actions into the committed plan, so the solid line rises and the dotted line disappears. The scenario (blue) is passed explicitly to every calculation, so more scenarios can be added later. Day one draws one sandbox overlay plus an optional pinned line. Several drafts arrive in Phase 2.</figcaption>
     </figure>
   </section>
 
-  <!-- ───────────── 6. Comparing options ───────────── -->
+  <!-- ───────────── 6. Day one: sandbox ───────────── -->
+  <section id="sandbox">
+    <h2>6. Day one: the sandbox</h2>
+    <p>Each operator has one private, saved working area. Add units, see the dotted lines, commit all or some, carry on. A sandbox is an ordinary draft with restrictions (one per user, private), so Phase 2 lifts a rule rather than rebuilding.</p>
+    <figure>
+      <svg class="dg" viewBox="0 0 1000 330" role="img" aria-label="The sandbox starts empty. Adding units or loading a commitment from the plan (Edit, with a warning if not empty) gives it work. Commit all sends units to the plan and leaves the sandbox empty; commit selected sends some and keeps the rest; Clear empties it without committing. Pin keeps one previous state as a faded reference line, display only.">
+        <defs>
+          <marker id="fsb-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker>
+          <marker id="fsb-aa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah-accent" d="M0,0 L10,5 L0,10 z"/></marker>
+          <marker id="fsb-aw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah-warn" d="M0,0 L10,5 L0,10 z"/></marker>
+        </defs>
+        <rect class="box" x="60" y="110" width="150" height="60" rx="12"/>
+        <text class="t-title" x="135" y="136" text-anchor="middle">Empty</text>
+        <text class="t-sub" x="135" y="154" text-anchor="middle">saved · ready</text>
+
+        <rect class="draft-box" x="420" y="100" width="220" height="80" rx="12"/>
+        <text class="t-title" x="530" y="128" text-anchor="middle">Has work</text>
+        <text class="t-sub" x="530" y="147" text-anchor="middle">units · loaded commitments</text>
+        <text class="t-sub" x="530" y="163" text-anchor="middle">dotted line on every chart</text>
+
+        <rect class="accent-box" x="780" y="100" width="200" height="80" rx="12"/>
+        <text class="t-title" x="880" y="128" text-anchor="middle">Committed plan</text>
+        <text class="t-sub" x="880" y="147" text-anchor="middle">new commitment record</text>
+        <text class="t-sub" x="880" y="163" text-anchor="middle">solid line for everyone</text>
+
+        <rect class="box-dash" x="440" y="250" width="180" height="50" rx="10"/>
+        <text class="t-title" x="530" y="272" text-anchor="middle">Pinned state</text>
+        <text class="t-sub" x="530" y="289" text-anchor="middle">faded line · display only</text>
+
+        <line class="edge" x1="210" y1="130" x2="418" y2="130" marker-end="url(#fsb-a)"/>
+        <text class="lbl" x="314" y="122" text-anchor="middle">add units</text>
+        <path class="edge" d="M500,100 V62 H135 V108" marker-end="url(#fsb-a)"/>
+        <text class="lbl" x="318" y="55" text-anchor="middle">Commit all, or Clear → empty</text>
+        <path class="edge" d="M450,180 V215 H395 V160 H418" marker-end="url(#fsb-a)"/>
+        <text class="lbl" x="380" y="232">Commit selected: the rest stays</text>
+        <line class="edge edge-accent" x1="640" y1="120" x2="778" y2="120" marker-end="url(#fsb-aa)"/>
+        <text class="lbl t-accent" x="709" y="112" text-anchor="middle">Commit (all / selected)</text>
+        <line class="edge edge-dash" x1="778" y1="162" x2="642" y2="162" marker-end="url(#fsb-a)"/>
+        <text class="lbl" x="709" y="180" text-anchor="middle">Edit: load from plan</text>
+        <text class="lbl t-warn" x="709" y="194" text-anchor="middle">warn if not empty</text>
+        <line class="edge edge-dash" x1="600" y1="180" x2="600" y2="248" marker-end="url(#fsb-a)"/>
+        <text class="lbl" x="608" y="220">Pin</text>
+      </svg>
+      <figcaption>The sandbox is saved on the server, so a refresh never loses work. Committed units move into a new <em>commitment record</em> and the sandbox keeps whatever wasn't selected (recorded choice, flagged C5 for confirmation). The pin is day one's answer to side-by-side comparison: one previous state as a faded line, plus a small "pinned vs now" panel (C6). Phase 2 replaces it with multiple drafts and the comparison table.</figcaption>
+    </figure>
+  </section>
+
+  <!-- ───────────── 7. Comparing options (Ph. 2) ───────────── -->
   <section id="compare">
-    <h2>6. Comparing options across all areas</h2>
-    <p>Dotted lines show one area at a time. The comparison table puts competing drafts side by side across every area, plus a read-only "A + B" preview of two drafts together.</p>
+    <h2>7. Comparing options across all areas (Phase 2)</h2>
+    <p>Dotted lines show one area at a time. The comparison table puts competing drafts side by side across every area, plus a read-only "A + B" preview of two drafts together. Both arrive in Phase 2 with multiple drafts. Day one has the <a href="#sandbox">pin</a> instead.</p>
     <figure>
       <svg class="dg" viewBox="0 0 1000 330" role="img" aria-label="Comparison table with the current plan, Draft A, Draft B and a combined A plus B preview as columns, and rows for worst headroom per area, half-hours still short, units and megawatts added, indicative cost and clashes with the plan. Draft A fixes margin and inertia; Draft B fixes reserve but leaves margin short and clashes with the plan.">
         <rect class="th" x="20" y="30" width="960" height="36" rx="6"/>
@@ -587,12 +642,12 @@
     </figure>
   </section>
 
-  <!-- ───────────── 7. Commit flow ───────────── -->
+  <!-- ───────────── 8. Commit flow ───────────── -->
   <section id="commit">
-    <h2>7. What happens when an operator commits</h2>
-    <p>One transaction: hard time rule, warnings to acknowledge, close the version being replaced (if this is an edit), add the new plan actions, and let the database reject any overlap. Then every screen is told.</p>
+    <h2>8. What happens when an operator commits</h2>
+    <p>One transaction: hard time rule, warnings to acknowledge, close the loaded plan actions (if this is an edit), add the new plan actions, and let the database reject any overlap. Then every screen is told.</p>
     <figure>
-      <svg class="dg" viewBox="0 0 1000 590" role="img" aria-label="Operator A posts a commit. The API locks the draft, rejects an effective time in the past, and returns warnings about gate closure or notice time for acknowledgement. It closes the superseded plan actions if any, then inserts the new plan actions; the database rejects any overlap with another commitment, returning a clash. Otherwise it writes the plan version, snapshots and audit, recomputes the baseline and publishes an event to all browsers.">
+      <svg class="dg" viewBox="0 0 1000 590" role="img" aria-label="Operator A commits all or selected sandbox units. The API locks the sandbox, rejects an effective time in the past, and returns warnings about gate closure or notice time for acknowledgement. It closes the superseded plan actions if any, then inserts the new plan actions; the database rejects any overlap with another commitment, returning a clash. Otherwise it writes the plan version, snapshots and audit, recomputes the baseline and publishes an event to all browsers.">
         <defs>
           <marker id="f6-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker>
           <marker id="f6-aa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah-accent" d="M0,0 L10,5 L0,10 z"/></marker>
@@ -615,9 +670,9 @@
         <line class="lifeline" x1="910" y1="70" x2="910" y2="528"/>
 
         <line class="edge" x1="90" y1="100" x2="298" y2="100" marker-end="url(#f6-a)"/>
-        <text class="t-mono" x="195" y="93" text-anchor="middle">POST …/commit {effectiveAt}</text>
+        <text class="t-mono" x="195" y="93" text-anchor="middle">POST /sandbox/commit</text>
         <line class="edge" x1="300" y1="138" x2="508" y2="138" marker-end="url(#f6-a)"/>
-        <text class="lbl" x="405" y="131" text-anchor="middle">begin · lock draft (+ the one it replaces)</text>
+        <text class="lbl" x="405" y="131" text-anchor="middle">begin · lock sandbox + loaded actions</text>
         <path class="edge" d="M300,160 H350 V178 H302" marker-end="url(#f6-a)"/>
         <text class="lbl" x="358" y="173">effective time ≥ next half-hour? (hard rule)</text>
 
@@ -627,24 +682,24 @@
         <text class="lbl t-warn" x="210" y="220" text-anchor="middle">409 warnings → acknowledge</text>
 
         <line class="edge" x1="300" y1="270" x2="508" y2="270" marker-end="url(#f6-a)"/>
-        <text class="lbl" x="405" y="263" text-anchor="middle">if edit: close old rows (split at T)</text>
+        <text class="lbl" x="405" y="263" text-anchor="middle">close loaded plan actions (split at T)</text>
         <line class="edge" x1="300" y1="306" x2="508" y2="306" marker-end="url(#f6-a)"/>
-        <text class="lbl" x="405" y="299" text-anchor="middle">insert new plan actions (no-overlap rule)</text>
+        <text class="lbl" x="405" y="299" text-anchor="middle">commitment + plan actions (no overlap)</text>
 
         <rect class="box-dash" x="60" y="318" width="470" height="62" rx="4" style="stroke: var(--warn)"/>
         <text class="lbl t-warn" x="66" y="332">if overlap</text>
         <line class="edge edge-warn edge-dash" x1="510" y1="344" x2="302" y2="344" marker-end="url(#f6-aw)"/>
         <text class="lbl t-warn" x="405" y="338" text-anchor="middle">constraint violation → rollback</text>
         <line class="edge edge-warn edge-dash" x1="300" y1="368" x2="92" y2="368" marker-end="url(#f6-aw)"/>
-        <text class="lbl t-warn" x="195" y="362" text-anchor="middle">409 clash → "edit that draft"</text>
+        <text class="lbl t-warn" x="195" y="362" text-anchor="middle">409 clash → "Edit that commitment"</text>
 
         <line class="edge" x1="300" y1="412" x2="508" y2="412" marker-end="url(#f6-a)"/>
-        <text class="lbl" x="405" y="405" text-anchor="middle">plan v.N+1 · snapshots · audit · commit</text>
+        <text class="lbl" x="405" y="405" text-anchor="middle">plan v.N+1 · scenario ref · audit · commit</text>
         <path class="edge" d="M300,428 H350 V446 H302" marker-end="url(#f6-a)"/>
         <text class="lbl" x="358" y="441">recompute baseline v.N+1</text>
 
         <line class="edge edge-dash" x1="300" y1="478" x2="92" y2="478" marker-end="url(#f6-a)"/>
-        <text class="lbl" x="195" y="471" text-anchor="middle">200 OK</text>
+        <text class="lbl" x="195" y="471" text-anchor="middle">200 OK · rest stays in sandbox</text>
         <line class="edge edge-accent" x1="300" y1="478" x2="718" y2="478" marker-end="url(#f6-aa)"/>
         <text class="lbl t-mono" x="560" y="471" text-anchor="middle">plan.committed / superseded</text>
         <line class="edge edge-accent" x1="720" y1="512" x2="92" y2="512" marker-end="url(#f6-aa)"/>
@@ -653,22 +708,22 @@
         <text class="lbl" x="815" y="505" text-anchor="middle">event</text>
 
         <rect class="note" x="15" y="534" width="150" height="46" rx="6"/>
-        <text class="t-sub" x="90" y="553" text-anchor="middle">draft now in the plan</text>
-        <text class="t-sub" x="90" y="569" text-anchor="middle">(solid line)</text>
+        <text class="t-sub" x="90" y="553" text-anchor="middle">committed units solid</text>
+        <text class="t-sub" x="90" y="569" text-anchor="middle">unselected stay in sandbox</text>
         <rect class="note" x="835" y="534" width="150" height="46" rx="6"/>
         <text class="t-sub" x="910" y="553" text-anchor="middle">fetch new baseline</text>
         <text class="t-sub" x="910" y="569" text-anchor="middle">own dotted lines redraw</text>
       </svg>
-      <figcaption>The overlap check is a database rule, not a query run before inserting. Two operators committing the same unit at the same moment can't both succeed: one gets a clash naming the other's draft. An effective time in the past is rejected outright. Gate-closure and notice-time issues are warnings the operator acknowledges, and the acknowledgement is recorded with the plan version.</figcaption>
+      <figcaption>The overlap check is a database rule, not a query run before inserting. Two operators committing the same unit at the same moment can't both succeed: one gets a clash naming the other's commitment. An effective time in the past is rejected outright. Gate-closure and notice-time issues are warnings the operator acknowledges, and the acknowledgement is recorded with the plan version.</figcaption>
     </figure>
   </section>
 
-  <!-- ───────────── 8. Lifecycle ───────────── -->
+  <!-- ───────────── 9. Lifecycle ───────────── -->
   <section id="lifecycle">
-    <h2>8. Draft lifecycle: committed drafts never become editable again</h2>
-    <p>"Edit" on a committed draft makes a new version (v2). The original stays in the plan until v2 is committed, and then v2 replaces it in one step.</p>
+    <h2>9. Draft lifecycle: committed drafts never become editable again</h2>
+    <p>"Edit" on a committed draft loads it into your sandbox, with a warning if the sandbox isn't empty. The original stays in the plan until you commit, and then the edited version replaces it in one step.</p>
     <figure>
-      <svg class="dg" viewBox="0 0 1000 330" role="img" aria-label="A new draft is editable and can be discarded, restored or deleted. Committing moves it to Committed, which is never editable. Edit on a committed draft creates a new draft v2 while the original stays in the plan; committing v2 supersedes the original. A committed draft can also be withdrawn from an effective time. Superseded and withdrawn drafts keep their past half-hours in the plan record.">
+      <svg class="dg" viewBox="0 0 1000 330" role="img" aria-label="A new draft is editable and can be discarded, restored or deleted. Committing moves it to Committed, which is never editable. Edit on a committed draft loads it into the sandbox while the original stays in the plan; committing the sandbox supersedes the original. A committed draft can also be withdrawn from an effective time. Superseded and withdrawn drafts keep their past half-hours in the plan record.">
         <defs>
           <marker id="f7-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker>
           <marker id="f7-aa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah-accent" d="M0,0 L10,5 L0,10 z"/></marker>
@@ -676,9 +731,9 @@
         </defs>
         <circle class="dot" cx="50" cy="120" r="7"/>
         <line class="edge" x1="57" y1="120" x2="108" y2="120" marker-end="url(#f7-a)"/>
-        <text class="t-sub" x="195" y="80" text-anchor="middle">edit · share · duplicate (owner)</text>
+        <text class="t-sub" x="195" y="80" text-anchor="middle">edit (owner) · share, duplicate: Ph. 2–3</text>
         <rect class="draft-box" x="110" y="90" width="170" height="60" rx="12"/>
-        <text class="t-title" x="195" y="116" text-anchor="middle">Draft</text>
+        <text class="t-title" x="195" y="116" text-anchor="middle">Sandbox / draft</text>
         <text class="t-sub" x="195" y="134" text-anchor="middle">editable · dotted line</text>
 
         <rect class="accent-box" x="450" y="90" width="190" height="60" rx="12"/>
@@ -694,10 +749,10 @@
 
         <rect class="box" x="110" y="240" width="170" height="56" rx="12"/>
         <text class="t-title" x="195" y="264" text-anchor="middle">Discarded</text>
-        <text class="t-sub" x="195" y="282" text-anchor="middle">open draft set aside</text>
+        <text class="t-sub" x="195" y="282" text-anchor="middle">named drafts (Phase 2)</text>
         <rect class="draft-box" x="450" y="240" width="190" height="56" rx="12"/>
-        <text class="t-title" x="545" y="264" text-anchor="middle">Draft A (v2)</text>
-        <text class="t-sub" x="545" y="282" text-anchor="middle">editing · A stays in plan</text>
+        <text class="t-title" x="545" y="264" text-anchor="middle">Sandbox (A loaded)</text>
+        <text class="t-sub" x="545" y="282" text-anchor="middle">A stays in plan · Clear = cancel</text>
 
         <line class="edge" x1="280" y1="120" x2="448" y2="120" marker-end="url(#f7-a)"/>
         <text class="lbl" x="364" y="112" text-anchor="middle">Commit · owner</text>
@@ -711,28 +766,26 @@
         <circle class="dot" cx="52" cy="268" r="4"/>
 
         <line class="edge edge-dash" x1="510" y1="150" x2="510" y2="238" marker-end="url(#f7-a)"/>
-        <text class="lbl" x="502" y="190" text-anchor="end">Edit</text>
-        <text class="lbl" x="502" y="203" text-anchor="end">(duplicate)</text>
+        <text class="lbl" x="502" y="190" text-anchor="end">Edit = load</text>
+        <text class="lbl" x="502" y="203" text-anchor="end">(warn if not empty)</text>
         <line class="edge edge-accent" x1="590" y1="240" x2="590" y2="152" marker-end="url(#f7-aa)"/>
         <text class="lbl t-accent" x="598" y="190">Commit changes</text>
         <text class="lbl t-accent" x="598" y="203">(supersede)</text>
-        <line class="edge" x1="450" y1="268" x2="282" y2="268" marker-end="url(#f7-a)"/>
-        <text class="lbl" x="366" y="260" text-anchor="middle">Cancel</text>
-
+        
         <line class="edge" x1="640" y1="104" x2="778" y2="70" marker-end="url(#f7-a)"/>
-        <text class="lbl" x="688" y="68" text-anchor="middle">when v2 commits</text>
+        <text class="lbl" x="688" y="68" text-anchor="middle">when replaced</text>
         <line class="edge" x1="640" y1="136" x2="778" y2="176" marker-end="url(#f7-a)"/>
         <text class="lbl" x="712" y="176" text-anchor="end">Withdraw</text>
         <text class="t-sub" x="880" y="236" text-anchor="middle">both: read-only, duplicable,</text>
         <text class="t-sub" x="880" y="252" text-anchor="middle">past half-hours kept in the plan</text>
       </svg>
-      <figcaption>There is no arrow from Committed back to Draft: the committed record is never edited. Operators still get an <strong>Edit</strong> button, which opens v2 (decision D20, for operator sign-off). Edit and Withdraw are allowed for the owner or a senior operator with a reason (D6). Both take effect from an effective time that is never in the past.</figcaption>
+      <figcaption>There is no arrow from Committed back to Draft: the committed record is never edited. Operators still get an <strong>Edit</strong> button, which loads the commitment into their sandbox (decision D20, for operator sign-off). If only some of a commitment's units are replaced, it stays Committed with a "partly amended" badge (flagged as C3). Edit and Withdraw are allowed for the owner or a senior operator with a reason (D6). Both take effect from an effective time that is never in the past.</figcaption>
     </figure>
   </section>
 
-  <!-- ───────────── 9. Edit = supersede ───────────── -->
+  <!-- ───────────── 10. Edit = supersede ───────────── -->
   <section id="supersede">
-    <h2>9. Editing a committed draft: supersede, with no gap and the past kept</h2>
+    <h2>10. Editing a committed draft: supersede, with no gap and the past kept</h2>
     <p>Example: at 16:10 an operator trims DRAXX-1 (committed 15:00–19:00) to finish at 18:00. Each row is a plan version.</p>
     <figure>
       <svg class="dg" viewBox="0 0 1000 360" role="img" aria-label="Today, uncommitting creates a plan version with nothing committed, shown as a shortfall, and it erases the past; recommitting comes later. With supersede, one new plan version keeps 15:00 to 16:30 from the original, closes the rest and adds the edited version from 16:30, so there is no gap. The effective time cannot be earlier than the next half-hour, and changes inside gate closure or notice time give a warning.">
@@ -754,7 +807,7 @@
         <rect class="bar-b" x="340" y="156" width="360" height="20" rx="3"/>
         <text class="lbl" x="520" y="170" text-anchor="middle">A (edited)</text>
 
-        <text class="t-title t-accent" x="20" y="208">Proposed: Edit = duplicate + supersede</text>
+        <text class="t-title t-accent" x="20" y="208">Proposed: Edit = load into sandbox + supersede</text>
         <text class="t-sub" x="20" y="234">v.N</text>
         <rect class="bar-a" x="340" y="220" width="480" height="20" rx="3"/>
         <text class="lbl" x="580" y="234" text-anchor="middle">Draft A · DRAXX-1</text>
@@ -764,7 +817,7 @@
         <text class="lbl" x="430" y="266" text-anchor="middle">A (kept)</text>
         <rect class="bar-ghost" x="520" y="252" width="300" height="20" rx="3"/>
         <rect class="bar-b" x="520" y="252" width="180" height="20" rx="3"/>
-        <text class="lbl" x="610" y="266" text-anchor="middle">A′ (v2)</text>
+        <text class="lbl" x="610" y="266" text-anchor="middle">A′ (edited)</text>
         <text class="lbl" x="760" y="266" text-anchor="middle">closed</text>
 
         <line class="axis" x1="220" y1="300" x2="940" y2="300"/>
@@ -788,9 +841,9 @@
     </figure>
   </section>
 
-  <!-- ───────────── 10. Sharing ───────────── -->
+  <!-- ───────────── 11. Sharing (Ph. 3) ───────────── -->
   <section id="sharing">
-    <h2>10. Sharing: who sees what</h2>
+    <h2>11. Sharing: who sees what (Phase 3)</h2>
     <p>Same rules as the prototype, but with real users on different machines, checked by the server.</p>
     <figure>
       <svg class="dg" viewBox="0 0 1000 280" role="img" aria-label="Operator A owns Draft A and can edit, commit and share it. Operator B, who it is shared with, sees the dotted line read-only and can duplicate it. Operator C, not shared, does not see it. Once committed, everyone sees it in the baseline.">
@@ -829,12 +882,12 @@
     </figure>
   </section>
 
-  <!-- ───────────── 11. Data model ───────────── -->
+  <!-- ───────────── 12. Data model ───────────── -->
   <section id="data-model">
-    <h2>11. Data model: drafts hold intent, plan actions hold the record</h2>
-    <p>Drafts and their actions are editable working copies. On commit, actions are copied into <code>plan_actions</code>, which are never edited: changes close rows and add new ones, each stamped with a plan version.</p>
+    <h2>12. Data model: drafts hold intent, plan actions hold the record</h2>
+    <p>The sandbox is a row in <code>drafts</code> (<code>kind = sandbox</code>). On commit, actions become immutable <code>plan_actions</code> under a new commitment record. Demand and requirements move out of market data into scenario tables: facts and assumptions are kept apart.</p>
     <figure>
-      <svg class="dg" viewBox="0 0 1000 455" role="img" aria-label="Users own drafts, which contain draft actions referencing BM units with UTC times and a list of reasons. On commit, actions are copied into plan actions, stamped with the plan event that added them and later the one that removed them. Plan events carry the plan version, type, effective time and reason. No two open plan actions for the same unit may overlap.">
+      <svg class="dg" viewBox="0 0 1000 640" role="img" aria-label="Users own drafts, including the sandbox. Draft actions reference units, carry a list of reasons, and may replace a loaded plan action. On commit, actions are copied into immutable plan actions under a commitment record, stamped by plan events that also record the reference scenario. Sandbox pins hold one display-only state per user. Scenario tables hold demand, renewables and requirements; market snapshots hold facts only. Day one allows one open draft per user.">
         <defs>
           <marker id="f11-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker>
           <marker id="f11-aa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah-accent" d="M0,0 L10,5 L0,10 z"/></marker>
@@ -852,10 +905,10 @@
         <text class="t-mono t-title" x="290" y="58">drafts</text>
         <text class="t-mono" x="290" y="83">id</text>
         <text class="t-mono t-sub" x="290" y="100">owner_id → users</text>
-        <text class="t-mono t-accent" x="290" y="117">status (5 states)</text>
-        <text class="t-mono t-sub" x="290" y="134">version</text>
-        <text class="t-mono t-accent" x="290" y="151">supersedes_id → drafts</text>
-        <text class="t-mono t-sub" x="290" y="168">window_start / end</text>
+        <text class="t-mono t-accent" x="290" y="117">kind (sandbox|draft)</text>
+        <text class="t-mono t-sub" x="290" y="134">status · version</text>
+        <text class="t-mono t-sub" x="290" y="151">window_start / end</text>
+        <text class="t-mono t-sub" x="290" y="168">source_draft_id</text>
         <text class="t-mono t-sub" x="290" y="185">last_evaluated</text>
         <rect class="box" x="540" y="40" width="190" height="153" rx="6"/>
         <rect class="th" x="540" y="40" width="190" height="26" rx="6"/>
@@ -863,10 +916,10 @@
         <text class="t-mono" x="550" y="83">id</text>
         <text class="t-mono t-sub" x="550" y="100">draft_id → drafts</text>
         <text class="t-mono t-sub" x="550" y="117">bm_unit_id</text>
-        <text class="t-mono t-sub" x="550" y="134">start_at (UTC)</text>
-        <text class="t-mono t-sub" x="550" y="151">end_at (null=open)</text>
-        <text class="t-mono t-sub" x="550" y="168">output_mw</text>
-        <text class="t-mono t-accent" x="550" y="185">reasons[] (≥ 1)</text>
+        <text class="t-mono t-sub" x="550" y="134">start_at / end_at</text>
+        <text class="t-mono t-sub" x="550" y="151">output_mw · reasons[]</text>
+        <text class="t-mono t-accent" x="550" y="168">replaces_plan_action</text>
+        <text class="t-mono t-accent" x="550" y="185">is_removal</text>
         <rect class="box" x="800" y="40" width="190" height="102" rx="6"/>
         <rect class="th" x="800" y="40" width="190" height="26" rx="6"/>
         <text class="t-mono t-title" x="810" y="58">bm_units</text>
@@ -876,14 +929,14 @@
         <text class="t-mono t-sub" x="810" y="134">ndz mzt mnzt sel</text>
         <rect class="box" x="20" y="240" width="190" height="85" rx="6"/>
         <rect class="th" x="20" y="240" width="190" height="26" rx="6"/>
-        <text class="t-mono t-title" x="30" y="258">draft_shares</text>
+        <text class="t-mono t-title" x="30" y="258">draft_shares · Ph.3</text>
         <text class="t-mono t-sub" x="30" y="283">draft_id → drafts</text>
         <text class="t-mono t-sub" x="30" y="300">grantee (user|desk)</text>
         <text class="t-mono t-sub" x="30" y="317">permission (view)</text>
         <rect class="box" x="280" y="240" width="190" height="136" rx="6"/>
         <rect class="th" x="280" y="240" width="190" height="26" rx="6"/>
         <text class="t-mono t-title" x="290" y="258">plan_actions</text>
-        <text class="t-mono t-sub" x="290" y="283">draft_id → drafts</text>
+        <text class="t-mono t-sub" x="290" y="283">draft_id → commitment</text>
         <text class="t-mono t-sub" x="290" y="300">bm_unit_id · reasons[]</text>
         <text class="t-mono t-sub" x="290" y="317">start_at / end_at</text>
         <text class="t-mono t-accent" x="290" y="334">added_in → plan_events</text>
@@ -894,16 +947,43 @@
         <text class="t-mono t-title" x="550" y="258">plan_events</text>
         <text class="t-mono t-accent" x="550" y="283">seq = plan version</text>
         <text class="t-mono t-sub" x="550" y="300">commit|supersede|withdraw</text>
-        <text class="t-mono t-sub" x="550" y="317">draft_id · replaced_id</text>
-        <text class="t-mono t-sub" x="550" y="334">effective_at · reason</text>
-        <text class="t-mono t-sub" x="550" y="351">acknowledged_warnings</text>
+        <text class="t-mono t-sub" x="550" y="317">draft_id · effective_at</text>
+        <text class="t-mono t-sub" x="550" y="334">reason · warnings</text>
+        <text class="t-mono t-accent" x="550" y="351">reference_scenario_id</text>
         <rect class="box" x="800" y="240" width="190" height="102" rx="6"/>
         <rect class="th" x="800" y="240" width="190" height="26" rx="6"/>
-        <text class="t-mono t-title" x="810" y="258">market_snapshots</text>
-        <text class="t-mono" x="810" y="283">id</text>
-        <text class="t-mono t-sub" x="810" y="300">fetched_at · kind</text>
-        <text class="t-mono t-sub" x="810" y="317">↳ market_sp (demand)</text>
-        <text class="t-mono t-sub" x="810" y="334">↳ market_unit_sp (pn…)</text>
+        <text class="t-mono t-title" x="810" y="258">sandbox_pins</text>
+        <text class="t-mono" x="810" y="283">owner_id</text>
+        <text class="t-mono t-sub" x="810" y="300">pinned_at</text>
+        <text class="t-mono t-sub" x="810" y="317">scenario·snapshot·seq</text>
+        <text class="t-mono t-sub" x="810" y="334">impact (display only)</text>
+        <rect class="box" x="20" y="440" width="190" height="119" rx="6"/>
+        <rect class="th" x="20" y="440" width="190" height="26" rx="6"/>
+        <text class="t-mono t-title" x="30" y="458">scenarios</text>
+        <text class="t-mono" x="30" y="483">id</text>
+        <text class="t-mono t-sub" x="30" y="500">name · source</text>
+        <text class="t-mono t-sub" x="30" y="517">generator_run_id</text>
+        <text class="t-mono t-sub" x="30" y="534">valid_from / to</text>
+        <text class="t-mono t-sub" x="30" y="551">status</text>
+        <rect class="box" x="280" y="440" width="190" height="85" rx="6"/>
+        <rect class="th" x="280" y="440" width="190" height="26" rx="6"/>
+        <text class="t-mono t-title" x="290" y="458">scenario_sp</text>
+        <text class="t-mono t-sub" x="290" y="483">scenario_id</text>
+        <text class="t-mono t-sub" x="290" y="500">start_at</text>
+        <text class="t-mono t-accent" x="290" y="517">demand · wind · solar</text>
+        <rect class="box" x="540" y="440" width="190" height="85" rx="6"/>
+        <rect class="th" x="540" y="440" width="190" height="26" rx="6"/>
+        <text class="t-mono t-title" x="550" y="458">scenario_requirements</text>
+        <text class="t-mono t-sub" x="550" y="483">scenario_id</text>
+        <text class="t-mono t-sub" x="550" y="500">start_at · area</text>
+        <text class="t-mono t-accent" x="550" y="517">requirement</text>
+        <rect class="box" x="800" y="440" width="190" height="102" rx="6"/>
+        <rect class="th" x="800" y="440" width="190" height="26" rx="6"/>
+        <text class="t-mono t-title" x="810" y="458">market_snapshots</text>
+        <text class="t-mono" x="810" y="483">id</text>
+        <text class="t-mono t-sub" x="810" y="500">fetched_at · kind</text>
+        <text class="t-mono t-sub" x="810" y="517">↳ market_sp (no demand)</text>
+        <text class="t-mono t-sub" x="810" y="534">↳ market_unit_sp (pn…)</text>
         <line class="edge" x1="210" y1="75" x2="278" y2="75" marker-end="url(#f11-a)"/>
         <text class="lbl" x="244" y="68" text-anchor="middle">owns</text>
         <line class="edge" x1="470" y1="75" x2="538" y2="75" marker-end="url(#f11-a)"/>
@@ -915,88 +995,127 @@
         <line class="edge" x1="300" y1="193" x2="200" y2="238" marker-end="url(#f11-a)"/>
         <text class="lbl" x="232" y="207" text-anchor="end">shared via</text>
         <line class="edge edge-accent" x1="375" y1="193" x2="375" y2="238" marker-end="url(#f11-aa)"/>
-        <text class="lbl t-accent" x="383" y="220">copied at commit</text>
-        <line class="edge" x1="450" y1="193" x2="560" y2="238" marker-end="url(#f11-a)"/>
-        <text class="lbl" x="512" y="208">changes plan</text>
+        <text class="lbl t-accent" x="367" y="222" text-anchor="end">commitment</text>
+        <line class="edge edge-accent edge-dash" x1="580" y1="193" x2="452" y2="238" marker-end="url(#f11-aa)"/>
+        <text class="lbl t-accent" x="470" y="208" text-anchor="end">replaces (Edit)</text>
         <line class="edge" x1="540" y1="320" x2="472" y2="320" marker-end="url(#f11-a)"/>
         <text class="lbl" x="506" y="312" text-anchor="middle">stamps</text>
 
-        <rect class="note" x="20" y="392" width="970" height="50" rx="6"/>
-        <text x="505" y="412" text-anchor="middle"><tspan class="t-accent">Rule:</tspan> no two open <tspan class="t-mono">plan_actions</tspan> for the same unit may overlap in time (database exclusion constraint)</text>
-        <text class="t-sub" x="505" y="431" text-anchor="middle">also: commit_unit_snapshots (unit data at commit) · audit_events (append-only) · optional: action profiles (D14), instruction records (D19)</text>
+        <text class="lbl t-accent" x="20" y="432">assumptions · scenario (one "central" scenario in Phase 1)</text>
+        <text class="lbl" x="800" y="432">facts</text>
+
+        <rect class="note" x="20" y="575" width="970" height="52" rx="6"/>
+        <text x="505" y="596" text-anchor="middle"><tspan class="t-accent">Rules:</tspan> no two open <tspan class="t-mono">plan_actions</tspan> for the same unit overlap · day one: one open draft (sandbox) per user</text>
+        <text class="t-sub" x="505" y="615" text-anchor="middle">also: commit_unit_snapshots · audit_events (append-only) · optional: action profiles (D14), instruction records (D19)</text>
       </svg>
-      <figcaption>The plan at any version N is a query: plan actions added at or before N and not yet removed by N. That makes "the plan as it was at 14:00" and "who put this unit here" simple lookups. Reasons are a list on each action: one unit, one commitment, many reasons. The calculation ignores reasons (a unit contributes physically to every area), while cost cards list a unit under each of its reasons and count it once in totals.</figcaption>
+      <figcaption>The plan at any version N is a query: plan actions added at or before N and not yet removed by N. Edit copies plan actions into the sandbox with a <code>replaces_plan_action</code> link, so committing closes exactly those rows (and withdraws any loaded unit marked <code>is_removal</code>). Every plan event records the scenario it was validated against, and the plan itself is the same in every scenario. Dropping the one-open-draft-per-user index is the main model change for Phase 2.</figcaption>
     </figure>
   </section>
 
-  <!-- ───────────── 12. Delivery phases ───────────── -->
-  <section id="phases">
-    <h2>12. Delivery phases</h2>
-    <p>Each phase leaves something working. Phase 1 needs no back end and is useful whatever platform is chosen.</p>
+  <!-- ───────────── 13. Scenarios (future) ───────────── -->
+  <section id="scenarios">
+    <h2>13. Scenarios (future): the same drafts, tested against different futures</h2>
+    <p>Drafts vary what <em>we</em> do. Scenarios vary what the <em>world</em> does (demand, wind, solar, requirements). Because drafts store intent, any draft can be evaluated against any scenario unchanged. Phase 1 builds only the seams, with one central scenario.</p>
     <figure>
-      <svg class="dg" viewBox="0 0 1000 185" role="img" aria-label="Seven phases: 0 decide, 1 groundwork which can start now, 2 persistence and SSO, 3 multi-user, 4 shared plan and market data, 5 hardening and rollout, 6 optional extras.">
-        <defs>
-          <marker id="f8-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker>
-        </defs>
-        <text class="lbl t-accent" x="216" y="28" text-anchor="middle">can start now</text>
-
-        <rect class="box" x="9" y="40" width="130" height="120" rx="8"/>
-        <text class="t-sub" x="74" y="62" text-anchor="middle">Phase 0</text>
-        <text class="t-title" x="74" y="82" text-anchor="middle">Decide</text>
-        <text class="t-sub" x="74" y="104" text-anchor="middle">sign off design</text>
-        <text class="t-sub" x="74" y="120" text-anchor="middle">D1–D20</text>
-        <text class="lbl" x="74" y="148" text-anchor="middle">size S</text>
-
-        <rect class="accent-box" x="151" y="40" width="130" height="120" rx="8"/>
-        <text class="t-sub" x="216" y="62" text-anchor="middle">Phase 1</text>
-        <text class="t-title" x="216" y="82" text-anchor="middle">Groundwork</text>
-        <text class="t-sub" x="216" y="104" text-anchor="middle">real times · calc</text>
-        <text class="t-sub" x="216" y="120" text-anchor="middle">reasons list · compare</text>
-        <text class="lbl" x="216" y="148" text-anchor="middle">size M</text>
-
-        <rect class="box" x="293" y="40" width="130" height="120" rx="8"/>
-        <text class="t-sub" x="358" y="62" text-anchor="middle">Phase 2</text>
-        <text class="t-title" x="358" y="82" text-anchor="middle">Persist + SSO</text>
-        <text class="t-sub" x="358" y="104" text-anchor="middle">drafts saved</text>
-        <text class="t-sub" x="358" y="120" text-anchor="middle">real sign-in</text>
-        <text class="lbl" x="358" y="148" text-anchor="middle">size L</text>
-
-        <rect class="box" x="435" y="40" width="130" height="120" rx="8"/>
-        <text class="t-sub" x="500" y="62" text-anchor="middle">Phase 3</text>
-        <text class="t-title" x="500" y="82" text-anchor="middle">Multi-user</text>
-        <text class="t-sub" x="500" y="104" text-anchor="middle">live sharing</text>
-        <text class="t-sub" x="500" y="120" text-anchor="middle">server permissions</text>
-        <text class="lbl" x="500" y="148" text-anchor="middle">size M</text>
-
-        <rect class="box" x="577" y="40" width="130" height="120" rx="8"/>
-        <text class="t-sub" x="642" y="62" text-anchor="middle">Phase 4</text>
-        <text class="t-title" x="642" y="82" text-anchor="middle">Committed plan</text>
-        <text class="t-sub" x="642" y="104" text-anchor="middle">versioned plan</text>
-        <text class="t-sub" x="642" y="120" text-anchor="middle">no-overlap rule</text>
-        <text class="lbl" x="642" y="148" text-anchor="middle">size L</text>
-
-        <rect class="box" x="719" y="40" width="130" height="120" rx="8"/>
-        <text class="t-sub" x="784" y="62" text-anchor="middle">Phase 5</text>
-        <text class="t-title" x="784" y="82" text-anchor="middle">Harden</text>
-        <text class="t-sub" x="784" y="104" text-anchor="middle">security · recovery</text>
-        <text class="t-sub" x="784" y="120" text-anchor="middle">operator UAT</text>
-        <text class="lbl" x="784" y="148" text-anchor="middle">size M</text>
-
-        <rect class="box-dash" x="861" y="40" width="130" height="120" rx="8"/>
-        <text class="t-sub" x="926" y="62" text-anchor="middle">Phase 6</text>
-        <text class="t-title" x="926" y="82" text-anchor="middle">Extras</text>
-        <text class="t-sub" x="926" y="104" text-anchor="middle">dashboard preview</text>
-        <text class="t-sub" x="926" y="120" text-anchor="middle">history UI · approvals</text>
-        <text class="lbl" x="926" y="148" text-anchor="middle">optional</text>
-
-        <line class="edge" x1="139" y1="100" x2="149" y2="100" marker-end="url(#f8-a)"/>
-        <line class="edge" x1="281" y1="100" x2="291" y2="100" marker-end="url(#f8-a)"/>
-        <line class="edge" x1="423" y1="100" x2="433" y2="100" marker-end="url(#f8-a)"/>
-        <line class="edge" x1="565" y1="100" x2="575" y2="100" marker-end="url(#f8-a)"/>
-        <line class="edge" x1="707" y1="100" x2="717" y2="100" marker-end="url(#f8-a)"/>
-        <line class="edge" x1="849" y1="100" x2="859" y2="100" marker-end="url(#f8-a)"/>
+      <svg class="dg" viewBox="0 0 1000 300" role="img" aria-label="A grid of drafts by scenarios showing worst margin headroom. Draft A clears the central and low-wind scenarios but not the cold snap, so it is robust across two of three. Draft B only clears the cold snap. Draft C only clears central.">
+        <text class="t-mono" x="20" y="30">result = evaluate(scenario, market snapshot, committed plan, draft)</text>
+        <rect class="th" x="20" y="50" width="960" height="45" rx="6"/>
+        <line class="axis" x1="220" y1="50" x2="220" y2="245"/>
+        <line class="axis" x1="473" y1="50" x2="473" y2="245"/>
+        <line class="axis" x1="726" y1="50" x2="726" y2="245"/>
+        <text class="lbl" x="32" y="77">worst margin headroom</text>
+        <text class="t-title" x="346" y="70" text-anchor="middle">Central</text>
+        <text class="lbl" x="346" y="85" text-anchor="middle">Phase 1: the only one</text>
+        <text class="t-title" x="600" y="70" text-anchor="middle">Low wind, evening peak</text>
+        <text class="lbl" x="600" y="85" text-anchor="middle">generated</text>
+        <text class="t-title" x="853" y="70" text-anchor="middle">Cold snap, high demand</text>
+        <text class="lbl" x="853" y="85" text-anchor="middle">generated</text>
+        <line class="axis" x1="20" y1="145" x2="980" y2="145"/>
+        <text class="t-title t-draft" x="32" y="119">Draft A</text>
+        <text class="t-sub" x="346" y="125" text-anchor="middle">✓ +225 MW</text>
+        <text class="t-sub" x="600" y="125" text-anchor="middle">✓ +80 MW</text>
+        <text class="t-sub t-warn" x="853" y="125" text-anchor="middle">✗ −150 MW</text>
+        <line class="axis" x1="20" y1="195" x2="980" y2="195"/>
+        <text class="t-title t-draft2" x="32" y="175">Draft B</text>
+        <text class="t-sub t-warn" x="346" y="175" text-anchor="middle">✗ −60 MW</text>
+        <text class="t-sub t-warn" x="600" y="175" text-anchor="middle">✗ −310 MW</text>
+        <text class="t-sub" x="853" y="175" text-anchor="middle">✓ +40 MW</text>
+        <line class="axis" x1="20" y1="245" x2="980" y2="245"/>
+        <text class="t-title " x="32" y="225">Draft C</text>
+        <text class="t-sub" x="346" y="225" text-anchor="middle">✓ +120 MW</text>
+        <text class="t-sub t-warn" x="600" y="225" text-anchor="middle">✗ −90 MW</text>
+        <text class="t-sub t-warn" x="853" y="225" text-anchor="middle">✗ −400 MW</text>
+        <rect class="box-dash-accent" x="22" y="97" width="956" height="46" rx="6"/>
+        <text class="lbl t-accent" x="32" y="136">robust: clears 2 of 3</text>
+        <text class="lbl" x="20" y="275">Future capability (§14.3), not built now. Figures illustrative. If one draft clears two scenarios, they are not decision-distinct: useful feedback to the scenario generator.</text>
       </svg>
-      <figcaption>Sizes are relative (S/M/L) until the decisions in Phase 0 are made. After Phase 2, one operator has everything the prototype offers, now saved. After Phase 3, sharing works across machines. After Phase 4, every operator works from the same baseline, the committed plan is a versioned record, and Edit never leaves a gap.</figcaption>
+      <figcaption>Seams built in Phase 1: scenario as an explicit input to every calculation, demand and requirements stored per scenario (not in market data), a baseline cache keyed by scenario, and the reference scenario recorded on every commit. With those in place, this grid, and drafts × areas × scenarios in the comparison table, can be added without a redesign.</figcaption>
+    </figure>
+  </section>
+
+  <!-- ───────────── 14. Delivery phases ───────────── -->
+  <section id="phases">
+    <h2>14. Delivery phases</h2>
+    <p>Phase 1 is the day-one release: the sandbox with the full committed-plan design. Multiple drafts (with comparison) come before sharing, because comparing options matters more to operators than sharing them.</p>
+    <figure>
+      <svg class="dg" viewBox="0 0 1000 190" role="img" aria-label="Phase 0 decide; Phase 1 day one sandbox release made of 1a groundwork, 1b sandbox and versioned plan, 1c harden; Phase 2 multiple drafts with comparison; Phase 3 sharing; Phase 4 optional extras.">
+        <defs>
+          <marker id="f12-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker>
+          <marker id="f12-aa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah-accent" d="M0,0 L10,5 L0,10 z"/></marker>
+          <marker id="f12-aw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah-warn" d="M0,0 L10,5 L0,10 z"/></marker>
+        </defs>
+        <path class="edge edge-accent" d="M151,40 V32 H565 V40"/>
+        <text class="lbl t-accent" x="358" y="24" text-anchor="middle">Phase 1 · day one: sandbox release</text>
+        <rect class="box" x="9" y="50" width="130" height="120" rx="8"/>
+        <text class="t-sub" x="74" y="72" text-anchor="middle">Phase 0</text>
+        <text class="t-title" x="74" y="92" text-anchor="middle">Decide</text>
+        <text class="t-sub" x="74" y="114" text-anchor="middle">sign-offs</text>
+        <text class="t-sub" x="74" y="130" text-anchor="middle">D1–D28 · C1–C11</text>
+        <text class="lbl" x="74" y="158" text-anchor="middle">size S</text>
+        <line class="edge" x1="139" y1="110" x2="149" y2="110" marker-end="url(#f12-a)"/>
+        <rect class="accent-box" x="151" y="50" width="130" height="120" rx="8"/>
+        <text class="t-sub" x="216" y="72" text-anchor="middle">Phase 1a</text>
+        <text class="t-title" x="216" y="92" text-anchor="middle">Groundwork</text>
+        <text class="t-sub" x="216" y="114" text-anchor="middle">calc · scenario seam</text>
+        <text class="t-sub" x="216" y="130" text-anchor="middle">no back end · now</text>
+        <text class="lbl" x="216" y="158" text-anchor="middle">size M</text>
+        <line class="edge" x1="281" y1="110" x2="291" y2="110" marker-end="url(#f12-a)"/>
+        <rect class="box" x="293" y="50" width="130" height="120" rx="8"/>
+        <text class="t-sub" x="358" y="72" text-anchor="middle">Phase 1b</text>
+        <text class="t-title" x="358" y="92" text-anchor="middle">Sandbox + plan</text>
+        <text class="t-sub" x="358" y="114" text-anchor="middle">persisted sandbox</text>
+        <text class="t-sub" x="358" y="130" text-anchor="middle">versioned plan</text>
+        <text class="lbl" x="358" y="158" text-anchor="middle">size L</text>
+        <line class="edge" x1="423" y1="110" x2="433" y2="110" marker-end="url(#f12-a)"/>
+        <rect class="box" x="435" y="50" width="130" height="120" rx="8"/>
+        <text class="t-sub" x="500" y="72" text-anchor="middle">Phase 1c</text>
+        <text class="t-title" x="500" y="92" text-anchor="middle">Harden</text>
+        <text class="t-sub" x="500" y="114" text-anchor="middle">security · UAT</text>
+        <text class="t-sub" x="500" y="130" text-anchor="middle">roll out</text>
+        <text class="lbl" x="500" y="158" text-anchor="middle">size M</text>
+        <line class="edge" x1="565" y1="110" x2="575" y2="110" marker-end="url(#f12-a)"/>
+        <rect class="box" x="577" y="50" width="130" height="120" rx="8"/>
+        <text class="t-sub" x="642" y="72" text-anchor="middle">Phase 2</text>
+        <text class="t-title" x="642" y="92" text-anchor="middle">Multiple drafts</text>
+        <text class="t-sub" x="642" y="114" text-anchor="middle">named drafts</text>
+        <text class="t-sub" x="642" y="130" text-anchor="middle">compare · preview</text>
+        <text class="lbl" x="642" y="158" text-anchor="middle">size M</text>
+        <line class="edge" x1="707" y1="110" x2="717" y2="110" marker-end="url(#f12-a)"/>
+        <rect class="box" x="719" y="50" width="130" height="120" rx="8"/>
+        <text class="t-sub" x="784" y="72" text-anchor="middle">Phase 3</text>
+        <text class="t-title" x="784" y="92" text-anchor="middle">Sharing</text>
+        <text class="t-sub" x="784" y="114" text-anchor="middle">users · desks</text>
+        <text class="t-sub" x="784" y="130" text-anchor="middle">view · duplicate</text>
+        <text class="lbl" x="784" y="158" text-anchor="middle">size M</text>
+        <line class="edge" x1="849" y1="110" x2="859" y2="110" marker-end="url(#f12-a)"/>
+        <rect class="box-dash" x="861" y="50" width="130" height="120" rx="8"/>
+        <text class="t-sub" x="926" y="72" text-anchor="middle">Phase 4</text>
+        <text class="t-title" x="926" y="92" text-anchor="middle">Extras</text>
+        <text class="t-sub" x="926" y="114" text-anchor="middle">dashboard? (C1)</text>
+        <text class="t-sub" x="926" y="130" text-anchor="middle">history UI · approvals</text>
+        <text class="lbl" x="926" y="158" text-anchor="middle">optional</text>
+      </svg>
+      <figcaption>Sizes are relative (S/M/L) until Phase 0 is done. Phase 1a can start now in the prototype. After Phase 1, every operator has a saved sandbox, partial commit, Edit without gaps, a versioned plan, and scenario-ready calculations. Phase 2 lifts the one-sandbox rule and adds comparison. Phase 3 adds sharing.</figcaption>
     </figure>
   </section>
 </main>
