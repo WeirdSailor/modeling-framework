@@ -92,6 +92,12 @@
   .dg .u1 { fill: var(--draft); fill-opacity: .5; }
   .dg .u2 { fill: var(--draft); fill-opacity: .3; }
   .dg .u3 { fill: var(--draft); fill-opacity: .15; }
+  .ov-toggle { display: flex; gap: 8px; margin: 0 0 12px; }
+  .ov-toggle button {
+    font: inherit; font-size: 13px; padding: 4px 12px; border-radius: 6px; cursor: pointer;
+    background: var(--surface); color: var(--fg); border: 1px solid var(--line);
+  }
+  .ov-toggle button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
 </style>
 </head>
 <body>
@@ -102,6 +108,7 @@
     <p><strong>Releases:</strong> Phase 1 (day one) = one private sandbox per operator with the full committed-plan design · Phase 2 = multiple drafts and comparison · Phase 3 = sharing.</p>
     <p>Colour key: <span style="color:var(--accent)">blue</span> = new in the proposed design, <span style="color:var(--draft)">orange</span> / <span style="color:var(--draft2)">purple</span> = open drafts (dotted lines), <span style="color:var(--warn)">red</span> = a limitation or a rejected path.</p>
     <nav>
+      <a href="#overview">0. Overview</a>
       <a href="#today-vs-proposed">1. Today vs proposed</a>
       <a href="#components">2. Components</a>
       <a href="#inside-draft">3. Inside a draft</a>
@@ -118,6 +125,115 @@
       <a href="#phases">14. Delivery phases</a>
     </nav>
   </header>
+
+  <!-- ───────────── 0. Overview ───────────── -->
+  <section id="overview">
+    <h2>0. Overview: one architecture, two stages</h2>
+    <p>The same architecture serves Phase 1 and the target. Blue parts are built properly in Phase 1 and don't change later. Only the dashed parts grow: one scenario becomes many, and one sandbox becomes many shared drafts. Facts, scenario input values and global policy arrive separately and only meet in the baseline calculation. Arrows show the direction data flows. Two heads mean both ways.</p>
+    <div class="ov-toggle" role="group" aria-label="Show stage">
+      <button type="button" id="ov-b1" aria-pressed="true" onclick="ovSet('p1')">Phase 1</button>
+      <button type="button" id="ov-b2" aria-pressed="false" onclick="ovSet('t')">Target</button>
+    </div>
+    <figure>
+      <svg class="dg" viewBox="0 0 1000 612" role="img" aria-label="Scenario source and market data feed flow into the server stores. Scenarios, market snapshots and the committed plan flow into the baseline calculation, whose result flows to the planning API. The API exchanges drafts both ways, writes commits to the committed plan and records every command in the audit log. Each operator's browser exchanges edits and commits with the API, and receives the baseline and live updates. Global policy and availability data also feed the baseline. Phase 1 has one central scenario and one sandbox per user; the target has many scenarios and many shared drafts.">
+        <defs>
+          <marker id="f0-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker>
+        </defs>
+
+        <!-- Sources -->
+        <rect class="box-dash" x="40" y="30" width="260" height="56" rx="8"/>
+        <text class="t-title" x="170" y="54" text-anchor="middle">Scenario source</text>
+        <text id="ov-src" class="t-sub" x="170" y="72" text-anchor="middle">Central forecast only</text>
+        <rect class="box" x="700" y="30" width="260" height="56" rx="8"/>
+        <text class="t-title" x="830" y="54" text-anchor="middle">Market data feed</text>
+        <text class="t-sub" x="830" y="72" text-anchor="middle">PN, MEL, unit data</text>
+
+        <rect class="box" x="370" y="30" width="260" height="56" rx="8"/>
+        <text class="t-title" x="500" y="54" text-anchor="middle">Policy + availability</text>
+        <text class="t-sub" x="500" y="72" text-anchor="middle">global input data · versioned</text>
+
+        <!-- Server -->
+        <rect class="encl" x="20" y="108" width="960" height="284" rx="14"/>
+        <text class="t-title" x="36" y="130">Server</text>
+        <line class="edge" x1="170" y1="86" x2="170" y2="144" marker-end="url(#f0-a)"/>
+        <line class="edge" x1="830" y1="86" x2="830" y2="144" marker-end="url(#f0-a)"/>
+        <line class="edge" x1="500" y1="86" x2="500" y2="144" marker-end="url(#f0-a)"/>
+
+        <rect class="box-dash" x="40" y="146" width="260" height="56" rx="8"/>
+        <text class="t-title" x="170" y="170" text-anchor="middle">Scenarios (input values)</text>
+        <text id="ov-sc" class="t-sub" x="170" y="188" text-anchor="middle">1 central scenario</text>
+        <rect class="accent-box" x="370" y="146" width="260" height="56" rx="8"/>
+        <text class="t-title" x="500" y="170" text-anchor="middle">Baseline calc</text>
+        <text class="t-sub" x="500" y="188" text-anchor="middle">keyed by inputs + plan version</text>
+        <rect class="box" x="700" y="146" width="260" height="56" rx="8"/>
+        <text class="t-title" x="830" y="170" text-anchor="middle">Market snapshots (facts)</text>
+        <text class="t-sub" x="830" y="188" text-anchor="middle">immutable</text>
+        <line class="edge" x1="300" y1="174" x2="368" y2="174" marker-end="url(#f0-a)"/>
+        <line class="edge" x1="700" y1="174" x2="632" y2="174" marker-end="url(#f0-a)"/>
+
+        <rect class="box-dash" x="40" y="250" width="260" height="56" rx="8"/>
+        <text class="t-title" x="170" y="274" text-anchor="middle">Drafts</text>
+        <text id="ov-dr" class="t-sub" x="170" y="292" text-anchor="middle">1 sandbox per user</text>
+        <rect class="accent-box" x="370" y="250" width="220" height="56" rx="8"/>
+        <text class="t-title" x="480" y="274" text-anchor="middle">Committed plan</text>
+        <text class="t-sub" x="480" y="292" text-anchor="middle">versioned log · one for all</text>
+        <rect class="accent-box" x="700" y="250" width="260" height="56" rx="8"/>
+        <text class="t-title" x="830" y="274" text-anchor="middle">Audit log</text>
+        <text class="t-sub" x="830" y="292" text-anchor="middle">every command</text>
+        <line class="edge" x1="480" y1="250" x2="480" y2="204" marker-end="url(#f0-a)"/>
+
+        <rect class="accent-box" x="40" y="326" width="920" height="44" rx="8"/>
+        <text class="t-title" x="500" y="353" text-anchor="middle">Planning API: commands, queries, live events</text>
+        <line class="edge" x1="162" y1="306" x2="162" y2="324" marker-end="url(#f0-a)"/>
+        <line class="edge" x1="178" y1="326" x2="178" y2="308" marker-end="url(#f0-a)"/>
+        <line class="edge" x1="480" y1="326" x2="480" y2="308" marker-end="url(#f0-a)"/>
+        <line class="edge" x1="615" y1="202" x2="615" y2="324" marker-end="url(#f0-a)"/>
+        <line class="edge" x1="830" y1="326" x2="830" y2="308" marker-end="url(#f0-a)"/>
+
+        <!-- Browser -->
+        <rect class="encl" x="20" y="412" width="960" height="132" rx="14"/>
+        <text class="t-title" x="36" y="434">Browser · each operator</text>
+        <rect class="accent-box" x="40" y="456" width="260" height="56" rx="8"/>
+        <text class="t-title" x="170" y="480" text-anchor="middle">Editor</text>
+        <text id="ov-ed" class="t-sub" x="170" y="498" text-anchor="middle">add units to sandbox</text>
+        <rect class="accent-box" x="370" y="456" width="260" height="56" rx="8"/>
+        <text class="t-title" x="500" y="480" text-anchor="middle">Overlay calc</text>
+        <text class="t-sub" x="500" y="498" text-anchor="middle">same calc library as server</text>
+        <rect class="box-dash" x="700" y="456" width="260" height="56" rx="8"/>
+        <text class="t-title" x="830" y="480" text-anchor="middle">Charts, dashboard</text>
+        <text id="ov-vw" class="t-sub" x="830" y="498" text-anchor="middle">1 dotted line + pin</text>
+        <line class="edge" x1="300" y1="484" x2="368" y2="484" marker-end="url(#f0-a)"/>
+        <line class="edge" x1="630" y1="484" x2="698" y2="484" marker-end="url(#f0-a)"/>
+        <line class="edge" x1="170" y1="372" x2="170" y2="454" marker-start="url(#f0-a)" marker-end="url(#f0-a)"/>
+        <text class="lbl" x="178" y="404">edits, commits</text>
+        <line class="edge" x1="500" y1="370" x2="500" y2="454" marker-end="url(#f0-a)"/>
+        <text class="lbl" x="508" y="404">baseline</text>
+        <line class="edge" x1="830" y1="370" x2="830" y2="454" marker-end="url(#f0-a)"/>
+        <text class="lbl" x="838" y="404">live updates</text>
+
+        <!-- Legend -->
+        <rect class="accent-box" x="40" y="566" width="14" height="14" rx="3"/>
+        <text class="lbl" x="62" y="577">built in Phase 1, unchanged later</text>
+        <rect class="box-dash" x="300" y="566" width="14" height="14" rx="3"/>
+        <text class="lbl" x="322" y="577">grows after Phase 1</text>
+        <rect class="box" x="480" y="566" width="14" height="14" rx="3"/>
+        <text class="lbl" x="502" y="577">facts, global input data</text>
+        <text class="lbl" x="40" y="600">arrows = direction data flows · two heads = both ways</text>
+      </svg>
+      <figcaption>Phase 1 runs one central scenario and one private sandbox per operator, with the full committed-plan design. In the target, a scenario generator supplies many versioned scenarios, operators have many drafts they can share, and the charts compare drafts × scenarios. Nothing in blue is rebuilt between the two. Dashed boxes are the parts that grow. Use the buttons above to switch views.</figcaption>
+    </figure>
+    <script>
+      function ovSet(p) {
+        const T = {
+          p1: { 'ov-src': 'Central forecast only', 'ov-sc': '1 central scenario', 'ov-dr': '1 sandbox per user', 'ov-ed': 'add units to sandbox', 'ov-vw': '1 dotted line + pin' },
+          t:  { 'ov-src': 'Scenario generator', 'ov-sc': 'many, versioned', 'ov-dr': 'many per user, shared', 'ov-ed': 'edit, share, compare', 'ov-vw': 'drafts × scenarios' }
+        };
+        for (const id in T[p]) document.getElementById(id).textContent = T[p][id];
+        document.getElementById('ov-b1').setAttribute('aria-pressed', p === 'p1');
+        document.getElementById('ov-b2').setAttribute('aria-pressed', p === 't');
+      }
+    </script>
+  </section>
 
   <!-- ───────────── 1. Today vs proposed ───────────── -->
   <section id="today-vs-proposed">
