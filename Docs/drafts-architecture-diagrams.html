@@ -135,7 +135,7 @@
       <button type="button" id="ov-b2" aria-pressed="false" onclick="ovSet('t')">Target</button>
     </div>
     <figure>
-      <svg class="dg" viewBox="0 0 1000 612" role="img" aria-label="Scenario source and market data feed flow into the server stores. Scenarios, market snapshots and the committed plan flow into the baseline calculation, whose result flows to the planning API. The API exchanges drafts both ways, writes commits to the committed plan and records every command in the audit log. Each operator's browser exchanges edits and commits with the API, and receives the baseline and live updates. Global policy and availability data also feed the baseline. Phase 1 has one central scenario and one sandbox per user; the target has many scenarios and many shared drafts.">
+      <svg class="dg" viewBox="0 14 1000 598" role="img" aria-label="Scenario source and market data feed flow into the server stores. Scenarios, market snapshots and the committed plan flow into the baseline calculation, whose result flows to the planning API. The API exchanges drafts both ways, writes commits to the committed plan and records every command in the audit log. Each operator's browser exchanges edits and commits with the API, and receives the baseline and live updates. Policy and availability data are stored and versioned on the server, changed through the API, and also feed the baseline. Phase 1 has one central scenario and one sandbox per user; the target has many scenarios and many shared drafts.">
         <defs>
           <marker id="f0-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker>
         </defs>
@@ -148,16 +148,11 @@
         <text class="t-title" x="830" y="54" text-anchor="middle">Market data feed</text>
         <text class="t-sub" x="830" y="72" text-anchor="middle">PN, MEL, unit data</text>
 
-        <rect class="box" x="370" y="30" width="260" height="56" rx="8"/>
-        <text class="t-title" x="500" y="54" text-anchor="middle">Policy + availability</text>
-        <text class="t-sub" x="500" y="72" text-anchor="middle">global input data · versioned</text>
-
         <!-- Server -->
         <rect class="encl" x="20" y="108" width="960" height="284" rx="14"/>
         <text class="t-title" x="36" y="130">Server</text>
         <line class="edge" x1="170" y1="86" x2="170" y2="144" marker-end="url(#f0-a)"/>
         <line class="edge" x1="830" y1="86" x2="830" y2="144" marker-end="url(#f0-a)"/>
-        <line class="edge" x1="500" y1="86" x2="500" y2="144" marker-end="url(#f0-a)"/>
 
         <rect class="box-dash" x="40" y="146" width="260" height="56" rx="8"/>
         <text class="t-title" x="170" y="170" text-anchor="middle">Scenarios (input values)</text>
@@ -171,24 +166,29 @@
         <line class="edge" x1="300" y1="174" x2="368" y2="174" marker-end="url(#f0-a)"/>
         <line class="edge" x1="700" y1="174" x2="632" y2="174" marker-end="url(#f0-a)"/>
 
-        <rect class="box-dash" x="40" y="250" width="260" height="56" rx="8"/>
-        <text class="t-title" x="170" y="274" text-anchor="middle">Drafts</text>
-        <text id="ov-dr" class="t-sub" x="170" y="292" text-anchor="middle">1 sandbox per user</text>
-        <rect class="accent-box" x="370" y="250" width="220" height="56" rx="8"/>
-        <text class="t-title" x="480" y="274" text-anchor="middle">Committed plan</text>
-        <text class="t-sub" x="480" y="292" text-anchor="middle">versioned log · one for all</text>
-        <rect class="accent-box" x="700" y="250" width="260" height="56" rx="8"/>
-        <text class="t-title" x="830" y="274" text-anchor="middle">Audit log</text>
-        <text class="t-sub" x="830" y="292" text-anchor="middle">every command</text>
-        <line class="edge" x1="480" y1="250" x2="480" y2="204" marker-end="url(#f0-a)"/>
+        <rect class="box-dash" x="40" y="250" width="200" height="56" rx="8"/>
+        <text class="t-title" x="140" y="274" text-anchor="middle">Drafts</text>
+        <text id="ov-dr" class="t-sub" x="140" y="292" text-anchor="middle">1 sandbox per user</text>
+        <rect class="accent-box" x="280" y="250" width="200" height="56" rx="8"/>
+        <text class="t-title" x="380" y="274" text-anchor="middle">Committed plan</text>
+        <text class="t-sub" x="380" y="292" text-anchor="middle">versioned log · one for all</text>
+        <rect class="box" x="520" y="250" width="200" height="56" rx="8"/>
+        <text class="t-title" x="620" y="274" text-anchor="middle">Policy + availability</text>
+        <text class="t-sub" x="620" y="292" text-anchor="middle">global · versioned</text>
+        <rect class="accent-box" x="760" y="250" width="200" height="56" rx="8"/>
+        <text class="t-title" x="860" y="274" text-anchor="middle">Audit log</text>
+        <text class="t-sub" x="860" y="292" text-anchor="middle">every command</text>
+        <line class="edge" x1="400" y1="250" x2="400" y2="204" marker-end="url(#f0-a)"/>
+        <line class="edge" x1="600" y1="250" x2="600" y2="204" marker-end="url(#f0-a)"/>
 
         <rect class="accent-box" x="40" y="326" width="920" height="44" rx="8"/>
         <text class="t-title" x="500" y="353" text-anchor="middle">Planning API: commands, queries, live events</text>
-        <line class="edge" x1="162" y1="306" x2="162" y2="324" marker-end="url(#f0-a)"/>
-        <line class="edge" x1="178" y1="326" x2="178" y2="308" marker-end="url(#f0-a)"/>
-        <line class="edge" x1="480" y1="326" x2="480" y2="308" marker-end="url(#f0-a)"/>
-        <line class="edge" x1="615" y1="202" x2="615" y2="324" marker-end="url(#f0-a)"/>
-        <line class="edge" x1="830" y1="326" x2="830" y2="308" marker-end="url(#f0-a)"/>
+        <line class="edge" x1="132" y1="306" x2="132" y2="324" marker-end="url(#f0-a)"/>
+        <line class="edge" x1="148" y1="326" x2="148" y2="308" marker-end="url(#f0-a)"/>
+        <line class="edge" x1="380" y1="326" x2="380" y2="308" marker-end="url(#f0-a)"/>
+        <line class="edge" x1="500" y1="202" x2="500" y2="324" marker-end="url(#f0-a)"/>
+        <line class="edge" x1="640" y1="326" x2="640" y2="308" marker-end="url(#f0-a)"/>
+        <line class="edge" x1="860" y1="326" x2="860" y2="308" marker-end="url(#f0-a)"/>
 
         <!-- Browser -->
         <rect class="encl" x="20" y="412" width="960" height="132" rx="14"/>
@@ -204,8 +204,8 @@
         <text id="ov-vw" class="t-sub" x="830" y="498" text-anchor="middle">1 dotted line + pin</text>
         <line class="edge" x1="300" y1="484" x2="368" y2="484" marker-end="url(#f0-a)"/>
         <line class="edge" x1="630" y1="484" x2="698" y2="484" marker-end="url(#f0-a)"/>
-        <line class="edge" x1="170" y1="372" x2="170" y2="454" marker-start="url(#f0-a)" marker-end="url(#f0-a)"/>
-        <text class="lbl" x="178" y="404">edits, commits</text>
+        <line class="edge" x1="240" y1="372" x2="240" y2="454" marker-start="url(#f0-a)" marker-end="url(#f0-a)"/>
+        <text class="lbl" x="248" y="404">edits, commits</text>
         <line class="edge" x1="500" y1="370" x2="500" y2="454" marker-end="url(#f0-a)"/>
         <text class="lbl" x="508" y="404">baseline</text>
         <line class="edge" x1="830" y1="370" x2="830" y2="454" marker-end="url(#f0-a)"/>
@@ -220,7 +220,7 @@
         <text class="lbl" x="502" y="577">facts, global input data</text>
         <text class="lbl" x="40" y="600">arrows = direction data flows · two heads = both ways</text>
       </svg>
-      <figcaption>Phase 1 runs one central scenario and one private sandbox per operator, with the full committed-plan design. In the target, a scenario generator supplies many versioned scenarios, operators have many drafts they can share, and the charts compare drafts × scenarios. Nothing in blue is rebuilt between the two. Dashed boxes are the parts that grow. Use the buttons above to switch views.</figcaption>
+      <figcaption>Phase 1 runs one central scenario and one private sandbox per operator, with the full committed-plan design. In the target, a scenario generator supplies many versioned scenarios, operators have many drafts they can share, and the charts compare drafts × scenarios. Nothing in blue is rebuilt between the two. Dashed boxes are the parts that grow. Policy and availability data are a server store like scenarios and snapshots, changed through the API by the policy owner and operators. Use the buttons above to switch views.</figcaption>
     </figure>
     <script>
       function ovSet(p) {
