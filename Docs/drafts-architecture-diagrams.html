@@ -106,23 +106,22 @@
     <h1>Drafts: proposed architecture in diagrams</h1>
     <p>A visual companion to <code>Docs/drafts-architecture.md</code>. Each diagram answers one question. The written document has the detail, the decisions (D1–D28), the resolved conflicts (C1–C14) and the items still open (C15–C17).</p>
     <p><strong>Releases:</strong> Phase 1 (day one) = one private sandbox per operator with the full committed-plan design · Phase 2 = multiple drafts and comparison · Phase 3 = sharing.</p>
-    <p>Colour key: <span style="color:var(--accent)">blue</span> = new in the proposed design, <span style="color:var(--draft)">orange</span> / <span style="color:var(--draft2)">purple</span> = open drafts (dotted lines), <span style="color:var(--warn)">red</span> = a limitation or a rejected path.</p>
+    <p>Colour key: <span style="color:var(--accent)">blue</span> = core design, built in Phase 1, <span style="color:var(--draft)">orange</span> / <span style="color:var(--draft2)">purple</span> = open drafts (dotted lines), <span style="color:var(--warn)">red</span> = a limitation or a rejected path.</p>
     <nav>
       <a href="#overview">0. Overview</a>
-      <a href="#today-vs-proposed">1. Today vs proposed</a>
-      <a href="#components">2. Components</a>
-      <a href="#inside-draft">3. Inside a draft</a>
-      <a href="#unit-contribution">4. Open decision: unit contribution</a>
-      <a href="#dotted-line">5. How the dotted line works</a>
-      <a href="#sandbox">6. Day one: sandbox</a>
-      <a href="#compare">7. Comparing options (Ph. 2)</a>
-      <a href="#commit">8. Commit flow</a>
-      <a href="#lifecycle">9. Lifecycle</a>
-      <a href="#supersede">10. Edit = supersede</a>
-      <a href="#sharing">11. Sharing (Ph. 3)</a>
-      <a href="#data-model">12. Data model</a>
-      <a href="#scenarios">13. Scenarios (future)</a>
-      <a href="#phases">14. Delivery phases</a>
+      <a href="#components">1. Components</a>
+      <a href="#inside-draft">2. Inside a draft</a>
+      <a href="#unit-contribution">3. Open decision: unit contribution</a>
+      <a href="#dotted-line">4. How the dotted line works</a>
+      <a href="#sandbox">5. Day one: sandbox</a>
+      <a href="#compare">6. Comparing options (Ph. 2)</a>
+      <a href="#commit">7. Commit flow</a>
+      <a href="#lifecycle">8. Lifecycle</a>
+      <a href="#supersede">9. Edit = supersede</a>
+      <a href="#sharing">10. Sharing (Ph. 3)</a>
+      <a href="#data-model">11. Data model</a>
+      <a href="#scenarios">12. Scenarios (future)</a>
+      <a href="#phases">13. Delivery phases</a>
     </nav>
   </header>
 
@@ -135,7 +134,7 @@
       <button type="button" id="ov-b2" aria-pressed="false" onclick="ovSet('t')">Target</button>
     </div>
     <figure>
-      <svg class="dg" viewBox="0 14 1000 598" role="img" aria-label="Scenario source and market data feed flow into the server stores. Scenarios, market snapshots and the committed plan flow into the baseline calculation, whose result flows to the planning API. The API exchanges drafts both ways, writes commits to the committed plan and records every command in the audit log. Each operator's browser exchanges edits and commits with the API, and receives the baseline and live updates. Policy and availability data are stored and versioned on the server, changed through the API, and also feed the baseline. Phase 1 has one central scenario and one sandbox per user; the target has many scenarios and many shared drafts.">
+      <svg class="dg" viewBox="0 14 1000 598" role="img" aria-label="Scenario source and market participant data flow into the server stores. Scenarios, market snapshots and the committed plan flow into the baseline calculation, whose result flows to the planning API. The API exchanges drafts both ways, writes commits to the committed plan and records every command in the audit log. Each operator's browser exchanges edits and commits with the API, and receives the baseline and live updates. Policy and availability data are stored and versioned on the server, changed through the API, and also feed the baseline. Phase 1 has one central scenario and one sandbox per user; the target has many scenarios and many shared drafts.">
         <defs>
           <marker id="f0-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker>
         </defs>
@@ -145,7 +144,7 @@
         <text class="t-title" x="170" y="54" text-anchor="middle">Scenario source</text>
         <text id="ov-src" class="t-sub" x="170" y="72" text-anchor="middle">Central forecast only</text>
         <rect class="box" x="700" y="30" width="260" height="56" rx="8"/>
-        <text class="t-title" x="830" y="54" text-anchor="middle">Market data feed</text>
+        <text class="t-title" x="830" y="54" text-anchor="middle">Market participants</text>
         <text class="t-sub" x="830" y="72" text-anchor="middle">PN, MEL, unit data</text>
 
         <!-- Server -->
@@ -235,114 +234,12 @@
     </script>
   </section>
 
-  <!-- ───────────── 1. Today vs proposed ───────────── -->
-  <section id="today-vs-proposed">
-    <h2>1. What changes: today vs proposed</h2>
-    <p>Today every operator's browser is an island. In the proposed design, browsers still draw everything, but drafts and commits are saved in one shared server tier.</p>
-    <figure>
-      <svg class="dg" viewBox="0 0 1000 470" role="img" aria-label="Today each browser fetches Elexon and holds drafts in memory with no link between machines. In the proposed design a server tier with a Planning API, PostgreSQL and an ingestion worker sits between Elexon and all browsers.">
-        <defs>
-          <marker id="f1-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker>
-        </defs>
-        <line class="divider" x1="470" y1="20" x2="470" y2="455"/>
-        <text class="t-h" x="235" y="30" text-anchor="middle">Today (prototype)</text>
-        <text class="t-h t-accent" x="745" y="30" text-anchor="middle">Proposed</text>
-
-        <!-- Today -->
-        <rect class="box" x="150" y="55" width="170" height="40" rx="6"/>
-        <text x="235" y="80" text-anchor="middle">Elexon API (public)</text>
-        <line class="edge" x1="205" y1="95" x2="140" y2="148" marker-end="url(#f1-a)"/>
-        <line class="edge" x1="265" y1="95" x2="330" y2="148" marker-end="url(#f1-a)"/>
-        <text class="lbl" x="162" y="118" text-anchor="end">fetches</text>
-        <text class="lbl" x="308" y="118">fetches</text>
-
-        <rect class="encl" x="30" y="150" width="190" height="230" rx="10"/>
-        <text class="t-title" x="125" y="172" text-anchor="middle">Browser · Operator A</text>
-        <rect class="box" x="45" y="185" width="160" height="40" rx="6"/>
-        <text x="125" y="210" text-anchor="middle">UI + charts</text>
-        <rect class="box" x="45" y="240" width="160" height="64" rx="6"/>
-        <text class="t-title" x="125" y="262" text-anchor="middle">In memory only</text>
-        <text class="t-sub" x="125" y="279" text-anchor="middle">drafts · market data</text>
-        <text class="lbl t-warn" x="125" y="295" text-anchor="middle">lost on reload</text>
-        <rect class="box" x="45" y="318" width="160" height="44" rx="6"/>
-        <text x="125" y="337" text-anchor="middle">localStorage</text>
-        <text class="t-sub" x="125" y="353" text-anchor="middle">identity · standing data</text>
-
-        <rect class="encl" x="250" y="150" width="190" height="230" rx="10"/>
-        <text class="t-title" x="345" y="172" text-anchor="middle">Browser · Operator B</text>
-        <rect class="box" x="265" y="185" width="160" height="40" rx="6"/>
-        <text x="345" y="210" text-anchor="middle">UI + charts</text>
-        <rect class="box" x="265" y="240" width="160" height="64" rx="6"/>
-        <text class="t-title" x="345" y="262" text-anchor="middle">In memory only</text>
-        <text class="t-sub" x="345" y="279" text-anchor="middle">drafts · market data</text>
-        <text class="lbl t-warn" x="345" y="295" text-anchor="middle">lost on reload</text>
-        <rect class="box" x="265" y="318" width="160" height="44" rx="6"/>
-        <text x="345" y="337" text-anchor="middle">localStorage</text>
-        <text class="t-sub" x="345" y="353" text-anchor="middle">identity · standing data</text>
-
-        <line class="edge edge-warn edge-dash" x1="220" y1="272" x2="250" y2="272"/>
-        <line class="x-warn" x1="229" y1="266" x2="241" y2="278"/>
-        <line class="x-warn" x1="241" y1="266" x2="229" y2="278"/>
-        <text class="t-warn" x="235" y="405" text-anchor="middle">No connection between machines</text>
-        <text class="t-sub" x="235" y="424" text-anchor="middle">"Sharing" = switching identity in one tab</text>
-        <text class="t-sub" x="235" y="442" text-anchor="middle">Refresh or reload deletes every draft</text>
-
-        <!-- Proposed -->
-        <rect class="box" x="500" y="80" width="130" height="40" rx="6"/>
-        <text x="565" y="105" text-anchor="middle">Elexon API</text>
-        <line class="edge" x1="565" y1="120" x2="565" y2="198" marker-end="url(#f1-a)"/>
-        <text class="lbl" x="573" y="164">every 5 min</text>
-        <rect class="accent-box" x="500" y="200" width="130" height="44" rx="6"/>
-        <text x="565" y="219" text-anchor="middle">Ingestion worker</text>
-        <text class="t-sub" x="565" y="235" text-anchor="middle">one fetch for all</text>
-        <path class="edge" d="M565,244 V364 H660" marker-end="url(#f1-a)"/>
-        <text class="lbl" x="557" y="305" text-anchor="end">writes snapshots</text>
-
-        <rect class="encl-new" x="650" y="50" width="170" height="370" rx="10"/>
-        <text class="t-title t-accent" x="735" y="70" text-anchor="middle">Server tier (new)</text>
-        <rect class="box" x="662" y="85" width="146" height="190" rx="6"/>
-        <text class="t-title" x="735" y="165" text-anchor="middle">Planning API</text>
-        <text class="t-sub" x="735" y="183" text-anchor="middle">commands · permissions</text>
-        <text class="t-sub" x="735" y="199" text-anchor="middle">audit · live events</text>
-        <line class="edge" x1="735" y1="277" x2="735" y2="323" marker-start="url(#f1-a)" marker-end="url(#f1-a)"/>
-        <text class="lbl" x="743" y="304">transactions</text>
-        <rect class="box" x="662" y="325" width="146" height="78" rx="6"/>
-        <text class="t-title" x="735" y="350" text-anchor="middle">PostgreSQL</text>
-        <text class="t-sub" x="735" y="368" text-anchor="middle">drafts · shares · audit</text>
-        <text class="t-sub" x="735" y="384" text-anchor="middle">market snapshots</text>
-
-        <rect class="encl" x="862" y="85" width="128" height="80" rx="10"/>
-        <text class="t-title" x="926" y="108" text-anchor="middle">Browser · Op A</text>
-        <text class="t-sub" x="926" y="128" text-anchor="middle">UI + cache</text>
-        <text class="t-sub" x="926" y="144" text-anchor="middle">draws dotted lines</text>
-        <rect class="encl" x="862" y="195" width="128" height="80" rx="10"/>
-        <text class="t-title" x="926" y="218" text-anchor="middle">Browser · Op B</text>
-        <text class="t-sub" x="926" y="238" text-anchor="middle">UI + cache</text>
-        <text class="t-sub" x="926" y="254" text-anchor="middle">draws dotted lines</text>
-        <line class="edge" x1="860" y1="112" x2="810" y2="112" marker-start="url(#f1-a)"/>
-        <text class="lbl" x="840" y="105" text-anchor="middle">REST</text>
-        <line class="edge edge-accent" x1="810" y1="140" x2="860" y2="140" marker-start="url(#f1-a)"/>
-        <text class="lbl" x="840" y="156" text-anchor="middle">events</text>
-        <line class="edge" x1="860" y1="222" x2="810" y2="222" marker-start="url(#f1-a)"/>
-        <text class="lbl" x="840" y="215" text-anchor="middle">REST</text>
-        <line class="edge edge-accent" x1="810" y1="250" x2="860" y2="250" marker-start="url(#f1-a)"/>
-        <text class="lbl" x="840" y="266" text-anchor="middle">events</text>
-        <rect class="box" x="862" y="325" width="128" height="40" rx="6"/>
-        <text x="926" y="350" text-anchor="middle">SSO identity provider</text>
-        <line class="edge" x1="926" y1="275" x2="926" y2="323" marker-end="url(#f1-a)"/>
-        <text class="lbl" x="934" y="303">sign in</text>
-        <text class="t-accent" x="745" y="442" text-anchor="middle">Work saved · commits seen by all · one baseline</text>
-      </svg>
-      <figcaption>The UI and the in-browser calculation stay as they are. What's new is the blue server tier. It saves drafts, enforces who can do what, records an audit trail, and pushes "something changed" events so every operator's screen updates within seconds. Market data is fetched once on the server instead of separately by every browser.</figcaption>
-    </figure>
-  </section>
-
-  <!-- ───────────── 2. Components ───────────── -->
+  <!-- ───────────── 1. Components ───────────── -->
   <section id="components">
-    <h2>2. Proposed components and who talks to whom</h2>
+    <h2>1. Proposed components and who talks to whom</h2>
     <p>The same calculation library (blue) runs in both the browser and the server, so both always produce the same numbers.</p>
     <figure>
-      <svg class="dg" viewBox="0 0 1000 450" role="img" aria-label="The browser holds UI, a client cache and the shared calculation library. It sends REST commands to the Planning API and receives the baseline and live events. The API writes to PostgreSQL in one transaction and reads plan and market data to compute the baseline. An ingestion worker pulls Elexon, writes snapshots and triggers a snapshot event.">
+      <svg class="dg" viewBox="0 0 1000 450" role="img" aria-label="The browser holds UI, a client cache and the shared calculation library. It sends REST commands to the Planning API and receives the baseline and live events. The API writes to PostgreSQL in one transaction and reads plan and market data to compute the baseline. An ingestion worker receives data submitted by market participants, writes snapshots and triggers a snapshot event.">
         <defs>
           <marker id="f2-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker>
           <marker id="f2-aa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah-accent" d="M0,0 L10,5 L0,10 z"/></marker>
@@ -420,9 +317,9 @@
 
         <!-- Ingestion -->
         <rect class="box" x="900" y="395" width="80" height="40" rx="6"/>
-        <text x="940" y="420" text-anchor="middle">Elexon</text>
+        <text x="940" y="420" text-anchor="middle">Participants</text>
         <line class="edge" x1="900" y1="415" x2="852" y2="415" marker-end="url(#f2-a)"/>
-        <text class="lbl" x="876" y="407" text-anchor="middle">pull</text>
+        <text class="lbl" x="876" y="407" text-anchor="middle">submit</text>
         <rect class="accent-box" x="730" y="395" width="120" height="40" rx="6"/>
         <text x="790" y="413" text-anchor="middle">Ingestion</text>
         <text class="t-sub" x="790" y="428" text-anchor="middle">worker</text>
@@ -435,9 +332,9 @@
     </figure>
   </section>
 
-  <!-- ───────────── 3. Inside a draft ───────────── -->
+  <!-- ───────────── 2. Inside a draft ───────────── -->
   <section id="inside-draft">
-    <h2>3. Inside a draft: one draft, many units</h2>
+    <h2>2. Inside a draft: one draft, many units</h2>
     <p>A unit does not get its own draft. A draft is a container, and each unit added to it becomes one <em>action</em> (one row) with its own window, output and reasons.</p>
     <figure>
       <svg class="dg" viewBox="0 0 1000 365" role="img" aria-label="Draft A contains three actions for three different units, each with its own window, output and reason. Draft B contains two actions. One unit appears in both drafts, which is allowed. A unit appears at most once per draft, and a unit committed in two drafts for the same half-hour is counted once.">
@@ -502,14 +399,14 @@
     </figure>
   </section>
 
-  <!-- ───────────── 4. Open decision: unit contribution ───────────── -->
+  <!-- ───────────── 3. Open decision: unit contribution ───────────── -->
   <section id="unit-contribution">
-    <h2>4. Open decision D14: how each unit contributes</h2>
+    <h2>3. Open decision D14: how each unit contributes</h2>
     <p>Both options add units up to get the draft's impact. They differ in the <em>shape</em> of each unit's contribution over time. Below is the same draft, with the same three units and windows, drawn both ways. This is still to be decided.</p>
     <figure>
       <svg class="dg" viewBox="0 0 1000 340" role="img" aria-label="Option A, flat block: each unit contributes its full output for every half-hour of its window, and the draft impact is the sum of rectangles. Option B, unit profile: each unit's output follows notice time and ramps up and down, and the draft impact is the sum of the profiles.">
         <line class="divider" x1="500" y1="15" x2="500" y2="325"/>
-        <text class="t-h" x="260" y="30" text-anchor="middle">Option A · Flat block (today)</text>
+        <text class="t-h" x="260" y="30" text-anchor="middle">Option A · Flat block (simplest)</text>
         <text class="t-h" x="760" y="30" text-anchor="middle">Option B · Unit profile</text>
 
         <!-- Option A -->
@@ -534,7 +431,7 @@
         <text class="lbl" x="285" y="146" text-anchor="middle">CNQPS-2</text>
         <text class="lbl" x="310" y="105" text-anchor="middle">PEHE-1</text>
         <text class="t-sub t-warn" x="260" y="296" text-anchor="middle">Full MW from the first half-hour, ignoring notice and ramp</text>
-        <text class="t-sub" x="260" y="314" text-anchor="middle">simple · matches the prototype · no extra data</text>
+        <text class="t-sub" x="260" y="314" text-anchor="middle">simple · no extra data</text>
 
         <!-- Option B -->
         <line class="line-draft" x1="560" y1="56" x2="580" y2="56"/>
@@ -571,10 +468,10 @@
     </figure>
   </section>
 
-  <!-- ───────────── 5. How the dotted line works ───────────── -->
+  <!-- ───────────── 4. How the dotted line works ───────────── -->
   <section id="dotted-line">
-    <h2>5. How the dotted line works: one data set, many drafts</h2>
-    <p>The heavy data is stored once. A draft is just a short list of units and times, drawn as the stored baseline plus that draft's extra units. This works the same today and in the proposed design.</p>
+    <h2>4. How the dotted line works: one data set, many drafts</h2>
+    <p>The heavy data is stored once. A draft is just a short list of units and times, drawn as the stored baseline plus that draft's extra units.</p>
     <figure>
       <svg class="dg" viewBox="0 0 1000 340" role="img" aria-label="One market snapshot produces one stored baseline that includes committed drafts. Each open draft adds its delta on top of that baseline only over its own time window, producing a dotted line that leaves and rejoins the solid line at anchor points. Hidden drafts are not drawn.">
         <defs>
@@ -648,9 +545,9 @@
     </figure>
   </section>
 
-  <!-- ───────────── 6. Day one: sandbox ───────────── -->
+  <!-- ───────────── 5. Day one: sandbox ───────────── -->
   <section id="sandbox">
-    <h2>6. Day one: the sandbox</h2>
+    <h2>5. Day one: the sandbox</h2>
     <p>Each operator has one private, saved working area. Add units, see the dotted lines, commit all or some, carry on. A sandbox is an ordinary draft with restrictions (one per user, private), so Phase 2 lifts a rule rather than rebuilding.</p>
     <figure>
       <svg class="dg" viewBox="0 0 1000 330" role="img" aria-label="The sandbox starts empty. Adding units or loading a commitment from the plan (Edit, with a warning if not empty) gives it work. Commit all sends units to the plan and leaves the sandbox empty; commit selected sends some and keeps the rest; Clear empties it without committing. Pin keeps one previous state as a faded reference line, display only.">
@@ -695,9 +592,9 @@
     </figure>
   </section>
 
-  <!-- ───────────── 7. Comparing options (Ph. 2) ───────────── -->
+  <!-- ───────────── 6. Comparing options (Ph. 2) ───────────── -->
   <section id="compare">
-    <h2>7. Comparing options across all areas (Phase 2)</h2>
+    <h2>6. Comparing options across all areas (Phase 2)</h2>
     <p>Dotted lines show one area at a time. The comparison table puts competing drafts side by side across every area, plus a read-only "A + B" preview of two drafts together. Both arrive in Phase 2 with multiple drafts. Day one has the <a href="#sandbox">pin</a> instead.</p>
     <figure>
       <svg class="dg" viewBox="0 0 1000 330" role="img" aria-label="Comparison table with the current plan, Draft A, Draft B and a combined A plus B preview as columns, and rows for worst headroom per area, half-hours still short, units and megawatts added, indicative cost and clashes with the plan. Draft A fixes margin and inertia; Draft B fixes reserve but leaves margin short and clashes with the plan.">
@@ -758,9 +655,9 @@
     </figure>
   </section>
 
-  <!-- ───────────── 8. Commit flow ───────────── -->
+  <!-- ───────────── 7. Commit flow ───────────── -->
   <section id="commit">
-    <h2>8. What happens when an operator commits</h2>
+    <h2>7. What happens when an operator commits</h2>
     <p>One transaction: hard time rule, warnings to acknowledge, close the loaded plan actions (if this is an edit), add the new plan actions, and let the database reject any overlap. Then every screen is told.</p>
     <figure>
       <svg class="dg" viewBox="0 0 1000 590" role="img" aria-label="Operator A commits all or selected sandbox units. The API locks the sandbox, rejects an effective time in the past, and returns warnings about gate closure or notice time for acknowledgement. It closes the superseded plan actions if any, then inserts the new plan actions; the database rejects any overlap with another commitment, returning a clash. Otherwise it writes the plan version, snapshots and audit, recomputes the baseline and publishes an event to all browsers.">
@@ -834,9 +731,9 @@
     </figure>
   </section>
 
-  <!-- ───────────── 9. Lifecycle ───────────── -->
+  <!-- ───────────── 8. Lifecycle ───────────── -->
   <section id="lifecycle">
-    <h2>9. Draft lifecycle: committed drafts never become editable again</h2>
+    <h2>8. Draft lifecycle: committed drafts never become editable again</h2>
     <p>"Edit" on a committed draft loads it into your sandbox, with a warning if the sandbox isn't empty. The original stays in the plan until you commit, and then the edited version replaces it in one step.</p>
     <figure>
       <svg class="dg" viewBox="0 0 1000 330" role="img" aria-label="A new draft is editable and can be discarded, restored or deleted. Committing moves it to Committed, which is never editable. Edit on a committed draft loads it into the sandbox while the original stays in the plan; committing the sandbox supersedes the original. A committed draft can also be withdrawn from an effective time. Superseded and withdrawn drafts keep their past half-hours in the plan record.">
@@ -899,12 +796,12 @@
     </figure>
   </section>
 
-  <!-- ───────────── 10. Edit = supersede ───────────── -->
+  <!-- ───────────── 9. Edit = supersede ───────────── -->
   <section id="supersede">
-    <h2>10. Editing a committed draft: supersede, with no gap and the past kept</h2>
+    <h2>9. Editing a committed draft: supersede, with no gap and the past kept</h2>
     <p>Example: at 16:10 an operator trims DRAXX-1 (committed 15:00–19:00) to finish at 18:00. Each row is a plan version.</p>
     <figure>
-      <svg class="dg" viewBox="0 0 1000 360" role="img" aria-label="Today, uncommitting creates a plan version with nothing committed, shown as a shortfall, and it erases the past; recommitting comes later. With supersede, one new plan version keeps 15:00 to 16:30 from the original, closes the rest and adds the edited version from 16:30, so there is no gap. The effective time cannot be earlier than the next half-hour, and changes inside gate closure or notice time give a warning.">
+      <svg class="dg" viewBox="0 0 1000 360" role="img" aria-label="The rejected alternative, uncommitting, would create a plan version with nothing committed, shown as a shortfall, and would erase the past; recommitting comes later. With supersede, one new plan version keeps 15:00 to 16:30 from the original, closes the rest and adds the edited version from 16:30, so there is no gap. The effective time cannot be earlier than the next half-hour, and changes inside gate closure or notice time give a warning.">
         <rect class="band" x="460" y="50" width="60" height="245"/>
         <rect class="band-warn" x="520" y="50" width="120" height="245"/>
         <text class="lbl" x="490" y="44" text-anchor="middle">in delivery</text>
@@ -913,7 +810,7 @@
         <text class="lbl" x="476" y="292" text-anchor="end">now 16:10</text>
         <line class="acc-line" x1="520" y1="50" x2="520" y2="295"/>
 
-        <text class="t-title t-warn" x="20" y="80">Today: uncommit → edit → recommit</text>
+        <text class="t-title t-warn" x="20" y="80">Rejected: uncommit → edit → recommit</text>
         <text class="t-sub" x="20" y="106">v.N</text>
         <rect class="bar-a" x="340" y="92" width="480" height="20" rx="3"/>
         <text class="lbl" x="580" y="106" text-anchor="middle">Draft A · DRAXX-1</text>
@@ -957,10 +854,10 @@
     </figure>
   </section>
 
-  <!-- ───────────── 11. Sharing (Ph. 3) ───────────── -->
+  <!-- ───────────── 10. Sharing (Ph. 3) ───────────── -->
   <section id="sharing">
-    <h2>11. Sharing: who sees what (Phase 3)</h2>
-    <p>Same rules as the prototype, but with real users on different machines, checked by the server.</p>
+    <h2>10. Sharing: who sees what (Phase 3)</h2>
+    <p>Real users on different machines, with every rule checked by the server.</p>
     <figure>
       <svg class="dg" viewBox="0 0 1000 280" role="img" aria-label="Operator A owns Draft A and can edit, commit and share it. Operator B, who it is shared with, sees the dotted line read-only and can duplicate it. Operator C, not shared, does not see it. Once committed, everyone sees it in the baseline.">
         <defs>
@@ -994,13 +891,13 @@
         <rect class="accent-box" x="40" y="232" width="920" height="36" rx="8"/>
         <text x="500" y="255" text-anchor="middle">After commit: <tspan class="t-accent">everyone</tspan> (A, B, C and viewers) sees it as part of the solid baseline</text>
       </svg>
-      <figcaption>The prototype's charts showed every identity's open drafts. In the proposed design a chart draws only drafts you own or that are shared with you, matching the sidebar. Whether senior operators can see all open drafts is decision D7. Sharing with a whole desk (e.g. "NSE") as well as individuals is decision D8.</figcaption>
+      <figcaption>A chart draws only drafts you own or that are shared with you, matching the sidebar. Whether senior operators can see all open drafts is decision D7. Sharing with a whole desk (e.g. "NSE") as well as individuals is decision D8.</figcaption>
     </figure>
   </section>
 
-  <!-- ───────────── 12. Data model ───────────── -->
+  <!-- ───────────── 11. Data model ───────────── -->
   <section id="data-model">
-    <h2>12. Data model: drafts hold intent, plan actions hold the record</h2>
+    <h2>11. Data model: drafts hold intent, plan actions hold the record</h2>
     <p>The sandbox is a row in <code>drafts</code> (<code>kind = sandbox</code>). On commit, actions become immutable <code>plan_actions</code> under a new commitment record. Demand and requirement values move into scenario tables, reserve % and requirement rules into global planning policy, and contracted / constrained values into global availability data: facts, input values and policy are kept apart.</p>
     <figure>
       <svg class="dg" viewBox="0 0 1000 640" role="img" aria-label="Users own drafts, including the sandbox. Draft actions reference units, carry a list of reasons, and may replace a loaded plan action. On commit, actions are copied into immutable plan actions under a commitment record, stamped by plan events that also record the reference scenario. Sandbox pins hold one display-only state per user. Scenario tables hold demand, renewables and requirements; market snapshots hold facts only. Day one allows one open draft per user.">
@@ -1128,9 +1025,9 @@
     </figure>
   </section>
 
-  <!-- ───────────── 13. Scenarios (future) ───────────── -->
+  <!-- ───────────── 12. Scenarios (future) ───────────── -->
   <section id="scenarios">
-    <h2>13. Scenarios (future): the same drafts, tested against different futures</h2>
+    <h2>12. Scenarios (future): the same drafts, tested against different futures</h2>
     <p>Drafts vary what <em>we</em> do. Scenarios vary what the <em>world</em> does (demand, wind, solar, requirements). Because drafts store intent, any draft can be evaluated against any scenario unchanged. Phase 1 builds only the seams, with one central scenario.</p>
     <figure>
       <svg class="dg" viewBox="0 0 1000 300" role="img" aria-label="A grid of drafts by scenarios showing worst margin headroom. Draft A clears the central and low-wind scenarios but not the cold snap, so it is robust across two of three. Draft B only clears the cold snap. Draft C only clears central.">
@@ -1163,15 +1060,15 @@
         <text class="t-sub t-warn" x="853" y="225" text-anchor="middle">✗ −400 MW</text>
         <rect class="box-dash-accent" x="22" y="97" width="956" height="46" rx="6"/>
         <text class="lbl t-accent" x="32" y="136">robust: clears 2 of 3</text>
-        <text class="lbl" x="20" y="275">Future capability (§14.3), not built now. Figures illustrative. If one draft clears two scenarios, they are not decision-distinct: useful feedback to the scenario generator.</text>
+        <text class="lbl" x="20" y="275">Future capability (§10.3), not built now. Figures illustrative. If one draft clears two scenarios, they are not decision-distinct: useful feedback to the scenario generator.</text>
       </svg>
       <figcaption>Seams built in Phase 1: scenario and planning policy as explicit inputs to every calculation, demand and requirement values stored per scenario (not in market data; policy stays global), a baseline cache keyed by scenario, and the reference scenario recorded on every commit. With those in place, this grid, and drafts × areas × scenarios in the comparison table, can be added without a redesign.</figcaption>
     </figure>
   </section>
 
-  <!-- ───────────── 14. Delivery phases ───────────── -->
+  <!-- ───────────── 13. Delivery phases ───────────── -->
   <section id="phases">
-    <h2>14. Delivery phases</h2>
+    <h2>13. Delivery phases</h2>
     <p>Phase 1 is the day-one release: the sandbox with the full committed-plan design. Multiple drafts (with comparison) come before sharing, because comparing options matters more to operators than sharing them.</p>
     <figure>
       <svg class="dg" viewBox="0 0 1000 190" role="img" aria-label="Phase 0 decide; Phase 1 day one sandbox release made of 1a groundwork, 1b sandbox and versioned plan, 1c harden; Phase 2 multiple drafts with comparison; Phase 3 sharing; Phase 4 optional extras.">
@@ -1231,7 +1128,7 @@
         <text class="t-sub" x="926" y="130" text-anchor="middle">practice plan · profiles</text>
         <text class="lbl" x="926" y="158" text-anchor="middle">optional</text>
       </svg>
-      <figcaption>Sizes are relative (S/M/L) until Phase 0 is done. Phase 1a can start now in the prototype. After Phase 1, every operator has a saved sandbox, partial commit, Edit without gaps, a versioned plan, and scenario-ready calculations. Phase 2 lifts the one-sandbox rule and adds comparison. Phase 3 adds sharing.</figcaption>
+      <figcaption>Sizes are relative (S/M/L) until Phase 0 is done. Phase 1a has no back-end dependency and can start first. After Phase 1, every operator has a saved sandbox, partial commit, Edit without gaps, a versioned plan, and scenario-ready calculations. Phase 2 lifts the one-sandbox rule and adds comparison. Phase 3 adds sharing.</figcaption>
     </figure>
   </section>
 </main>
