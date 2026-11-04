@@ -2,8 +2,9 @@
 
 import { AREA_CONFIG } from '../dashboard.config'
 import { arrowPoints } from '../geometry'
-import type { MockSource } from '../types'
+import type { DraftOverlay, MockSource } from '../types'
 import { HATCH_FILL } from './charts/SvgDefs'
+import { DRAFT_DASH } from './charts/LineChart'
 import { IC_ESTIMATE_OPACITY } from './charts/IcChart'
 import styles from '../dashboard2.module.css'
 
@@ -17,7 +18,12 @@ export function mockNote(sources: MockSource[]): string | null {
   return parts.length > 0 ? `Mock data: ${parts.join(', ')}` : null
 }
 
-export default function Legend({ mockSources }: { mockSources: MockSource[] }) {
+interface Props {
+  mockSources: MockSource[]
+  drafts?: Pick<DraftOverlay, 'draftId' | 'name' | 'color'>[] // drafts currently overlaid on line rows
+}
+
+export default function Legend({ mockSources, drafts = [] }: Props) {
   const note = mockNote(mockSources)
   return (
     <div className={styles.legend}>
@@ -53,6 +59,12 @@ export default function Legend({ mockSources }: { mockSources: MockSource[] }) {
         <svg width="12" height="14" aria-hidden="true"><rect x="2" y="1" width="8" height="12" rx="1.5" fill="#7D8A9C" opacity={IC_ESTIMATE_OPACITY} /></svg>
         IC estimate
       </span>
+      {drafts.map(d => (
+        <span key={d.draftId} className={styles.legendItem} title={`Draft: ${d.name || 'Untitled'} (with draft applied)`}>
+          <svg width="26" height="10" aria-hidden="true"><line x1="0" y1="5" x2="26" y2="5" stroke={d.color} strokeWidth={1.8} strokeDasharray={DRAFT_DASH} /></svg>
+          <span className={styles.legendDraftName}>{d.name || 'Untitled'}</span>
+        </span>
+      ))}
       {note && <span className={styles.legendNote}>{note}</span>}
     </div>
   )

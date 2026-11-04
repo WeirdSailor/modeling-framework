@@ -24,15 +24,21 @@ function withMockActions(real: StripAreaData, mock: StripAreaData): StripAreaDat
 export class HybridDashboardDataProvider implements DashboardDataProvider {
   private readonly getReservePct: () => number
   private readonly getSources: () => AreaSources
+  private readonly getHiddenDraftIds: () => ReadonlySet<string>
 
-  constructor(getReservePct: () => number, getSources: () => AreaSources) {
+  constructor(
+    getReservePct: () => number,
+    getSources: () => AreaSources,
+    getHiddenDraftIds: () => ReadonlySet<string> = () => new Set(),
+  ) {
     this.getReservePct = getReservePct
     this.getSources = getSources
+    this.getHiddenDraftIds = getHiddenDraftIds
   }
 
   async fetch(window: TimeWindow): Promise<DashboardData> {
     const nowMs = Date.now()
-    const ctx = readRealContext(this.getReservePct(), nowMs)
+    const ctx = readRealContext(this.getReservePct(), nowMs, this.getHiddenDraftIds())
     const sources = this.getSources()
     const areas: AreaData[] = []
     const mockSources: MockSource[] = []

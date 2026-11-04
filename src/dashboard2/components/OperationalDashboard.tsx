@@ -14,7 +14,7 @@ import { HybridDashboardDataProvider } from '../data/HybridDashboardDataProvider
 import { useTimeWindow } from '../state/useTimeWindow'
 import { useDashboardData } from '../state/useDashboardData'
 import { CursorContext, createCursorStore } from '../state/cursorStore'
-import type { DrillDownEvent } from '../types'
+import type { DraftOverlay, DrillDownEvent } from '../types'
 import TopBar from './TopBar'
 import CustomRangeBanner from './CustomRangeBanner'
 import TimeAxis from './TimeAxis'
@@ -26,14 +26,19 @@ import styles from '../dashboard2.module.css'
 const inter = Inter({ subsets: ['latin'], weight: ['400', '500', '600', '700'] })
 
 const defaultDrillDown = (e: DrillDownEvent) => console.debug('[dashboard2] drill-down', e)
+const NO_HIDDEN_DRAFTS: ReadonlySet<string> = new Set()
 
 interface Props {
   reservePct: number
   areaSources?: AreaSources
+  // Drafts hidden via the sidebar's chart-visibility toggle — same set MarginChart/AreaChart honour.
+  hiddenDraftIds?: ReadonlySet<string>
   onDrillDown?: (e: DrillDownEvent) => void
 }
 
-export default function OperationalDashboard({ reservePct, areaSources = AREA_SOURCES, onDrillDown = defaultDrillDown }: Props) {
+export default function OperationalDashboard({
+  reservePct, areaSources = AREA_SOURCES, hiddenDraftIds = NO_HIDDEN_DRAFTS, onDrillDown = defaultDrillDown,
+}: Props) {
   const { mode, window: win, nowMs, selectPreset, applyCustom, backToLive } = useTimeWindow()
 
   // Provider reads reservePct and the area sources lazily so it stays a stable instance.
@@ -41,12 +46,22 @@ export default function OperationalDashboard({ reservePct, areaSources = AREA_SO
   useEffect(() => { reservePctRef.current = reservePct }, [reservePct])
   const areaSourcesRef = useRef(areaSources)
   useEffect(() => { areaSourcesRef.current = areaSources }, [areaSources])
-  const provider = useMemo(() => new HybridDashboardDataProvider(() => reservePctRef.current, () => areaSourcesRef.current), [])
+  const hiddenDraftIdsRef = useRef(hiddenDraftIds)
+  useEffect(() => { hiddenDraftIdsRef.current = hiddenDraftIds }, [hiddenDraftIds])
+  const provider = useMemo(() => new HybridDashboardDataProvider(
+    () => reservePctRef.current, () => areaSourcesRef.current, () => hiddenDraftIdsRef.current,
+  ), [])
 
-  // Refetch immediately when the shared store data, the TR2 multiplier or the area sources change.
+  // Refetch immediately when the shared store data, the TR2 multiplier, the area sources or the
+  // drafts (edits, commits, sidebar visibility) change.
   const settlementPeriods = useModellingStore(s => s.settlementPeriods)
   const areaRequirements = useModellingStore(s => s.areaRequirements)
-  const refreshKey = useMemo(() => ({ settlementPeriods, areaRequirements, reservePct, areaSources }), [settlementPeriods, areaRequirements, reservePct, areaSources])
+  const drafts = useModellingStore(s => s.drafts)
+  const units = useModellingStore(s => s.units)
+  const refreshKey = useMemo(
+    () => ({ settlementPeriods, areaRequirements, reservePct, areaSources, drafts, units, hiddenDraftIds }),
+    [settlementPeriods, areaRequirements, reservePct, areaSources, drafts, units, hiddenDraftIds],
+  )
   const { data, lastFetchFailed } = useDashboardData(provider, win.startMs, win.endMs, refreshKey)
 
   // Shared chart width (ResizeObserver on the axis chart cell); every row uses the same scale.
@@ -95,6 +110,16 @@ export default function OperationalDashboard({ reservePct, areaSources = AREA_SO
 
   const areasById = useMemo(() => new Map((data?.areas ?? []).map(a => [a.id, a])), [data])
 
+  // Drafts drawn on at least one line row, for the legend (first occurrence wins).
+  const overlayDrafts = useMemo(() => {
+    const seen = new Map<string, Pick<DraftOverlay, 'draftId' | 'name' | 'color'>>()
+    for (const a of data?.areas ?? []) {
+      if (a.kind !== 'line') continue
+      for (const o of a.draftOverlays ?? []) if (!seen.has(o.draftId)) seen.set(o.draftId, o)
+    }
+    return [...seen.values()]
+  }, [data])
+
   return (
     <CursorContext.Provider value={cursorStore}>
       <div className={`${styles.root} ${inter.className}`} tabIndex={0} onKeyDown={onKeyDown} aria-label="Operational dashboard">
@@ -122,7 +147,7 @@ export default function OperationalDashboard({ reservePct, areaSources = AREA_SO
           {chartWidth > 0 && AREA_CONFIG.map(cfg => (
             <AreaRow key={cfg.id} cfg={cfg} area={areasById.get(cfg.id)} scale={scale} nowMs={nowMs} onDrillDown={onDrillDown} />
           ))}
-          <Legend mockSources={data?.mockSources ?? []} />
+          <Legend mockSources={data?.mockSources ?? []} drafts={overlayDrafts} />
         </div>
       </div>
     </CursorContext.Provider>

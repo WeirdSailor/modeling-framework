@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   lineWorst, lineTone, cellState, cellVisual, aggregateActions, stripWorst, itemStateFromHeadroom,
-  icSwings, largestSwing, icTone, isIcSeam, applyFetchResult, isStale,
+  icSwings, largestSwing, icTone, isIcSeam, applyFetchResult, isStale, draftCovers, overlayPeriods,
 } from '../derive.ts'
 
 const SP = 30 * 60 * 1000
@@ -139,4 +139,43 @@ test('Stale: on fetch failure, or after 2 missed polls', () => {
   assert.equal(isStale(t, t + 60_000, false, poll, 2), false)  // exactly 2 polls old → still Live
   assert.equal(isStale(t, t + 60_001, false, poll, 2), true)   // older than 2 polls → Stale
   assert.equal(isStale(null, t, false, poll, 2), false)        // nothing loaded yet
+})
+
+// ── Draft overlays ───────────────────────────────────────────────────────
+
+test('draftCovers honours inclusive bounds and open-ended actions', () => {
+  const actions = [{ fromPeriod: 5, toPeriod: 7 }, { fromPeriod: 20, toPeriod: undefined }]
+  assert.equal(draftCovers(actions, 4), false)
+  assert.equal(draftCovers(actions, 5), true)
+  assert.equal(draftCovers(actions, 7), true)
+  assert.equal(draftCovers(actions, 8), false)
+  assert.equal(draftCovers(actions, 48), true)
+  assert.equal(draftCovers([], 5), false)
+})
+
+const row = (k, covered, draftAvailable = 0, available = 100) =>
+  ({ period: { spStart: at(k), requirement: 50, available }, covered, draftAvailable })
+
+test('overlayPeriods: draft value on covered SPs, baseline bridge on each neighbour, nothing elsewhere', () => {
+  const out = overlayPeriods([row(0, false), row(1, false), row(2, true, 300), row(3, true, 310), row(4, false), row(5, false)])
+  assert.deepEqual(out.map(p => [p.spStart, p.available, !!p.bridge]), [
+    [at(1), 100, true],
+    [at(2), 300, false],
+    [at(3), 310, false],
+    [at(4), 100, true],
+  ])
+})
+
+test('overlayPeriods never bridges across a missing SP', () => {
+  const out = overlayPeriods([row(0, false), row(2, true, 300), row(4, false)])
+  assert.deepEqual(out.map(p => p.spStart), [at(2)])
+})
+
+test('overlayPeriods: an uncovered SP between two covered ones is a single bridge', () => {
+  const out = overlayPeriods([row(0, true, 200), row(1, false), row(2, true, 250)])
+  assert.deepEqual(out.map(p => [p.available, !!p.bridge]), [[200, false], [100, true], [250, false]])
+})
+
+test('overlayPeriods returns nothing when the draft covers no SP', () => {
+  assert.deepEqual(overlayPeriods([row(0, false), row(1, false)]), [])
 })

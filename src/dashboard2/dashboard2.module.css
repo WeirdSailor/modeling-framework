@@ -161,3 +161,4 @@
 }
 .legendItem { display: inline-flex; align-items: center; gap: 7px; }
 .legendNote { margin-left: auto; }
+.legendDraftName { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -74,11 +74,22 @@ A swing (`net[b] − net[b−1]`) is only meaningful when both values describe c
 - A skipped boundary renders as a gap (no bar) and is excluded from "largest swing".
 - Swings between two estimates that are consecutive in their source data are kept, but drawn at 40% opacity. Mock data has no source info and is treated as continuous.
 
+## Draft overlays (line rows)
+
+Uncommitted drafts are drawn as dotted lines on the **real** line rows only: +ve MARGIN and INERTIA. Mock rows (−ve MARGIN, LARGEST LOSS) and the strip/IC rows don't show them. Committed drafts are already in the baseline, because `refreshAllAggregates` folds them into `sp.emx` and `sp.areaAvailability`.
+
+- **Which drafts:** every `status === 'draft'` plan not hidden by the sidebar's chart-visibility toggle. This is the same set MarginChart and AreaChart draw, regardless of owner. `page.tsx` passes `hiddenDraftIds` in.
+- **+ve MARGIN draft value:** `applyDraftToBaseline(...).emx`, with `alreadyModelled` = units with PN > 1 in that SP ∪ units in a committed action covering that SP. This is exactly MarginChart's calculation. The requirement is unchanged.
+- **INERTIA draft value:** `applyDraftToAreaBaseline(sp, available, actions, committedUnits, units, 'inertia')`, exactly as AreaChart computes it.
+- **Shape:** each `LineAreaData.draftOverlays[]` entry holds only the SPs the draft covers, plus one **bridge** SP either side at the baseline value (`bridge: true`). The dotted line therefore branches off and rejoins the solid one, as in MarginChart. Overlays are built over the whole store window and then trimmed to the view, so a draft covering the SP just outside the view still bridges correctly. Bridges are never drawn across a data gap (`overlayPeriods` in `derive.ts`).
+- **Scale:** the same fixed `bandAbove`/`bandBelow` scale as the baseline, so a large draft uplift clamps flat at the row edge. The cursor label shows the true value.
+- **Not changed by drafts:** the worst-in-window value and the line fills. Both still describe the baseline.
+
 ## Refresh cadence
 
 The existing dashboard has no polling: the store only changes when data is loaded, Refresh is pressed, a draft is committed or a requirement is edited. Dashboard 2 therefore:
 - uses the spec default of a **30s poll**;
-- **refetches immediately** when the store's `settlementPeriods` or `areaRequirements` change, or when `reservePct` changes;
+- **refetches immediately** when the store's `settlementPeriods`, `areaRequirements`, `drafts` or `units` change, or when `reservePct`, the area sources or the sidebar's `hiddenDraftIds` change;
 - sets `forecastRunAt` for real data to the time the last store data load finished (`isLoading` true → false). This is tracked by a module-level store subscription in `data/realAdapters.ts`.
 
 ## Assumptions

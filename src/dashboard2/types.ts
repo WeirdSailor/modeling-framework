@@ -15,10 +15,25 @@ export interface TimeWindow { start: ISO; end: ISO }
 
 export interface LinePeriod { spStart: ISO; requirement: number; available: number }
 
+/**
+ * One overlay period: the draft's value where the draft covers the SP, or — when `bridge` is set — the
+ * baseline value on an uncovered neighbour, so the dotted line branches off and rejoins the solid one.
+ */
+export interface DraftOverlayPeriod extends LinePeriod { bridge?: boolean }
+
+/** What a line row would look like with one uncommitted draft applied on top of the baseline. */
+export interface DraftOverlay {
+  draftId: string
+  name: string
+  color: string
+  periods: DraftOverlayPeriod[] // only covered SPs and their bridges; everything else is absent
+}
+
 export interface LineAreaData {
   kind: 'line'
   id: AreaId
   periods: LinePeriod[]
+  draftOverlays?: DraftOverlay[] // real adapters only; absent for mock rows
 }
 
 export interface StripAction {

@@ -1,7 +1,9 @@
 // Pure derivations for Dashboard 2: headroom, strip cell state, action aggregation, worst-in-window,
 // IC swings. Type-only imports so this runs under `node --test` with type stripping.
 
-import type { DashboardData, IcPeriod, LinePeriod, SpState, StripAction, StripPeriod } from './types'
+import type {
+  DashboardData, DraftOverlayPeriod, IcPeriod, LinePeriod, SpState, StripAction, StripPeriod,
+} from './types'
 
 const SP_MS = 30 * 60 * 1000 // duplicated from time.ts to keep this module free of value imports
 
@@ -29,6 +31,39 @@ export function lineWorst(periods: LinePeriod[], startMs: number, endMs: number)
     if (!worst || h < worst.headroom) worst = { headroom: h, requirement: p.requirement, spStart: p.spStart }
   }
   return worst
+}
+
+// ── Draft overlays (line rows) ───────────────────────────────────────────
+
+/** True when any action covers the store slot index (toPeriod undefined = open-ended). */
+export function draftCovers(actions: { fromPeriod: number; toPeriod?: number }[], slotIdx: number): boolean {
+  return actions.some(a => a.fromPeriod <= slotIdx && (a.toPeriod === undefined || a.toPeriod >= slotIdx))
+}
+
+export interface OverlayInput {
+  period: LinePeriod      // baseline
+  covered: boolean        // the draft has an action in this SP
+  draftAvailable: number  // available with the draft applied (only read when covered)
+}
+
+/**
+ * One draft's overlay periods from time-ordered baseline rows, mirroring MarginChart: the draft value
+ * on covered SPs, the baseline value (bridge) on an uncovered SP directly adjacent to a covered one,
+ * nothing elsewhere. Rows that are not consecutive SPs are never bridged across.
+ */
+export function overlayPeriods(rows: OverlayInput[]): DraftOverlayPeriod[] {
+  const out: DraftOverlayPeriod[] = []
+  const adjacent = (i: number, j: number) =>
+    j >= 0 && j < rows.length && Math.abs(ms(rows[i].period.spStart) - ms(rows[j].period.spStart)) === SP_MS
+  for (let i = 0; i < rows.length; i++) {
+    const { period, covered, draftAvailable } = rows[i]
+    if (covered) {
+      out.push({ ...period, available: draftAvailable })
+    } else if ((adjacent(i, i - 1) && rows[i - 1].covered) || (adjacent(i, i + 1) && rows[i + 1].covered)) {
+      out.push({ ...period, bridge: true })
+    }
+  }
+  return out
 }
 
 export type ValueTone = 'crit' | 'warn' | 'muted'

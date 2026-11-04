@@ -684,7 +684,7 @@ export default function Home() {
 
         {/* Dashboard 2 tab — cross-area operational awareness view */}
         {activeTab === 'dashboard2' && (
-          <OperationalDashboard reservePct={tweaks.reservePct} areaSources={d2Sources} />
+          <OperationalDashboard reservePct={tweaks.reservePct} areaSources={d2Sources} hiddenDraftIds={hiddenDraftIds} />
         )}
 
         {/* Workspace tab */}

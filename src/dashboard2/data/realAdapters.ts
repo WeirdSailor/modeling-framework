@@ -6,12 +6,17 @@ import { useModellingStore } from '@/store/useModellingStore'
 import { getArea, type AreaId as StoreAreaId } from '@/config/areas'
 import { buildDemo24hRun, buildDemo4hRuns } from '@/config/constraintFixtures'
 import { bandForUtilisation } from '@/utils/constraintSummary'
-import type { AreaRequirementRow, ConstraintBand, SettlementPeriodData } from '@/models/types'
+import { applyDraftToBaseline } from '@/utils/margin'
+import { applyDraftToAreaBaseline } from '@/utils/areaAggregates'
+import type {
+  AreaRequirementRow, BMUnit, ConstraintBand, DraftPlan, ModellingAction, SettlementPeriodData,
+} from '@/models/types'
 import { CORRECT_ELEXON_SP_TO_UTC, STRIP_TIGHT_MW } from '../dashboard.config'
-import { itemStateFromHeadroom } from '../derive'
+import { draftCovers, itemStateFromHeadroom, overlayPeriods, type OverlayInput } from '../derive'
 import { SP_MS, settlementSpStartUtc } from '../time'
 import type {
-  AreaData, AreaId, IcAreaData, LineAreaData, SpState, StripAreaData, StripPeriod, TimeWindow,
+  AreaData, AreaId, DraftOverlay, IcAreaData, LineAreaData, LinePeriod, SpState, StripAreaData, StripPeriod,
+  TimeWindow,
 } from '../types'
 
 export interface RealContext {
@@ -19,6 +24,9 @@ export interface RealContext {
   areaRequirements: Record<string, AreaRequirementRow[]>
   reservePct: number
   nowMs: number
+  units: BMUnit[]
+  overlayDrafts: DraftPlan[]           // uncommitted drafts to overlay (status 'draft', not hidden in the sidebar)
+  committedActions: ModellingAction[]  // already in the baseline (sp.emx / areaAvailability)
 }
 
 // ── "Forecast run" time for real data: when the last store data load finished ──────────────
@@ -36,9 +44,14 @@ export function realDataLoadedAt(): number | null {
   return lastLoadedAt
 }
 
-export function readRealContext(reservePct: number, nowMs: number): RealContext {
-  const { settlementPeriods, areaRequirements } = useModellingStore.getState()
-  return { settlementPeriods, areaRequirements, reservePct, nowMs }
+export function readRealContext(reservePct: number, nowMs: number, hiddenDraftIds: ReadonlySet<string>): RealContext {
+  const { settlementPeriods, areaRequirements, units, drafts } = useModellingStore.getState()
+  return {
+    settlementPeriods, areaRequirements, reservePct, nowMs, units,
+    // Same draft set as MarginChart / AreaChart: every 'draft'-status plan the sidebar has not hidden.
+    overlayDrafts: drafts.filter(d => d.status === 'draft' && !hiddenDraftIds.has(d.id)),
+    committedActions: drafts.filter(d => d.status === 'committed').flatMap(d => d.actions),
+  }
 }
 
 // ── Slot timing ──────────────────────────────────────────────────────────
@@ -82,34 +95,78 @@ function requirementIndex(ctx: RealContext, area: string): Map<number, AreaRequi
   return new Map((ctx.areaRequirements[area] ?? []).map(r => [r.sp, r]))
 }
 
+function allSlots(ctx: RealContext): Slot[] {
+  return slotsIn(ctx, -Infinity, Infinity)
+}
+
 const iso = (ms: number) => new Date(ms).toISOString()
 
 // ── Line areas ───────────────────────────────────────────────────────────
 
+interface LineRow { startMs: number; sp: SettlementPeriodData; period: LinePeriod }
+
+/**
+ * Builds a line area from rows over the WHOLE store window (so a draft covering the SP just outside the
+ * view still bridges correctly), then trims baseline and overlays to the view window.
+ */
+function lineArea(
+  id: AreaId,
+  rows: LineRow[],
+  ctx: RealContext,
+  w: { startMs: number; endMs: number },
+  draftAvailable: (draft: DraftPlan, row: LineRow) => number,
+): LineAreaData {
+  const inView = (p: LinePeriod) => { const t = Date.parse(p.spStart); return t >= w.startMs && t < w.endMs }
+  const draftOverlays: DraftOverlay[] = []
+  for (const draft of ctx.overlayDrafts) {
+    const inputs: OverlayInput[] = rows.map(row => {
+      const covered = draftCovers(draft.actions, row.sp.settlementPeriod)
+      return { period: row.period, covered, draftAvailable: covered ? draftAvailable(draft, row) : row.period.available }
+    })
+    const periods = overlayPeriods(inputs).filter(inView)
+    if (periods.some(p => !p.bridge)) {
+      draftOverlays.push({ draftId: draft.id, name: draft.name, color: draft.color, periods })
+    }
+  }
+  return { kind: 'line', id, periods: rows.map(r => r.period).filter(inView), draftOverlays }
+}
+
 function posMargin(ctx: RealContext, w: { startMs: number; endMs: number }): LineAreaData {
   // Same requirement as the existing Margin tile: TR2 + General Reserve requirement.
   const genReserve = requirementIndex(ctx, 'general_reserve')
-  return {
-    kind: 'line',
-    id: 'posMargin',
-    periods: slotsIn(ctx, w.startMs, w.endMs).map(({ startMs, sp }) => ({
+  const rows: LineRow[] = allSlots(ctx).map(({ startMs, sp }) => ({
+    startMs, sp,
+    period: {
       spStart: iso(startMs),
       requirement: sp.demand * (1 + ctx.reservePct / 100) + (genReserve.get(sp.settlementPeriod)?.requirement ?? 0),
       available: sp.emx,
-    })),
-  }
+    },
+  }))
+  // Draft EMX exactly as MarginChart computes it: units already generating (PN > 1) or in a committed
+  // action covering this SP are already in the baseline and add nothing.
+  return lineArea('posMargin', rows, ctx, w, (draft, { sp }) => {
+    const alreadyModelled = new Set<string>()
+    for (const [bmUnit, pn] of Object.entries(sp.pn)) if (pn > 1) alreadyModelled.add(bmUnit)
+    for (const a of ctx.committedActions) {
+      if (draftCovers([a], sp.settlementPeriod)) alreadyModelled.add(a.bmUnitId)
+    }
+    return applyDraftToBaseline(sp, sp.emx, sp.eol, sp.emi, draft.actions, alreadyModelled, ctx.units).emx
+  })
 }
 
 function areaLine(id: AreaId, storeArea: StoreAreaId, ctx: RealContext, w: { startMs: number; endMs: number }): LineAreaData {
   const reqs = requirementIndex(ctx, storeArea)
-  const periods: LineAreaData['periods'] = []
-  for (const { startMs, sp } of slotsIn(ctx, w.startMs, w.endMs)) {
+  const rows: LineRow[] = []
+  for (const { startMs, sp } of allSlots(ctx)) {
     const row = reqs.get(sp.settlementPeriod)
     const available = sp.areaAvailability?.[storeArea]
     if (!row || available === undefined) continue // gap, never zero
-    periods.push({ spStart: iso(startMs), requirement: row.requirement, available })
+    rows.push({ startMs, sp, period: { spStart: iso(startMs), requirement: row.requirement, available } })
   }
-  return { kind: 'line', id, periods }
+  // Draft availability exactly as AreaChart computes it: units in any committed draft add nothing.
+  const committedUnits = new Set(ctx.committedActions.map(a => a.bmUnitId))
+  return lineArea(id, rows, ctx, w, (draft, { sp, period }) =>
+    applyDraftToAreaBaseline(sp, period.available, draft.actions, committedUnits, ctx.units, storeArea))
 }
 
 // ── Strip areas from requirement vs availability ─────────────────────────
