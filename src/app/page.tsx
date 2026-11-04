@@ -16,7 +16,7 @@ import SelectedTable from '@/components/SelectedTable'
 import ConfigPanel, { type TweakState } from '@/components/ConfigPanel'
 import ConfirmModal from '@/components/ConfirmModal'
 import FeedbackModal from '@/components/FeedbackModal'
-import CommittedTab from '@/components/CommittedTab'
+import PromotedTab from '@/components/PromotedTab'
 import RedeclareTab from '@/components/RedeclareTab'
 import BatterySummaryTab from '@/components/BatterySummaryTab'
 import BatteryRedeclareTab from '@/components/BatteryRedeclareTab'
@@ -32,7 +32,7 @@ import type { AreaId } from '@/config/areas'
 import { AREAS, getArea } from '@/config/areas'
 import { computeAreaStatus } from '@/utils/areaAggregates'
 
-type Tab = 'dashboard' | 'dashboard2' | 'workspace' | 'chart' | 'committed' | 'redeclare' | 'graph' | 'requirements'
+type Tab = 'dashboard' | 'dashboard2' | 'workspace' | 'chart' | 'promoted' | 'redeclare' | 'graph' | 'requirements'
 type BatteryTab = 'summary' | 'redeclare' | 'reliability'
 
 interface ConfirmState {
@@ -151,7 +151,7 @@ export default function Home() {
   const duplicateDraft    = useModellingStore(s => s.duplicateDraft)
   const shareDraft        = useModellingStore(s => s.shareDraft)
   const unshareDraft      = useModellingStore(s => s.unshareDraft)
-  const commitDraft       = useModellingStore(s => s.commitDraft)
+  const promoteDraft       = useModellingStore(s => s.promoteDraft)
   const discardDraft      = useModellingStore(s => s.discardDraft)
   const reopenDraft       = useModellingStore(s => s.reopenDraft)
   const deleteDraft       = useModellingStore(s => s.deleteDraft)
@@ -286,8 +286,8 @@ export default function Home() {
   // ── derived data ──
   const activeDraft = drafts.find(d => d.id === activeDraftId) ?? null
 
-  const committedUnitIds = useMemo(() => new Set(
-    drafts.filter(d => d.status === 'committed').flatMap(d => d.actions.map(a => a.bmUnitId))
+  const promotedUnitIds = useMemo(() => new Set(
+    drafts.filter(d => d.status === 'promoted').flatMap(d => d.actions.map(a => a.bmUnitId))
   ), [drafts])
 
   const pnCommittedUnitIds = useMemo(() => new Set(
@@ -300,10 +300,10 @@ export default function Home() {
     units.filter(u =>
       !EXCLUDED_FUEL_TYPES.has(u.fuelType) &&
       u.registeredCapacity > 0 &&
-      !committedUnitIds.has(u.bmUnitId) &&
+      !promotedUnitIds.has(u.bmUnitId) &&
       !pnCommittedUnitIds.has(u.bmUnitId)
     )
-  , [units, committedUnitIds, pnCommittedUnitIds])
+  , [units, promotedUnitIds, pnCommittedUnitIds])
 
   // Wind units for Pullback — not filtered by pnCommittedUnitIds since generating
   // wind is exactly what we want to curtail
@@ -311,9 +311,9 @@ export default function Home() {
     units.filter(u =>
       PULLBACK_FUEL_TYPES.has(u.fuelType) &&
       u.registeredCapacity > 0 &&
-      !committedUnitIds.has(u.bmUnitId)
+      !promotedUnitIds.has(u.bmUnitId)
     )
-  , [units, committedUnitIds])
+  , [units, promotedUnitIds])
 
   const unitsForAvailableTable = scenario === 'pullback' ? pullbackUnits : availableUnits
 
@@ -374,16 +374,16 @@ export default function Home() {
     flashToast('Draft duplicated')
   }
 
-  function handleCommit() {
+  function handlePromote() {
     if (!activeDraftId || !activeDraft) return
     setConfirmState({
-      message: `Commit "${activeDraft.name}"?`,
-      confirmLabel: 'Commit',
+      message: `Promote "${activeDraft.name}"?`,
+      confirmLabel: 'Promote',
       onConfirm: () => {
-        commitDraft(activeDraftId)
+        promoteDraft(activeDraftId)
         setSolveTarget(null)
         setAvailablePendingIds(new Set())
-        flashToast('Draft committed')
+        flashToast('Draft promoted')
         setConfirmState(null)
       },
     })
@@ -406,9 +406,9 @@ export default function Home() {
 
   function handleReopen() {
     if (!activeDraftId || !activeDraft) return
-    const wasCommitted = activeDraft.status === 'committed'
+    const wasPromoted = activeDraft.status === 'promoted'
     reopenDraft(activeDraftId)
-    flashToast(wasCommitted ? 'Draft uncommitted' : 'Draft restored')
+    flashToast(wasPromoted ? 'Draft unpromoted' : 'Draft restored')
   }
 
   function handleDelete() {
@@ -449,14 +449,14 @@ export default function Home() {
     flashToast(`Removed ${bmUnitId}`)
   }
 
-  function handleRemoveCommittedUnits(removals: { draftId: string; bmUnitId: string }[]) {
+  function handleRemovePromotedUnits(removals: { draftId: string; bmUnitId: string }[]) {
     for (const { draftId, bmUnitId } of removals) {
       removeUnitFromDraft(draftId, bmUnitId)
     }
     flashToast(
       removals.length === 1
-        ? `Removed ${removals[0].bmUnitId} from committed draft`
-        : `Removed ${removals.length} units from committed drafts`
+        ? `Removed ${removals[0].bmUnitId} from promoted draft`
+        : `Removed ${removals.length} units from promoted drafts`
     )
   }
 
@@ -611,10 +611,10 @@ export default function Home() {
             Workspace
           </button>
           <button
-            className={`tab-btn${activeTab === 'committed' ? ' active' : ''}`}
-            onClick={() => setActiveTab('committed')}
+            className={`tab-btn${activeTab === 'promoted' ? ' active' : ''}`}
+            onClick={() => setActiveTab('promoted')}
           >
-            Committed
+            Promoted
           </button>
           <button
             className={`tab-btn${activeTab === 'graph' ? ' active' : ''}`}
@@ -716,7 +716,7 @@ export default function Home() {
                     setSolveTarget(null)
                     updateDraftWindow(activeDraftId!, activeDraft.fromPeriod, to)
                   }}
-                  onCommit={handleCommit}
+                  onPromote={handlePromote}
                   onDiscard={handleDiscard}
                   onReopen={handleReopen}
                   onDelete={handleDelete}
@@ -912,16 +912,16 @@ export default function Home() {
           </div>
         )}
 
-        {/* Committed tab */}
-        {activeTab === 'committed' && (
-          <CommittedTab
+        {/* Promoted tab */}
+        {activeTab === 'promoted' && (
+          <PromotedTab
             drafts={drafts}
             unitById={unitById}
             unitPnByBmUnit={unitPnByBmUnit}
             dataOverrides={dataOverrides}
             unitServices={unitServices}
             settlementPeriods={settlementPeriods}
-            onRemoveUnits={handleRemoveCommittedUnits}
+            onRemoveUnits={handleRemovePromotedUnits}
           />
         )}
 

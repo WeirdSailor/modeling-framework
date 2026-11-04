@@ -21,7 +21,7 @@ export interface LinePeriod { spStart: ISO; requirement: number; available: numb
  */
 export interface DraftOverlayPeriod extends LinePeriod { bridge?: boolean }
 
-/** What a line row would look like with one uncommitted draft applied on top of the baseline. */
+/** What a line row would look like with one not-yet-promoted draft applied on top of the baseline. */
 export interface DraftOverlay {
   draftId: string
   name: string

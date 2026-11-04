@@ -25,8 +25,8 @@ export interface RealContext {
   reservePct: number
   nowMs: number
   units: BMUnit[]
-  overlayDrafts: DraftPlan[]           // uncommitted drafts to overlay (status 'draft', not hidden in the sidebar)
-  committedActions: ModellingAction[]  // already in the baseline (sp.emx / areaAvailability)
+  overlayDrafts: DraftPlan[]           // not-yet-promoted drafts to overlay (status 'draft', not hidden in the sidebar)
+  promotedActions: ModellingAction[]  // already in the baseline (sp.emx / areaAvailability)
 }
 
 // ── "Forecast run" time for real data: when the last store data load finished ──────────────
@@ -50,7 +50,7 @@ export function readRealContext(reservePct: number, nowMs: number, hiddenDraftId
     settlementPeriods, areaRequirements, reservePct, nowMs, units,
     // Same draft set as MarginChart / AreaChart: every 'draft'-status plan the sidebar has not hidden.
     overlayDrafts: drafts.filter(d => d.status === 'draft' && !hiddenDraftIds.has(d.id)),
-    committedActions: drafts.filter(d => d.status === 'committed').flatMap(d => d.actions),
+    promotedActions: drafts.filter(d => d.status === 'promoted').flatMap(d => d.actions),
   }
 }
 
@@ -142,12 +142,12 @@ function posMargin(ctx: RealContext, w: { startMs: number; endMs: number }): Lin
       available: sp.emx,
     },
   }))
-  // Draft EMX exactly as MarginChart computes it: units already generating (PN > 1) or in a committed
+  // Draft EMX exactly as MarginChart computes it: units already generating (PN > 1) or in a promoted
   // action covering this SP are already in the baseline and add nothing.
   return lineArea('posMargin', rows, ctx, w, (draft, { sp }) => {
     const alreadyModelled = new Set<string>()
     for (const [bmUnit, pn] of Object.entries(sp.pn)) if (pn > 1) alreadyModelled.add(bmUnit)
-    for (const a of ctx.committedActions) {
+    for (const a of ctx.promotedActions) {
       if (draftCovers([a], sp.settlementPeriod)) alreadyModelled.add(a.bmUnitId)
     }
     return applyDraftToBaseline(sp, sp.emx, sp.eol, sp.emi, draft.actions, alreadyModelled, ctx.units).emx
@@ -163,10 +163,10 @@ function areaLine(id: AreaId, storeArea: StoreAreaId, ctx: RealContext, w: { sta
     if (!row || available === undefined) continue // gap, never zero
     rows.push({ startMs, sp, period: { spStart: iso(startMs), requirement: row.requirement, available } })
   }
-  // Draft availability exactly as AreaChart computes it: units in any committed draft add nothing.
-  const committedUnits = new Set(ctx.committedActions.map(a => a.bmUnitId))
+  // Draft availability exactly as AreaChart computes it: units in any promoted draft add nothing.
+  const promotedUnits = new Set(ctx.promotedActions.map(a => a.bmUnitId))
   return lineArea(id, rows, ctx, w, (draft, { sp, period }) =>
-    applyDraftToAreaBaseline(sp, period.available, draft.actions, committedUnits, ctx.units, storeArea))
+    applyDraftToAreaBaseline(sp, period.available, draft.actions, promotedUnits, ctx.units, storeArea))
 }
 
 // ── Strip areas from requirement vs availability ─────────────────────────

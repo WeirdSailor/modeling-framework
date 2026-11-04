@@ -10,7 +10,7 @@ const NON_MARGIN_AREA_IDS = [
   'contingency_reserve', 'response', 'inertia', 'voltage',
 ] as const
 
-// MW / GVAs / MVAr contribution of committing one unit to a given area for a given SP.
+// MW / GVAs / MVAr contribution of promoting one unit to a given area for a given SP.
 // Returns 0 for margin — margin uses the existing computeAggregates path.
 export function unitAreaContribution(
   bmUnitId: string,
@@ -48,7 +48,7 @@ export function unitAreaContribution(
 // Called after refreshAggregates so sp.emx/eol/emi are already fresh.
 export function computeAreaAvailabilities(
   settlementPeriods: SettlementPeriodData[],
-  committedActions: ModellingAction[],
+  promotedActions: ModellingAction[],
   units: BMUnit[],
   areaRequirements: Record<string, AreaRequirementRow[]>
 ): SettlementPeriodData[] {
@@ -63,7 +63,7 @@ export function computeAreaAvailabilities(
 
       const seen = new Set<string>()
       let contribution = 0
-      for (const action of committedActions) {
+      for (const action of promotedActions) {
         if (
           action.fromPeriod <= spIdx &&
           (action.toPeriod === undefined || action.toPeriod >= spIdx) &&
@@ -80,8 +80,8 @@ export function computeAreaAvailabilities(
   })
 }
 
-// For draft overlay rendering: compute projected availability if draft actions were committed.
-// alreadyModelled = bmUnitIds already counted in sp.areaAvailability[area] (committed draft units).
+// For draft overlay rendering: compute projected availability if draft actions were promoted.
+// alreadyModelled = bmUnitIds already counted in sp.areaAvailability[area] (promoted draft units).
 export function applyDraftToAreaBaseline(
   sp: SettlementPeriodData,
   baseAvailability: number,

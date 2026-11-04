@@ -33,7 +33,7 @@ export interface SettlementPeriodData {
   hasConfirmedPn: boolean; // true if this slot has post-gate-closure PN data from Elexon
   proxyEmx: number;        // D-1 EMX estimate for unconfirmed slots (0 if confirmed or unavailable)
   proxyEol: number;        // D-1 EOL estimate for unconfirmed slots (0 if confirmed or unavailable)
-  areaAvailability?: Record<string, number>  // effective availability per non-Margin AreaId, after committed actions
+  areaAvailability?: Record<string, number>  // effective availability per non-Margin AreaId, after promoted actions
 }
 
 export type ServiceType = 'SR' | 'QR'
@@ -122,13 +122,13 @@ export interface DraftPlan {
   name: string;
   description: string;
   actions: ModellingAction[];
-  status: 'draft' | 'committed' | 'discarded';
+  status: 'draft' | 'promoted' | 'discarded';
   color: string;
   fromPeriod: number;
   toPeriod: number;
   unitNotes: Record<string, string>;
   createdAt: number;
-  committedAt?: number;
+  promotedAt?: number;
   discardedAt?: number;
   ownerId: UserId;
   sharedWith: UserId[];

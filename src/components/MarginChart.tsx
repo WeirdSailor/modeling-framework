@@ -303,8 +303,8 @@ export function MarginChart({
   }
 
   const activeDrafts = drafts.filter(d => d.status === 'draft' && !hiddenDraftIds.has(d.id))
-  const committedActions = drafts
-    .filter(d => d.status === 'committed')
+  const promotedActions = drafts
+    .filter(d => d.status === 'promoted')
     .flatMap(d => d.actions)
 
   const firstTomorrowDate = settlementPeriods.find((sp, i) =>
@@ -337,7 +337,7 @@ export function MarginChart({
     for (const [bmUnit, pn] of Object.entries(sp.pn)) {
       if (pn > 1) alreadyModelled.add(bmUnit)
     }
-    for (const action of committedActions) {
+    for (const action of promotedActions) {
       if (action.fromPeriod <= spNum && (action.toPeriod === undefined || action.toPeriod >= spNum)) {
         alreadyModelled.add(action.bmUnitId)
       }

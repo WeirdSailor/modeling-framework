@@ -17,10 +17,10 @@ function refreshAggregates(
   drafts: DraftPlan[],
   units: BMUnit[]
 ): SettlementPeriodData[] {
-  const committedActions = drafts
-    .filter(d => d.status === 'committed')
+  const promotedActions = drafts
+    .filter(d => d.status === 'promoted')
     .flatMap(d => d.actions)
-  return periods.map(sp => ({ ...sp, ...computeAggregates(sp, committedActions, units) }))
+  return periods.map(sp => ({ ...sp, ...computeAggregates(sp, promotedActions, units) }))
 }
 
 const NON_MARGIN_AREA_IDS = [
@@ -45,9 +45,9 @@ function refreshAllAggregates(
   units: BMUnit[],
   areaRequirements: Record<string, AreaRequirementRow[]>
 ): SettlementPeriodData[] {
-  const committedActions = drafts.filter(d => d.status === 'committed').flatMap(d => d.actions)
+  const promotedActions = drafts.filter(d => d.status === 'promoted').flatMap(d => d.actions)
   const withMargin = refreshAggregates(periods, drafts, units)
-  return computeAreaAvailabilities(withMargin, committedActions, units, areaRequirements)
+  return computeAreaAvailabilities(withMargin, promotedActions, units, areaRequirements)
 }
 
 interface ModellingState {
@@ -99,7 +99,7 @@ interface ModellingState {
   duplicateDraft: (id: string) => string
   shareDraft: (draftId: string, userId: UserId) => void
   unshareDraft: (draftId: string, userId: UserId) => void
-  commitDraft: (id: string) => void
+  promoteDraft: (id: string) => void
   discardDraft: (id: string) => void
   reopenDraft: (id: string) => void
   deleteDraft: (id: string) => void
@@ -151,10 +151,10 @@ export const useModellingStore = create<ModellingState>((set, get) => ({
         r.sp === sp ? { ...r, [field]: value } : r
       )
       const newReqs = { ...state.areaRequirements, [area]: rows }
-      const committedActions = state.drafts.filter(d => d.status === 'committed').flatMap(d => d.actions)
+      const promotedActions = state.drafts.filter(d => d.status === 'promoted').flatMap(d => d.actions)
       return {
         areaRequirements: newReqs,
-        settlementPeriods: computeAreaAvailabilities(state.settlementPeriods, committedActions, state.units, newReqs),
+        settlementPeriods: computeAreaAvailabilities(state.settlementPeriods, promotedActions, state.units, newReqs),
       }
     }),
 
@@ -167,19 +167,19 @@ export const useModellingStore = create<ModellingState>((set, get) => ({
         ...(constrained  !== undefined ? { constrained  } : {}),
       }))
       const newReqs = { ...state.areaRequirements, [area]: rows }
-      const committedActions = state.drafts.filter(d => d.status === 'committed').flatMap(d => d.actions)
+      const promotedActions = state.drafts.filter(d => d.status === 'promoted').flatMap(d => d.actions)
       return {
         areaRequirements: newReqs,
-        settlementPeriods: computeAreaAvailabilities(state.settlementPeriods, committedActions, state.units, newReqs),
+        settlementPeriods: computeAreaAvailabilities(state.settlementPeriods, promotedActions, state.units, newReqs),
       }
     }),
 
   setAllAreaRequirements: (reqs) =>
     set(state => {
-      const committedActions = state.drafts.filter(d => d.status === 'committed').flatMap(d => d.actions)
+      const promotedActions = state.drafts.filter(d => d.status === 'promoted').flatMap(d => d.actions)
       return {
         areaRequirements: reqs,
-        settlementPeriods: computeAreaAvailabilities(state.settlementPeriods, committedActions, state.units, reqs),
+        settlementPeriods: computeAreaAvailabilities(state.settlementPeriods, promotedActions, state.units, reqs),
       }
     }),
 
@@ -268,7 +268,7 @@ export const useModellingStore = create<ModellingState>((set, get) => ({
   removeUnitFromDraft: (draftId, bmUnitId) =>
     set(state => {
       const draft = state.drafts.find(d => d.id === draftId)
-      const isCommitted = draft?.status === 'committed'
+      const isPromoted = draft?.status === 'promoted'
       const drafts = state.drafts.map(d =>
         d.id === draftId
           ? { ...d, actions: d.actions.filter(a => a.bmUnitId !== bmUnitId) }
@@ -276,7 +276,7 @@ export const useModellingStore = create<ModellingState>((set, get) => ({
       )
       return {
         drafts,
-        settlementPeriods: isCommitted
+        settlementPeriods: isPromoted
           ? refreshAllAggregates(state.settlementPeriods, drafts, state.units, state.areaRequirements)
           : state.settlementPeriods,
       }
@@ -305,7 +305,7 @@ export const useModellingStore = create<ModellingState>((set, get) => ({
           : d
       )
       const draft = state.drafts.find(d => d.id === id)
-      const needsRefresh = draft?.status === 'committed'
+      const needsRefresh = draft?.status === 'promoted'
       return {
         drafts,
         settlementPeriods: needsRefresh
@@ -352,7 +352,7 @@ export const useModellingStore = create<ModellingState>((set, get) => ({
       )
       return {
         drafts,
-        settlementPeriods: draft.status === 'committed'
+        settlementPeriods: draft.status === 'promoted'
           ? refreshAllAggregates(state.settlementPeriods, drafts, state.units, state.areaRequirements)
           : state.settlementPeriods,
       }
@@ -373,7 +373,7 @@ export const useModellingStore = create<ModellingState>((set, get) => ({
         actions: source.actions.map(a => ({ ...a, timestamp: new Date() })),
         unitNotes: { ...source.unitNotes },
         createdAt: Date.now(),
-        committedAt: undefined,
+        promotedAt: undefined,
         discardedAt: undefined,
         ownerId: state.currentUser,
         sharedWith: [],
@@ -401,7 +401,7 @@ export const useModellingStore = create<ModellingState>((set, get) => ({
       ),
     })),
 
-  commitDraft: (id) =>
+  promoteDraft: (id) =>
     set(state => {
       const draft = state.drafts.find(d => d.id === id)
       if (!draft) return {}
@@ -422,7 +422,7 @@ export const useModellingStore = create<ModellingState>((set, get) => ({
       }
       const drafts = state.drafts.map(d =>
         d.id === id
-          ? { ...d, status: 'committed' as const, committedAt: Date.now(), dataSnapshot }
+          ? { ...d, status: 'promoted' as const, promotedAt: Date.now(), dataSnapshot }
           : d
       )
       return {
@@ -434,13 +434,13 @@ export const useModellingStore = create<ModellingState>((set, get) => ({
   discardDraft: (id) =>
     set(state => {
       const draft = state.drafts.find(d => d.id === id)
-      const wasCommitted = draft?.status === 'committed'
+      const wasPromoted = draft?.status === 'promoted'
       const drafts = state.drafts.map(d =>
         d.id === id ? { ...d, status: 'discarded' as const, discardedAt: Date.now() } : d
       )
       return {
         drafts,
-        settlementPeriods: wasCommitted
+        settlementPeriods: wasPromoted
           ? refreshAllAggregates(state.settlementPeriods, drafts, state.units, state.areaRequirements)
           : state.settlementPeriods,
       }
@@ -449,15 +449,15 @@ export const useModellingStore = create<ModellingState>((set, get) => ({
   reopenDraft: (id) =>
     set(state => {
       const draft = state.drafts.find(d => d.id === id)
-      const wasCommitted = draft?.status === 'committed'
+      const wasPromoted = draft?.status === 'promoted'
       const drafts = state.drafts.map(d =>
         d.id === id
-          ? { ...d, status: 'draft' as const, committedAt: undefined, discardedAt: undefined }
+          ? { ...d, status: 'draft' as const, promotedAt: undefined, discardedAt: undefined }
           : d
       )
       return {
         drafts,
-        settlementPeriods: wasCommitted
+        settlementPeriods: wasPromoted
           ? refreshAllAggregates(state.settlementPeriods, drafts, state.units, state.areaRequirements)
           : state.settlementPeriods,
       }
@@ -473,12 +473,12 @@ export const useModellingStore = create<ModellingState>((set, get) => ({
 
   clearAllDrafts: () =>
     set(state => {
-      const hadCommitted = state.drafts.some(d => d.status === 'committed')
+      const hadPromoted = state.drafts.some(d => d.status === 'promoted')
       return {
         drafts: [],
         activeDraftId: null,
         selectedUnits: new Set<string>(),
-        settlementPeriods: hadCommitted
+        settlementPeriods: hadPromoted
           ? refreshAllAggregates(state.settlementPeriods, [], state.units, state.areaRequirements)
           : state.settlementPeriods,
       }

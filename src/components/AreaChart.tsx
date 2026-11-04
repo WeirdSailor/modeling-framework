@@ -188,7 +188,7 @@ export default function AreaChart({
   )
 
   const alreadyModelled = useMemo(() => new Set(
-    drafts.filter(d => d.status === 'committed').flatMap(d => d.actions.map(a => a.bmUnitId))
+    drafts.filter(d => d.status === 'promoted').flatMap(d => d.actions.map(a => a.bmUnitId))
   ), [drafts])
 
   // Build chart data with time labels matching MarginChart format

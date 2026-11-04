@@ -6,7 +6,7 @@ import { computeAreaStatus, type AreaStatus, type AreaStatusResult } from '@/uti
 import type { SettlementPeriodData, AreaRequirementRow, DraftPlan, UnitSnapshot } from '@/models/types'
 import ConstraintsTile from './ConstraintsTile'
 
-const CHANGE_THRESHOLD = 10 // percent — must match CommittedTab
+const CHANGE_THRESHOLD = 10 // percent — must match PromotedTab
 
 interface TileAlert {
   dataArrow: '↑' | '↓' | null
@@ -28,7 +28,7 @@ function computeTileAlert(
   let priceHasUp = false, priceHasDown = false
 
   for (const draft of drafts) {
-    if (draft.status !== 'committed') continue
+    if (draft.status !== 'promoted') continue
     for (const action of draft.actions) {
       if (action.reasonCode !== reasonCode) continue
       const snap = draft.dataSnapshot?.[action.bmUnitId]

@@ -53,7 +53,7 @@ export default function OperationalDashboard({
   ), [])
 
   // Refetch immediately when the shared store data, the TR2 multiplier, the area sources or the
-  // drafts (edits, commits, sidebar visibility) change.
+  // drafts (edits, promotes, sidebar visibility) change.
   const settlementPeriods = useModellingStore(s => s.settlementPeriods)
   const areaRequirements = useModellingStore(s => s.areaRequirements)
   const drafts = useModellingStore(s => s.drafts)

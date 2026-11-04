@@ -19,7 +19,7 @@ interface GraphRow {
   pn: number                // max PN across all SPs (EOL)
   mel: number | null        // EMX
   sel: number | null        // EMI
-  source: 'pn' | 'committed' | 'both'
+  source: 'pn' | 'promoted' | 'both'
 }
 
 const FUEL_CHIPS: Record<string, { label: string; chipClass: string }> = {
@@ -45,9 +45,9 @@ function SourceBadge({ source }: { source: GraphRow['source'] }) {
   return (
     <span style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
       {(source === 'pn' || source === 'both') && (
-        <span className="badge-state-committed" style={{ fontSize: 10, padding: '1px 5px', borderRadius: 4, fontWeight: 600, whiteSpace: 'nowrap' }}>PN</span>
+        <span className="badge-state-promoted" style={{ fontSize: 10, padding: '1px 5px', borderRadius: 4, fontWeight: 600, whiteSpace: 'nowrap' }}>PN</span>
       )}
-      {(source === 'committed' || source === 'both') && (
+      {(source === 'promoted' || source === 'both') && (
         <span className="chip chip-sr" style={{ fontSize: 10, padding: '1px 5px', whiteSpace: 'nowrap' }}>User</span>
       )}
     </span>
@@ -75,7 +75,7 @@ function SortTh({ col, sort, onSort, children, numeric }: {
   )
 }
 
-const SOURCE_WEIGHT: Record<GraphRow['source'], number> = { committed: 0, both: 1, pn: 2 }
+const SOURCE_WEIGHT: Record<GraphRow['source'], number> = { promoted: 0, both: 1, pn: 2 }
 
 export default function GraphTab({ settlementPeriods, units, drafts }: Props) {
   const [sort, setSort] = useState<{ key: SortKey; dir: 'asc' | 'desc' }>({ key: 'source', dir: 'asc' })
@@ -116,9 +116,9 @@ export default function GraphTab({ settlementPeriods, units, drafts }: Props) {
       })
     }
 
-    // Overlay committed draft units — tag existing rows as 'both', add new rows as 'committed'
+    // Overlay promoted draft units — tag existing rows as 'both', add new rows as 'promoted'
     for (const draft of drafts) {
-      if (draft.status !== 'committed') continue
+      if (draft.status !== 'promoted') continue
       for (const action of draft.actions) {
         const existing = map.get(action.bmUnitId)
         if (existing) {
@@ -133,7 +133,7 @@ export default function GraphTab({ settlementPeriods, units, drafts }: Props) {
             pn: allPnByBmUnit[action.bmUnitId] ?? 0,
             mel: unit?.registeredCapacity ?? null,
             sel: unit?.sel ?? null,
-            source: 'committed',
+            source: 'promoted',
           })
         }
       }
@@ -157,7 +157,7 @@ export default function GraphTab({ settlementPeriods, units, drafts }: Props) {
     })
   }, [rows, sort])
 
-  const pnCount = rows.filter(r => r.source !== 'committed').length
+  const pnCount = rows.filter(r => r.source !== 'promoted').length
   const userCount = rows.filter(r => r.source !== 'pn').length
 
   return (
@@ -165,7 +165,7 @@ export default function GraphTab({ settlementPeriods, units, drafts }: Props) {
       <header className="panel-head">
         <div className="panel-title">
           <h2>BMU Summary</h2>
-          <span className="panel-subtitle">{pnCount} dispatched · {userCount} committed by user</span>
+          <span className="panel-subtitle">{pnCount} dispatched · {userCount} promoted by user</span>
         </div>
       </header>
 

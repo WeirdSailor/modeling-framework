@@ -2,7 +2,7 @@
 
 // Line row (spec §8.2): headroom = available − requirement on a fixed scale centred on the requirement
 // line (bandAbove for the upper half, bandBelow for the lower half). Monotone curve through SP midpoints; gaps where SPs are missing.
-// Uncommitted drafts draw as dotted lines in the draft's colour, only where the draft has actions (plus a
+// Not-yet-promoted drafts draw as dotted lines in the draft's colour, only where the draft has actions (plus a
 // bridge SP either side at the baseline value so the dotted line branches off the solid one).
 
 import { memo, useCallback, useMemo } from 'react'

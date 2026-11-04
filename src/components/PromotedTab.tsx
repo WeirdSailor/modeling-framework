@@ -51,7 +51,7 @@ interface Props {
   onRemoveUnits: (removals: { draftId: string; bmUnitId: string }[]) => void
 }
 
-interface CommittedRow {
+interface PromotedRow {
   key: string
   draftId: string
   draftName: string
@@ -125,20 +125,20 @@ function TypeChip({ fuelType }: { fuelType: string }) {
   return <span className={`chip ${chipClass}`}>{label}</span>
 }
 
-export default function CommittedTab({
+export default function PromotedTab({
   drafts, unitById, unitPnByBmUnit, dataOverrides, unitServices, settlementPeriods, onRemoveUnits,
 }: Props) {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [selectedReason, setSelectedReason] = useState<ModellingAction['reasonCode'] | null>(null)
 
-  const committedDrafts = useMemo(
-    () => drafts.filter(d => d.status === 'committed'),
+  const promotedDrafts = useMemo(
+    () => drafts.filter(d => d.status === 'promoted'),
     [drafts]
   )
 
-  const rows = useMemo<CommittedRow[]>(() => {
-    const out: CommittedRow[] = []
-    for (const draft of committedDrafts) {
+  const rows = useMemo<PromotedRow[]>(() => {
+    const out: PromotedRow[] = []
+    for (const draft of promotedDrafts) {
       const seen = new Set<string>()
       for (const action of draft.actions) {
         if (seen.has(action.bmUnitId)) continue
@@ -170,7 +170,7 @@ export default function CommittedTab({
       }
     }
     return out
-  }, [committedDrafts, unitById, unitPnByBmUnit])
+  }, [promotedDrafts, unitById, unitPnByBmUnit])
 
   const reasonSummaries = useMemo(() =>
     REASON_ORDER.map(code => {
@@ -225,11 +225,11 @@ export default function CommittedTab({
     setSelected(new Set())
   }
 
-  if (committedDrafts.length === 0) {
+  if (promotedDrafts.length === 0) {
     return (
       <div className="workspace-empty">
-        <h2>No committed drafts</h2>
-        <p>Commit a draft from the Workspace tab to see units here.</p>
+        <h2>No promoted drafts</h2>
+        <p>Promote a draft from the Workspace tab to see units here.</p>
       </div>
     )
   }
@@ -247,10 +247,10 @@ export default function CommittedTab({
         flexShrink: 0,
       }}>
         <span style={{ fontSize: 12.5, color: 'var(--text-soft)' }}>
-          {rows.length} unit{rows.length !== 1 ? 's' : ''} across {committedDrafts.length} committed draft{committedDrafts.length !== 1 ? 's' : ''}
+          {rows.length} unit{rows.length !== 1 ? 's' : ''} across {promotedDrafts.length} promoted draft{promotedDrafts.length !== 1 ? 's' : ''}
         </span>
-        {committedDrafts.map(d => (
-          <span key={d.id} className="state-badge badge-state-committed">{d.name}</span>
+        {promotedDrafts.map(d => (
+          <span key={d.id} className="state-badge badge-state-promoted">{d.name}</span>
         ))}
       </div>
 

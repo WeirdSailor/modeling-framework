@@ -23,7 +23,7 @@ npm run test:dashboard2  # Dashboard 2 unit tests (node --test, no framework; No
 
 The app is split into top-level **sections** via `AppSection` (`'balancing' | 'battery'`, defined in `src/models/types.ts` alongside `APP_SECTIONS`). A `SegControl` ("Balancing | Battery") sits at the top of `DraftSidebar`, above the identity picker — `activeSection` state lives in `page.tsx` (default `'balancing'`, not in Zustand).
 
-- **Balancing** — everything described in this document: the full tab set (Dashboard, Dashboard 2, Chart, Workspace, Committed, BMU Summary, Redeclare, Requirements), Config/Feedback buttons, Deficit Solver, etc. This is the entire pre-existing app, now wrapped in `{activeSection === 'balancing' && <main className="workspace">...}`.
+- **Balancing** — everything described in this document: the full tab set (Dashboard, Dashboard 2, Chart, Workspace, Promoted, BMU Summary, Redeclare, Requirements), Config/Feedback buttons, Deficit Solver, etc. This is the entire pre-existing app, now wrapped in `{activeSection === 'balancing' && <main className="workspace">...}`.
 - **Battery** — a two-tab workspace (Summary, Redeclare) for battery-fuel-type units. See "Battery Section" below for full detail.
 
 **Shared across both sections:**
@@ -58,7 +58,7 @@ Props: `{ units: BMUnit[]; settlementPeriods: SettlementPeriodData[]; unitServic
 - **GSP filter** — same `gspFilter: Record<string, 'include'|'exclude'>` pattern and `GspFilterPopover` UI as Balancing's DraftDetails. A unit is **constrained** if it fails the GSP include/exclude check (reuses the same logic as `AvailableTable`'s GSP visibility check — no separate "constrained" flag).
 - **AS Services filter** — popover with SR/QR checkboxes ("Treat as contracted"). When ticked, units with that `unitServices` assignment are reclassified from Usable → Contracted (not hidden).
 - **Classification per unit** (mutually exclusive): `constrained` (fails GSP filter) → `contracted` (matches a ticked AS Services checkbox) → `usable` (everything else).
-- **Cards** (Total / Contracted / Constrained / Usable, same visual style as CommittedTab's cost cards): each shows `Σ capacity` and unit count for its row set.
+- **Cards** (Total / Contracted / Constrained / Usable, same visual style as PromotedTab's cost cards): each shows `Σ capacity` and unit count for its row set.
   - Total = all units. Contracted = contracted units. Constrained = constrained units. Usable = `total − contracted − constrained`.
   - Cards recompute live from `classified` as filters change. Empty cards render at 40% opacity.
   - **Click-to-filter**: clicking a card sets `selectedCard` and filters the table to that card's row set; clicking the active card again resets. Default (no card selected) view = all non-constrained units (constrained units are hidden by default, but their summed capacity still shows on the Constrained card).
@@ -102,9 +102,9 @@ unitServices: Record<string, ServiceType>             // per-unit service assign
 areaRequirements: Record<string, AreaRequirementRow[]> // 48 HH rows per non-Margin area (in Zustand)
 ```
 
-`updateUnitWindow(draftId, bmUnitId, fromPeriod, toPeriod)` updates a single action's from/to independently of the draft-level window. If the draft is committed, it triggers `refreshAllAggregates`. Note: calling `updateDraftWindow` afterwards overwrites per-unit customisations (it bulk-sets all actions to the draft's from/to).
+`updateUnitWindow(draftId, bmUnitId, fromPeriod, toPeriod)` updates a single action's from/to independently of the draft-level window. If the draft is promoted, it triggers `refreshAllAggregates`. Note: calling `updateDraftWindow` afterwards overwrites per-unit customisations (it bulk-sets all actions to the draft's from/to).
 
-`refreshAllAggregates` is called inside the store on every draft commit/discard/clear. It runs `refreshAggregates` (recomputes EMX/EOL/EMI/Margin for each SP) followed by `computeAreaAvailabilities` (recomputes effective availability for all 7 non-Margin areas). Both are module-level pure functions composed in `refreshAllAggregates`. The spread `{ ...sp, ...computeAggregates(...) }` preserves `hasConfirmedPn`, `proxyEmx`, `proxyEol` without special handling.
+`refreshAllAggregates` is called inside the store on every draft promote/discard/clear. It runs `refreshAggregates` (recomputes EMX/EOL/EMI/Margin for each SP) followed by `computeAreaAvailabilities` (recomputes effective availability for all 7 non-Margin areas). Both are module-level pure functions composed in `refreshAllAggregates`. The spread `{ ...sp, ...computeAggregates(...) }` preserves `hasConfirmedPn`, `proxyEmx`, `proxyEol` without special handling.
 
 ### Rolling 24-Hour Window
 
@@ -144,21 +144,21 @@ The sidebar **Refresh** button always calls `loadData` (real-time) regardless of
 
 ### Draft Plans System
 
-Operators create independent draft plans. Each draft is a colour-coded group of `ModellingAction`s. Drafts can be overlaid simultaneously on the margin chart as dotted lines. Committing a draft absorbs it into the solid baseline and triggers `refreshAggregates`. The `DraftDetails` component manages draft lifecycle (create, commit, discard, duplicate, share).
+Operators create independent draft plans. Each draft is a colour-coded group of `ModellingAction`s. Drafts can be overlaid simultaneously on the margin chart as dotted lines. Promoting a draft absorbs it into the solid baseline and triggers `refreshAggregates`. The `DraftDetails` component manages draft lifecycle (create, promote, discard, duplicate, share).
 
 `DraftPlan` has a `description: string` field (empty string by default). Edited via a compact input in the `DraftDetails` panel between the name row and the From/To row — truncated with ellipsis when not focused, full text on hover (`title` attribute). `updateDraftDescription(id, description)` in the store handles updates.
 
-Every draft has an `ownerId` (the operator who created it) and a `sharedWith` list. Only the owner can edit, commit, discard, or share a draft. Other operators can view shared drafts read-only and duplicate them into their own workspace.
+Every draft has an `ownerId` (the operator who created it) and a `sharedWith` list. Only the owner can edit, promote, discard, or share a draft. Other operators can view shared drafts read-only and duplicate them into their own workspace.
 
 ### Draft Duplication
 
-`duplicateDraft(id)` in the store deep-copies any draft (any status) into a new `'draft'`-status plan owned by `currentUser`, with a fresh ID, colour, and name prefixed `"Copy of …"`. It sets the copy as the active draft. The "Duplicate" button appears in `DraftDetails` for all statuses (draft, committed, discarded) and for shared-with-me drafts ("Duplicate to my drafts").
+`duplicateDraft(id)` in the store deep-copies any draft (any status) into a new `'draft'`-status plan owned by `currentUser`, with a fresh ID, colour, and name prefixed `"Copy of …"`. It sets the copy as the active draft. The "Duplicate" button appears in `DraftDetails` for all statuses (draft, promoted, discarded) and for shared-with-me drafts ("Duplicate to my drafts").
 
 ### User Identity & Sharing (prototype)
 
 Seven fixed operator identities: `ANSE | NSE | OSM | OEM | NBE | TSM | TSE` — defined as `USERS` constant in `src/models/types.ts`. No authentication; the active identity is selected from a dropdown in the sidebar and persisted to `localStorage`.
 
-- **Sidebar sections** (Editing / Committed / Discarded) show only the current user's own drafts.
+- **Sidebar sections** (Editing / Promoted / Discarded) show only the current user's own drafts.
 - **"Shared with me"** section at the bottom of the sidebar lists drafts from other operators that include `currentUser` in their `sharedWith` array.
 - **Share controls** in `DraftDetails` (owner only): inline chips per shared user with `×` to unshare, and a `+ Share` dropdown to add recipients.
 - Switching identity resets `activeDraftId` to the new user's first draft.
@@ -207,7 +207,7 @@ These values are also persisted in a **localStorage cache** (see Standing Data C
 
 | File | Role |
 |------|------|
-| `src/app/page.tsx` | Top-level: data loading, layout, tab switching, derived data, confirm modals, sharing actions; owns `activeSection: AppSection` (Balancing/Battery, default `'balancing'`) and `handleSectionChange`; owns `activeBatteryTab: 'summary' \| 'redeclare'` (default `'summary'`) and `batteryUnits` (units filtered to `fuelType === 'BATTERY'`); owns `hiddenDraftIds` state for chart draft visibility; owns `solveTarget` state for the Deficit Solver; owns `activeAreaTab: AreaId` for Chart subtab; tab order (Balancing section): Dashboard \| Dashboard 2 \| Chart \| Workspace \| Committed \| BMU Summary, with Redeclare \| Requirements as buttons on the right of the tab bar |
+| `src/app/page.tsx` | Top-level: data loading, layout, tab switching, derived data, confirm modals, sharing actions; owns `activeSection: AppSection` (Balancing/Battery, default `'balancing'`) and `handleSectionChange`; owns `activeBatteryTab: 'summary' \| 'redeclare'` (default `'summary'`) and `batteryUnits` (units filtered to `fuelType === 'BATTERY'`); owns `hiddenDraftIds` state for chart draft visibility; owns `solveTarget` state for the Deficit Solver; owns `activeAreaTab: AreaId` for Chart subtab; tab order (Balancing section): Dashboard \| Dashboard 2 \| Chart \| Workspace \| Promoted \| BMU Summary, with Redeclare \| Requirements as buttons on the right of the tab bar |
 | `src/components/DraftSidebar.tsx` | "Balancing \| Battery" `SegControl` section switcher at top, then identity picker ("You are: [NSE ▼]"), window time + Refresh, draft list filtered to current user, "Shared with me" collapsible section; coloured circle visibility toggle per active draft; collapse button (‹/›) at top; New Draft button pinned to bottom footer |
 | `src/components/SegControl.tsx` | Shared pill-style segmented control (`twk-seg`/`twk-seg-thumb` CSS); used by `ConfigPanel` and `DraftSidebar`'s section switcher |
 | `src/components/BatterySummaryTab.tsx` | Battery section "Summary" tab: GSP filter + AS Services filter + timeframe selector (30min/1h/1.5h/2h) above Total/Contracted/Constrained/Usable cost-card-style cards (Σ capacity = `max(0, MEL − worstPn)`), click-to-filter table of battery units (BMU, Type, Service, NDZ, MZT, MNZT, SEL, MEL, £SEL, £MEL, PN, Capacity) |
@@ -220,11 +220,11 @@ These values are also persisted in a **localStorage cache** (see Standing Data C
 | `src/dashboard2/` | Dashboard 2 tab (cross-area operational awareness view) — self-contained module; root component `components/OperationalDashboard.tsx`. See "Dashboard 2" section below |
 | `src/components/AreaChart.tsx` | Recharts chart for non-Margin areas: requirement line (dashed), availability line (solid, area-coloured), draft overlays (dotted), deficit zone shading, drag-to-solve — identical interaction modes to MarginChart; fires `onSolveSelect` |
 | `src/components/RequirementsTab.tsx` | 48-row editable table per area (Requirement / Contracted / Constrained → Net Available + Gap computed); area chip selector; per-column Fill ↓ input in each column header (Requirement, Contracted, Constrained independently); non-Margin areas only |
-| `src/components/CommittedTab.tsx` | Committed-tab view: cost breakdown cards (Total + per-reason, 8 reason codes), click-to-filter table, change-indicator arrows (↑/↓), service chip, bulk remove; **From/To columns** (read-only, before Event) |
-| `src/components/RedeclareTab.tsx` | Redeclare-tab view: editable data columns for committed units (simulates redeclarations); amber row highlight on override; Reset per-row and Reset all; Service (SR/QR) assign select |
+| `src/components/PromotedTab.tsx` | Promoted-tab view: cost breakdown cards (Total + per-reason, 8 reason codes), click-to-filter table, change-indicator arrows (↑/↓), service chip, bulk remove; **From/To columns** (read-only, before Event) |
+| `src/components/RedeclareTab.tsx` | Redeclare-tab view: editable data columns for promoted units (simulates redeclarations); amber row highlight on override; Reset per-row and Reset all; Service (SR/QR) assign select |
 | `src/components/MarginChart.tsx` | Recharts chart: solid EMX/EOL/EMI baseline for all SPs + solid orange TR2 line (demand × reserve multiplier) + partial draft overlays (dotted only where draft has actions) + gate-closure frontier + midnight marker; draft visibility controlled via `hiddenDraftIds` prop; `reservePct` prop (default 10) controls TR2; dark-mode aware via MutationObserver; **Deficit Solver**: `chartInteractionMode` prop enables drag / 2-click / deficit-zone selection; fires `onSolveSelect(fromSp, toSp, worstDeficitMw)` callback |
 | `src/components/ConfigPanel.tsx` | Floating config panel (4 tabs): **tweaks** (theme/layout/sidebar/selection/TR2 reserve %, **chart interaction mode** — drag/2-click/deficit zone), **scenarios** (ranking criteria), **data** (Real-time/Historical mode switch, date picker, start-time select, Load button), **standing data** (backfill + sync controls) |
-| `src/components/GraphTab.tsx` | BMU Summary tab: read-only table of all units contributing to the margin chart — units with PN > 1 in any SP (including those outside the reference list) plus committed-draft units; Source badge differentiates "PN" (green) vs "User" (blue) vs "Both"; columns match AvailableTable with PN inserted before SEL; sorted by PN descending |
+| `src/components/GraphTab.tsx` | BMU Summary tab: read-only table of all units contributing to the margin chart — units with PN > 1 in any SP (including those outside the reference list) plus promoted-draft units; Source badge differentiates "PN" (green) vs "User" (blue) vs "Both"; columns match AvailableTable with PN inserted before SEL; sorted by PN descending |
 | `src/components/StandingDataTab.tsx` | Standing data tab UI: shows coverage (NDZ/MZT/MNZT/SEL per unit count), runs one-time backfill, shows per-batch progress, Sync Recent button after backfill completes |
 | `src/components/ConfirmModal.tsx` | Dark-mode-aware confirm dialog (replaces native browser confirm) |
 | `src/config/areas.ts` | `AreaId` union type (8 values), `AreaConfig` interface, `AREAS` array, `NON_MARGIN_AREAS`, `getArea(id)` |
@@ -244,16 +244,16 @@ These values are also persisted in a **localStorage cache** (see Standing Data C
 
 - **Two separate fetch paths** — `fetchAllData()` (real-time, D-1 proxy) and `fetchHistoricalData()` (historical, all confirmed). Keep them independent. Do not merge them into a single function with a mode flag — that was an explicitly rejected design option.
 - **`computeAggregates` iterates `sp.pn` directly** — never change it to iterate `units` instead. That would miss all PN-holding units outside the dispatchable filter (wind, solar, etc.) and break the baseline.
-- **`refreshAllAggregates` in the store** — must be called whenever committed draft actions change. Replaces all former `refreshAggregates(...)` call sites: `commitDraft`, `discardDraft`, `reopenDraft`, `clearAllDrafts`, `setSettlementPeriods`, `removeUnitFromDraft`, `updateDraftWindow`, `updateUnitWindow`. Do not call `refreshAggregates` directly from these actions — it would skip recomputing non-Margin area availabilities.
+- **`refreshAllAggregates` in the store** — must be called whenever promoted draft actions change. Replaces all former `refreshAggregates(...)` call sites: `promoteDraft`, `discardDraft`, `reopenDraft`, `clearAllDrafts`, `setSettlementPeriods`, `removeUnitFromDraft`, `updateDraftWindow`, `updateUnitWindow`. Do not call `refreshAggregates` directly from these actions — it would skip recomputing non-Margin area availabilities.
 - **`settlementPeriod` in `SettlementPeriodData`** is the slot index 1–48, not the real SP number. All `ModellingAction.fromPeriod`/`toPeriod` comparisons use this slot index.
 - **`ModellingAction.toPeriod` is `number | undefined`** — `undefined` means open-ended (the action covers all SPs from `fromPeriod` to the end of the window). Every check against `toPeriod` must handle the undefined case: `(action.toPeriod === undefined || action.toPeriod >= spNum)`. Do not revert to `number` — the SelectedTable UI exposes a "clear To" option that sets it to undefined.
-- **`src/utils/fuelTypes.ts`** — two separate exclusion sets. `FETCH_EXCLUDED_FUEL_TYPES` prevents units from being fetched at all (solar, interconnectors, COAL, COALB). `EXCLUDED_FUEL_TYPES` is the display-only filter applied in `AvailableTable` (adds WIND, NUCLEAR, BATTERY on top). Keep both in sync when adding fuel types. COAL and COALB are in both sets — they are fetched but never displayed, and never committed to the unit list. **BATTERY is in `EXCLUDED_FUEL_TYPES` only** (not `FETCH_EXCLUDED_FUEL_TYPES`) — battery units are fetched and still feed `sp.pn`/EMX baseline, just hidden from Balancing's tables; they surface instead in the Battery section's Summary/Redeclare tabs.
+- **`src/utils/fuelTypes.ts`** — two separate exclusion sets. `FETCH_EXCLUDED_FUEL_TYPES` prevents units from being fetched at all (solar, interconnectors, COAL, COALB). `EXCLUDED_FUEL_TYPES` is the display-only filter applied in `AvailableTable` (adds WIND, NUCLEAR, BATTERY on top). Keep both in sync when adding fuel types. COAL and COALB are in both sets — they are fetched but never displayed, and never promoted to the unit list. **BATTERY is in `EXCLUDED_FUEL_TYPES` only** (not `FETCH_EXCLUDED_FUEL_TYPES`) — battery units are fetched and still feed `sp.pn`/EMX baseline, just hidden from Balancing's tables; they surface instead in the Battery section's Summary/Redeclare tabs.
 - **Standing data cache** — uses `localStorage` (keys `so:standing_data`, `so:sync_metadata`). Keep it in localStorage — it's per-browser by design and doesn't need cross-user sharing. Firestore is used elsewhere (`areaRequirements`) and is configured with `experimentalForceLongPolling: true` to handle environments where WebSocket connections to `firestore.googleapis.com` are blocked. The cache persists across sessions; a one-time backfill is sufficient for a given browser profile.
 - **Auto-sync in `fetchBmUnits`** — silently calls `runIncrementalSync()` before the `Promise.all` if `backfillComplete` is true and `lastSyncedTo` is more than 23 hours ago. It is intentionally silent (no UI feedback, error swallowed). Do not add loading state or toast for this — it runs in the background of a normal Refresh.
 - **Decommissioned unit filter in `fetchBmUnits`** — units where all four of `sel`, `ndz`, `mnzt`, `mzt` are `undefined` after merging live API + localStorage cache are skipped entirely (`continue`). This removes units that have never submitted standing data (mothballed / decommissioned). Do not remove this filter — the raw reference API returns ~1000+ units including long-decommissioned plant.
 - **`fetchSinglePN` + 48 parallel calls** — do not collapse into a single date-range call; the Elexon PN endpoint requires per-SP queries. The `/datasets/PN` endpoint with only a date-range returns 404 — `settlementDate` + `settlementPeriod` are both mandatory.
 - **`ownerId` on every draft** — `createDraft` and `duplicateDraft` both set `ownerId: state.currentUser`. Any new draft-creation path must do the same. Drafts without `ownerId` will be invisible to all users in the sidebar.
-- **`dataSnapshot` is set at commit time** — `commitDraft` in the store reads `state.units` and `state.dataOverrides` to build the snapshot. If you add new tracked fields to `UnitSnapshot`, update both `commitDraft` and `ChangeArrow`'s render logic.
+- **`dataSnapshot` is set at promote time** — `promoteDraft` in the store reads `state.units` and `state.dataOverrides` to build the snapshot. If you add new tracked fields to `UnitSnapshot`, update both `promoteDraft` and `ChangeArrow`'s render logic.
 - **`dataOverrides` is separate from `unitServices`** — overrides are numeric value redeclarations for change-tracking; services are categorical assignments. Do not merge them.
 - **`TweakState.reservePct`** — lives in local state in `page.tsx`, not in Zustand. Passed as a prop to `MarginChart`. Default 10. Clamped to 0–50 in the Config input. Do not lift to the store.
 - **`gspFilter` and `scenario` are props in `AvailableTable`** — lifted to `page.tsx` state so `DraftDetails` can also control them (Scenario and GSP buttons live in the DraftDetails time-pickers row). Do not move them back to local state in `AvailableTable`.
@@ -277,7 +277,7 @@ These values are also persisted in a **localStorage cache** (see Standing Data C
 - **Chart tab wrapper div must be a flex column** — the `<div>` wrapping the area subtab row and charts inside the Chart tab must have `display: flex; flex-direction: column; flex: 1; min-height: 0`. `MarginChart`'s root uses `flex: 1` and `<ResponsiveContainer height="100%">`, both of which require a flex parent to resolve. Without this the chart collapses to zero height. `AreaChart` is unaffected (uses explicit `height={260}`).
 - **Drag tracking in `AreaChart` uses `useRef`** — same pattern as `MarginChart`. `isDraggingRef = useRef(false)` and `dragStartRef = useRef<number | null>(null)` for synchronous tracking; `useState` batches and is not reliable inside `onMouseMove`.
 - **`handleSolveNavigate` auto-selects scenario from active area** — uses `getArea(activeAreaTab).defaultScenario` so the workspace scenario matches whichever area the operator solved from. Do not hardcode `'margin'`.
-- **`ModellingAction.reasonCode` no longer has `CONSTRAINT` or `RESERVE`** — replaced by `RECOVERY_RESERVE | FREQ_CONTROL_RESERVE | GENERAL_RESERVE | CONTINGENCY_RESERVE | RESPONSE`. Any switch/case on `reasonCode` in CommittedTab, SelectedTable, RedeclareTab must handle all 8 current codes and must not reference the removed ones.
+- **`ModellingAction.reasonCode` no longer has `CONSTRAINT` or `RESERVE`** — replaced by `RECOVERY_RESERVE | FREQ_CONTROL_RESERVE | GENERAL_RESERVE | CONTINGENCY_RESERVE | RESPONSE`. Any switch/case on `reasonCode` in PromotedTab, SelectedTable, RedeclareTab must handle all 8 current codes and must not reference the removed ones.
 - **`SCENARIO_REASON` in `page.tsx` maps `pullback → 'MARGIN'`** — pullback has no dedicated reason code; it falls back to MARGIN. `reserve → 'RECOVERY_RESERVE'`, `response → 'RESPONSE'`.
 - **Dashboard 2 is self-contained in `src/dashboard2/`** — it reads the store and `constraintFixtures` but never writes to them, and it does not modify any shared module. Keep it that way: extend shared modules additively if Dashboard 2 needs more, never change their behaviour for it.
 - **Dashboard 2's BST correction is local to its real adapters** — `slotStartMs` in `src/dashboard2/data/realAdapters.ts` re-derives true UTC SP starts (gated by `CORRECT_ELEXON_SP_TO_UTC`). The rest of the app still uses the UTC-labelled `sp.startTime`. Do not "fix" `settlements.ts` to match without reviewing every consumer.
@@ -299,7 +299,7 @@ A second dashboard tab (Balancing section), placed after Dashboard. The existing
   - −ve MARGIN and LARGEST LOSS have no real source → mock. Strip action markers have no real source either; per-row `actionsSource` defaults to `'none'` (no markers) rather than overlaying mock actions on real states.
 - **Legend note** lists every area/part on mock or fixture data ("Mock data: …"); empty when everything is real.
 - **State:** time window, horizon (persisted to `localStorage` key `d2:horizon`), polling and cursor all live inside `src/dashboard2/state/` — not in Zustand and not in `page.tsx`. `page.tsx` only passes `reservePct`, `areaSources` and `hiddenDraftIds`. The per-row Real/Mock choice is overridable in **Config → Data → Dashboard 2 mock data** (`useAreaSources` in `src/dashboard2/state/areaSources.ts`, persisted to localStorage key `d2:areaSources`, merged over the `AREA_SOURCES` defaults; −ve MARGIN and LARGEST LOSS are locked to mock via `NO_REAL_SOURCE`). Polls every 30s and refetches immediately when `settlementPeriods`, `areaRequirements`, `drafts`, `units`, `reservePct`, the area sources or `hiddenDraftIds` change.
-- **Draft overlays:** uncommitted, non-hidden drafts (same set as MarginChart/AreaChart, toggled by the sidebar's coloured circle) draw as dotted lines in the draft colour on the real line rows (+ve MARGIN, INERTIA), only over SPs the draft covers plus one baseline bridge SP either side. The values come from the existing `applyDraftToBaseline` / `applyDraftToAreaBaseline` with each chart's own `alreadyModelled` rule; the realAdapters build `LineAreaData.draftOverlays`. The worst value and fills stay baseline-only. The legend lists each overlaid draft. See "Draft overlays" in `DATA_MAPPING.md`.
+- **Draft overlays:** not-yet-promoted (status `'draft'`), non-hidden drafts (same set as MarginChart/AreaChart, toggled by the sidebar's coloured circle) draw as dotted lines in the draft colour on the real line rows (+ve MARGIN, INERTIA), only over SPs the draft covers plus one baseline bridge SP either side. The values come from the existing `applyDraftToBaseline` / `applyDraftToAreaBaseline` with each chart's own `alreadyModelled` rule; the realAdapters build `LineAreaData.draftOverlays`. The worst value and fills stay baseline-only. The legend lists each overlaid draft. See "Draft overlays" in `DATA_MAPPING.md`.
 - **Time:** UTC 30-minute SP iteration, displayed in Europe/London; handles 46/50-SP clock-change days (covered by tests). Missing SPs render as gaps, never zeros.
 - **All thresholds, bands, poll intervals and source switches** are in `dashboard.config.ts` (placeholders pending SME tuning).
 
@@ -345,7 +345,7 @@ effectiveAvailability[area][sp] = max(0, contracted − constrained) + Σ contri
 
 Contribution formulas (prototype — each area's formula will be refined independently):
 
-| Area | Contribution per committed unit |
+| Area | Contribution per promoted unit |
 |------|--------------------------------|
 | Reserve areas (4) | `max(0, mel − pn)` |
 | Response | `max(0, mel − pn)` if fuelType in `{PS, NPSHYD, OCGT, CCGT}`, else 0 |
@@ -421,7 +421,7 @@ Default: `'drag'`. Controlled via a `SegControl` in Config → Tweaks tab. Chang
 
 ## Draft Cost Calculation
 
-The cost formula is used only in `CommittedTab` for the cost breakdown cards (`STATIC_PRICE = 120`):
+The cost formula is used only in `PromotedTab` for the cost breakdown cards (`STATIC_PRICE = 120`):
 
 ```
 Cost = Σ max(0, MEL − PN) × £120   (per unique unit in the draft)
@@ -433,18 +433,18 @@ Cost = Σ max(0, MEL − PN) × £120   (per unique unit in the draft)
 
 The draft header no longer displays cost, window, duration, or unit count — those meta items were removed. `activeDraftCost` and its memo no longer exist in `page.tsx`.
 
-## Committed Tab — Cost Breakdown Cards
+## Promoted Tab — Cost Breakdown Cards
 
-A row of summary cards sits above the data table on the Committed tab:
+A row of summary cards sits above the data table on the Promoted tab:
 
-- **Total** (blue) — cost, unit count, and total MEL across all committed units.
+- **Total** (blue) — cost, unit count, and total MEL across all promoted units.
 - **Margin / Recovery Reserve / Freq. Control / General Reserve / Contingency / Response / Inertia / Voltage** (colour-coded) — per-reason-code breakdown using the same cost formula. (Old CONSTRAINT and RESERVE cards are removed.)
 
-Cards with 0 units render at 40% opacity. Clicking a card sets `selectedReason` and filters the table to matching rows. Clicking the active card (or Total) resets the filter. All state is local to `CommittedTab` — no props needed.
+Cards with 0 units render at 40% opacity. Clicking a card sets `selectedReason` and filters the table to matching rows. Clicking the active card (or Total) resets the filter. All state is local to `PromotedTab` — no props needed.
 
 ## Column Layout — All Four Tables
 
-`AvailableTable`, `SelectedTable`, `CommittedTab`, and `RedeclareTab` share the same column set (in order):
+`AvailableTable`, `SelectedTable`, `PromotedTab`, and `RedeclareTab` share the same column set (in order):
 
 | Column | Notes |
 |--------|-------|
@@ -458,13 +458,13 @@ Cards with 0 units render at 40% opacity. Clicking a card sets `selectedReason` 
 | MEL | `registeredCapacity` (MW) |
 | £ SEL | Price to SEL tier |
 | £ MEL | Price to MEL tier |
-| PN | Current physical notification (MW) — conditional on pullback scenario in Available/Selected; always shown in Committed |
-| From | Per-unit window start — editable select in SelectedTable, read-only in CommittedTab; displayed as `DD\|HH:MM` |
-| To | Per-unit window end — editable select with a `—` (clear) option in SelectedTable, read-only in CommittedTab; `undefined` = open-ended; displayed as `DD\|HH:MM` |
+| PN | Current physical notification (MW) — conditional on pullback scenario in Available/Selected; always shown in Promoted |
+| From | Per-unit window start — editable select in SelectedTable, read-only in PromotedTab; displayed as `DD\|HH:MM` |
+| To | Per-unit window end — editable select with a `—` (clear) option in SelectedTable, read-only in PromotedTab; `undefined` = open-ended; displayed as `DD\|HH:MM` |
 | Event | `operationType` (AS / DS / AD etc.) |
 | Reason | `reasonCode` — one of: Margin / Recovery Reserve / Freq. Control / General Reserve / Contingency / Response / Inertia / Voltage |
 
-CommittedTab also has: Draft (source draft name badge), Notes, a leading checkbox column for bulk remove, and change-indicator arrows (↑/↓) on data cells where the current value has drifted >10% from the commit-time snapshot.
+PromotedTab also has: Draft (source draft name badge), Notes, a leading checkbox column for bulk remove, and change-indicator arrows (↑/↓) on data cells where the current value has drifted >10% from the promote-time snapshot.
 
 ### AvailableTable-specific columns
 
@@ -483,7 +483,7 @@ The table has `min-width: 100%` (not `width: 100%`) so it can overflow and trigg
 
 ## PN / SEL Fallback in `unitPnByBmUnit`
 
-`unitPnByBmUnit` (computed in `page.tsx`) is the per-unit PN used by both tables (AvailableTable, SelectedTable, CommittedTab) and the Cost calculation. Build order:
+`unitPnByBmUnit` (computed in `page.tsx`) is the per-unit PN used by both tables (AvailableTable, SelectedTable, PromotedTab) and the Cost calculation. Build order:
 
 1. **Real PN** — from confirmed settlement period slots (`sp.pn[bmUnitId]`)
 2. **D-1 PN** — for unconfirmed slots, `sp.pn` is backfilled from yesterday's same-SP data in `fetchAllData`; the max over all 48 slots therefore includes any prior-day output
@@ -497,16 +497,16 @@ Units with no PN, no D-1 data, and no SEL show `—`. This is the honest answer 
 
 ### How it works
 
-When a draft is committed, `commitDraft` in the store snapshots the effective values of each unit at that moment into `draft.dataSnapshot: Record<string, UnitSnapshot>`. `UnitSnapshot` captures: `mel, sel, ndz, mzt, mnzt, priceToSel, priceToMel`.
+When a draft is promoted, `promoteDraft` in the store snapshots the effective values of each unit at that moment into `draft.dataSnapshot: Record<string, UnitSnapshot>`. `UnitSnapshot` captures: `mel, sel, ndz, mzt, mnzt, priceToSel, priceToMel`.
 
-The **Redeclare tab** allows a tester to simulate unit redeclarations by editing those fields inline. Changes are stored in `dataOverrides: Record<string, Partial<UnitSnapshot>>` — a global store map, not tied to any draft. The Committed tab reads `dataOverrides` to compute "effective" values at render time, then compares against the draft's snapshot.
+The **Redeclare tab** allows a tester to simulate unit redeclarations by editing those fields inline. Changes are stored in `dataOverrides: Record<string, Partial<UnitSnapshot>>` — a global store map, not tied to any draft. The Promoted tab reads `dataOverrides` to compute "effective" values at render time, then compares against the draft's snapshot.
 
-### Change indicators in Committed tab
+### Change indicators in Promoted tab
 
-A `ChangeArrow` component renders a coloured superscript arrow (↑ green, ↓ red) next to any cell whose effective value has drifted more than `CHANGE_THRESHOLD` (10%) from the commit-time snapshot. Hovering shows a `title` tooltip: `Was: 500 MW → Now: 400 MW (−20%)`.
+A `ChangeArrow` component renders a coloured superscript arrow (↑ green, ↓ red) next to any cell whose effective value has drifted more than `CHANGE_THRESHOLD` (10%) from the promote-time snapshot. Hovering shows a `title` tooltip: `Was: 500 MW → Now: 400 MW (−20%)`.
 
-- The threshold constant is `CHANGE_THRESHOLD = 10` in `CommittedTab.tsx`.
-- Arrows only appear for units that have a snapshot (i.e., were committed after this feature was added).
+- The threshold constant is `CHANGE_THRESHOLD = 10` in `PromotedTab.tsx`.
+- Arrows only appear for units that have a snapshot (i.e., were promoted after this feature was added).
 - `dataOverrides` is global — it persists across tab switches and simulates a live data feed changing underlying unit data.
 
 ### Redeclare tab UX
@@ -559,7 +559,7 @@ Zone list: `GSP_AREAS` in `src/config/scenarios.ts` (14 entries). Zone membershi
 `ServiceType = 'SR' | 'QR'` is defined in `src/models/types.ts`. Services are stored in `unitServices: Record<string, ServiceType>` in the Zustand store, separate from `dataOverrides`.
 
 - Assigned via the **Service** select on the Redeclare tab.
-- Displayed as a colour chip in the **Service** column (third column, after Type) on Available, Selected, Committed, and Redeclare tabs.
+- Displayed as a colour chip in the **Service** column (third column, after Type) on Available, Selected, Promoted, and Redeclare tabs.
 - SR = blue chip; QR = purple chip (light + dark mode variants in `globals.css`).
 - `setUnitService(bmUnitId, service | undefined)` — pass `undefined` to clear.
 

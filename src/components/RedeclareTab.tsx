@@ -90,14 +90,14 @@ export default function RedeclareTab({
   drafts, unitById, unitPnByBmUnit, dataOverrides, unitServices,
   onSetOverride, onClearOverride, onClearAll, onSetService,
 }: Props) {
-  const committedDrafts = useMemo(
-    () => drafts.filter(d => d.status === 'committed'),
+  const promotedDrafts = useMemo(
+    () => drafts.filter(d => d.status === 'promoted'),
     [drafts]
   )
 
   const rows = useMemo<RedeclareRow[]>(() => {
     const out: RedeclareRow[] = []
-    for (const draft of committedDrafts) {
+    for (const draft of promotedDrafts) {
       const seen = new Set<string>()
       for (const action of draft.actions) {
         if (seen.has(action.bmUnitId)) continue
@@ -125,15 +125,15 @@ export default function RedeclareTab({
       }
     }
     return out
-  }, [committedDrafts, unitById, unitPnByBmUnit])
+  }, [promotedDrafts, unitById, unitPnByBmUnit])
 
   const overrideCount = Object.keys(dataOverrides).length
 
-  if (committedDrafts.length === 0) {
+  if (promotedDrafts.length === 0) {
     return (
       <div className="workspace-empty">
-        <h2>No committed drafts</h2>
-        <p>Commit a draft to simulate redeclarations here.</p>
+        <h2>No promoted drafts</h2>
+        <p>Promote a draft to simulate redeclarations here.</p>
       </div>
     )
   }
@@ -151,7 +151,7 @@ export default function RedeclareTab({
         flexShrink: 0,
       }}>
         <span style={{ fontSize: 12.5, color: 'var(--text-soft)' }}>
-          Edit any value below to simulate a redeclaration — changes are reflected live in the Committed tab.
+          Edit any value below to simulate a redeclaration — changes are reflected live in the Promoted tab.
         </span>
         {overrideCount > 0 && (
           <span style={{

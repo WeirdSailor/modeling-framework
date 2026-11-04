@@ -9,7 +9,7 @@ The existing **Dashboard** tab (`src/components/Dashboard.tsx`) has no fetch log
 
 | Source | What it holds | Refresh |
 |---|---|---|
-| Zustand store `settlementPeriods` (`src/store/useModellingStore.ts`) | 48 rolling slots from `fetchAllData()` (Elexon PN, day-ahead demand, reference data), or from `fetchHistoricalData()`. Each slot has `pn`, `mel`, `demand`, `emx`/`eol`/`emi` (recomputed by `refreshAllAggregates` on every draft commit), and `areaAvailability[area]` for the 7 non-Margin areas. | Loaded on page mount and by the sidebar **Refresh** button. No polling. |
+| Zustand store `settlementPeriods` (`src/store/useModellingStore.ts`) | 48 rolling slots from `fetchAllData()` (Elexon PN, day-ahead demand, reference data), or from `fetchHistoricalData()`. Each slot has `pn`, `mel`, `demand`, `emx`/`eol`/`emi` (recomputed by `refreshAllAggregates` on every draft promote), and `areaAvailability[area]` for the 7 non-Margin areas. | Loaded on page mount and by the sidebar **Refresh** button. No polling. |
 | Zustand store `areaRequirements` | 48 rows per non-Margin area: `requirement`, `contracted`, `constrained`. Entered by hand on the Requirements tab and synced to Firestore (`config/area_requirements`). | Loaded once on mount, then live as operators edit. |
 | `tweaks.reservePct` (local state in `page.tsx`) | TR2 reserve multiplier for Margin. Default 10. | Live. |
 | `src/config/constraintFixtures.ts` (used by `ConstraintsTile`) | **Fixture** transmission-constraint forecasts (flow vs limit per SP). It uses a 4h run when the window is 8 SPs or fewer, otherwise a 24h run, anchored to the current SP. | Re-anchored every 60s. |
@@ -25,10 +25,10 @@ The existing areas are Margin, Recovery Reserve, Freq. Control Reserve, General 
 
 | Dashboard 2 area | Source | Source field(s) | Transformation | Notes / gaps |
 |---|---|---|---|---|
-| **+ve MARGIN** | real | `sp.emx`, `sp.demand`, `areaRequirements.general_reserve[slot].requirement`, `reservePct` | `available = emx`. `requirement = demand × (1 + reservePct/100) + generalReserveReq`. Headroom = `available − requirement`. | This is the same formula as the existing Margin tile and sparkline (`computeAreaStatus`). The value includes committed drafts, because `emx` is recomputed on commit. |
+| **+ve MARGIN** | real | `sp.emx`, `sp.demand`, `areaRequirements.general_reserve[slot].requirement`, `reservePct` | `available = emx`. `requirement = demand × (1 + reservePct/100) + generalReserveReq`. Headroom = `available − requirement`. | This is the same formula as the existing Margin tile and sparkline (`computeAreaStatus`). The value includes promoted drafts, because `emx` is recomputed on promote. |
 | **−ve MARGIN** | mock | `mock-data.json → areas.negMargin` | Offsets are anchored to the current SP. | There is no downward requirement anywhere in the app. `eol − emi` could proxy downward availability, but with no requirement to compare against, the mapping isn't meaningful. |
 | **CONSTRAINTS** | real (existing fixture) | `buildDemo4hRuns(now).current` when nSP ≤ 8, otherwise `buildDemo24hRun(now)`. Banding via `bandForUtilisation`. | Per constraint per SP: `active`/`activeSevere` (util > 100%) maps to **violated**, `near` (95–100%) to **tight**, `within` to ok. SPs with no constraint data are left out, so they render as a gap. | This is the **same data the existing ConstraintsTile shows**, but that source is itself a dummy fixture. The legend therefore lists CONSTRAINTS under "Mock data". The fixture has no actions, so the row shows **no action markers** (`actionsSource: 'none'`). The fixture only covers the next 4h or 24h from now, so anything beyond that is a gap. |
-| **INERTIA** | real | `sp.areaAvailability.inertia`, `areaRequirements.inertia[slot].requirement` | `available = areaAvailability.inertia`. `requirement = row.requirement`. A slot with no requirement row is left out (gap). | `available` is `max(0, contracted − constrained) + Σ committed units × 0.05`, which is the prototype formula. The requirement is whatever operators entered on the Requirements tab, and is 0 by default. |
+| **INERTIA** | real | `sp.areaAvailability.inertia`, `areaRequirements.inertia[slot].requirement` | `available = areaAvailability.inertia`. `requirement = row.requirement`. A slot with no requirement row is left out (gap). | `available` is `max(0, contracted − constrained) + Σ promoted units × 0.05`, which is the prototype formula. The requirement is whatever operators entered on the Requirements tab, and is 0 by default. |
 | **RESERVE** | real | `areaAvailability[x]` and `areaRequirements[x][slot].requirement` for x ∈ `recovery_reserve`, `freq_control_reserve`, `general_reserve`, `contingency_reserve` | One item per reserve type. Per SP: requirement ≤ 0 is ok; `avail < req` is **violated**; `avail − req < STRIP_TIGHT_MW.reserve` is **tight**; otherwise ok. | There are 4 items, all upward. The source has no +/− direction. Actions (▼ unusable / ▲ allocated) have no source anywhere, so the row shows **no action markers** (`actionsSource: 'none'`). |
 | **RESPONSE** | real | `areaAvailability.response`, `areaRequirements.response[slot].requirement` | Same item-state rule, with `STRIP_TIGHT_MW.response`. | There is **1 item** ("Response"). The source has no LF/HF or pre/post-fault split. No action markers (`actionsSource: 'none'`). |
 | **LARGEST LOSS** | mock | `mock-data.json → areas.largestLoss` | Offsets are anchored to the current SP. | The app has no securable-loss or credible-loss data. |
@@ -76,18 +76,18 @@ A swing (`net[b] − net[b−1]`) is only meaningful when both values describe c
 
 ## Draft overlays (line rows)
 
-Uncommitted drafts are drawn as dotted lines on the **real** line rows only: +ve MARGIN and INERTIA. Mock rows (−ve MARGIN, LARGEST LOSS) and the strip/IC rows don't show them. Committed drafts are already in the baseline, because `refreshAllAggregates` folds them into `sp.emx` and `sp.areaAvailability`.
+Drafts not yet promoted (status `'draft'`) are drawn as dotted lines on the **real** line rows only: +ve MARGIN and INERTIA. Mock rows (−ve MARGIN, LARGEST LOSS) and the strip/IC rows don't show them. Promoted drafts are already in the baseline, because `refreshAllAggregates` folds them into `sp.emx` and `sp.areaAvailability`.
 
 - **Which drafts:** every `status === 'draft'` plan not hidden by the sidebar's chart-visibility toggle. This is the same set MarginChart and AreaChart draw, regardless of owner. `page.tsx` passes `hiddenDraftIds` in.
-- **+ve MARGIN draft value:** `applyDraftToBaseline(...).emx`, with `alreadyModelled` = units with PN > 1 in that SP ∪ units in a committed action covering that SP. This is exactly MarginChart's calculation. The requirement is unchanged.
-- **INERTIA draft value:** `applyDraftToAreaBaseline(sp, available, actions, committedUnits, units, 'inertia')`, exactly as AreaChart computes it.
+- **+ve MARGIN draft value:** `applyDraftToBaseline(...).emx`, with `alreadyModelled` = units with PN > 1 in that SP ∪ units in a promoted action covering that SP. This is exactly MarginChart's calculation. The requirement is unchanged.
+- **INERTIA draft value:** `applyDraftToAreaBaseline(sp, available, actions, promotedUnits, units, 'inertia')`, exactly as AreaChart computes it.
 - **Shape:** each `LineAreaData.draftOverlays[]` entry holds only the SPs the draft covers, plus one **bridge** SP either side at the baseline value (`bridge: true`). The dotted line therefore branches off and rejoins the solid one, as in MarginChart. Overlays are built over the whole store window and then trimmed to the view, so a draft covering the SP just outside the view still bridges correctly. Bridges are never drawn across a data gap (`overlayPeriods` in `derive.ts`).
 - **Scale:** the same fixed `bandAbove`/`bandBelow` scale as the baseline, so a large draft uplift clamps flat at the row edge. The cursor label shows the true value.
 - **Not changed by drafts:** the worst-in-window value and the line fills. Both still describe the baseline.
 
 ## Refresh cadence
 
-The existing dashboard has no polling: the store only changes when data is loaded, Refresh is pressed, a draft is committed or a requirement is edited. Dashboard 2 therefore:
+The existing dashboard has no polling: the store only changes when data is loaded, Refresh is pressed, a draft is promoted or a requirement is edited. Dashboard 2 therefore:
 - uses the spec default of a **30s poll**;
 - **refetches immediately** when the store's `settlementPeriods`, `areaRequirements`, `drafts` or `units` change, or when `reservePct`, the area sources or the sidebar's `hiddenDraftIds` change;
 - sets `forecastRunAt` for real data to the time the last store data load finished (`isLoading` true → false). This is tracked by a module-level store subscription in `data/realAdapters.ts`.

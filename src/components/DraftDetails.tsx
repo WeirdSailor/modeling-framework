@@ -14,7 +14,7 @@ interface Props {
   onChangeDescription: (description: string) => void
   onChangeFrom: (period: number) => void
   onChangeTo: (period: number) => void
-  onCommit: () => void
+  onPromote: () => void
   onDiscard: () => void
   onReopen: () => void
   onDelete: () => void
@@ -73,7 +73,7 @@ export default function DraftDetails({
   draft, settlementPeriods, currentUser,
   onChangeName, onChangeFrom, onChangeTo,
   onChangeDescription,
-  onCommit, onDiscard, onReopen, onDelete, onDuplicate,
+  onPromote, onDiscard, onReopen, onDelete, onDuplicate,
   onShare, onUnshare,
   scenario, onScenarioChange, gspFilter, onGspFilterChange,
   solveMw = null, onSolveMwChange,
@@ -318,19 +318,19 @@ export default function DraftDetails({
               <button className="btn btn-ghost" onClick={onDiscard}>Discard</button>
               <button
                 className="btn btn-primary"
-                onClick={onCommit}
+                onClick={onPromote}
                 disabled={unitCount === 0}
-                title={unitCount === 0 ? 'Add at least one unit before committing' : ''}
+                title={unitCount === 0 ? 'Add at least one unit before promoting' : ''}
               >
-                Commit draft
+                Promote draft
               </button>
             </>
           )}
-          {isOwner && draft.status === 'committed' && (
+          {isOwner && draft.status === 'promoted' && (
             <>
-              <span className="dd-readonly-hint">Committed — read only</span>
+              <span className="dd-readonly-hint">Promoted — read only</span>
               <button className="btn btn-ghost" onClick={onDuplicate}>Duplicate</button>
-              <button className="btn btn-ghost" onClick={onReopen}>Uncommit</button>
+              <button className="btn btn-ghost" onClick={onReopen}>Unpromote</button>
             </>
           )}
           {isOwner && draft.status === 'discarded' && (

@@ -27,7 +27,7 @@ interface Props {
 function StateBadge({ status }: { status: DraftPlan['status'] }) {
   const map = {
     draft:     { label: 'Draft',     cls: 'badge-state-draft' },
-    committed: { label: 'Committed', cls: 'badge-state-committed' },
+    promoted: { label: 'Promoted', cls: 'badge-state-promoted' },
     discarded: { label: 'Discarded', cls: 'badge-state-discarded' },
   } as const
   const m = map[status]
@@ -97,12 +97,12 @@ export default function DraftSidebar({
   hiddenDraftIds, onToggleChartVisibility, sidebarOpen, onToggleSidebar,
   activeSection, onSectionChange,
 }: Props) {
-  const [showCommitted, setShowCommitted] = useState(true)
+  const [showPromoted, setShowPromoted] = useState(true)
   const [showShared, setShowShared] = useState(true)
 
   const myDrafts   = drafts.filter(d => d.ownerId === currentUser)
   const editing    = myDrafts.filter(d => d.status === 'draft')
-  const committed  = myDrafts.filter(d => d.status === 'committed')
+  const promoted  = myDrafts.filter(d => d.status === 'promoted')
   const archive    = myDrafts.filter(d => d.status === 'discarded')
   const sharedWithMe = drafts.filter(d =>
     d.ownerId !== currentUser && d.sharedWith.includes(currentUser)
@@ -193,19 +193,19 @@ export default function DraftSidebar({
         </div>
       )}
 
-      {committed.length > 0 && (
+      {promoted.length > 0 && (
         <div className="sidebar-section">
           <button
             className="sidebar-label-toggle"
-            onClick={() => setShowCommitted(!showCommitted)}
+            onClick={() => setShowPromoted(!showPromoted)}
           >
-            <span>Committed</span>
-            <span className="count-pill count-pill-sm">{committed.length}</span>
-            <span className={`caret ${showCommitted ? 'open' : ''}`}>▾</span>
+            <span>Promoted</span>
+            <span className="count-pill count-pill-sm">{promoted.length}</span>
+            <span className={`caret ${showPromoted ? 'open' : ''}`}>▾</span>
           </button>
-          {showCommitted && (
+          {showPromoted && (
             <ul className="draft-list">
-              {committed.map(d => (
+              {promoted.map(d => (
                 <DraftListItem
                   key={d.id} draft={d} active={d.id === activeId}
                   onClick={() => onSelect(d.id)} periods={settlementPeriods}

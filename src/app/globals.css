@@ -328,7 +328,7 @@ em.muted { font-style: normal; }
   white-space: nowrap; flex-shrink: 0;
 }
 .badge-state-draft     { background: var(--amber-soft); color: var(--amber); }
-.badge-state-committed { background: var(--green-soft);  color: var(--green); }
+.badge-state-promoted { background: var(--green-soft);  color: var(--green); }
 .badge-state-discarded { background: var(--slate-soft);  color: var(--text-soft); }
 
 /* ── Buttons ── */
