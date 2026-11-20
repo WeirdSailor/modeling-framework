@@ -26,13 +26,15 @@ import GraphTab from '@/components/GraphTab'
 import RequirementsTab from '@/components/RequirementsTab'
 import Dashboard from '@/components/Dashboard'
 import OperationalDashboard from '@/dashboard2/components/OperationalDashboard'
+import type { DrillDownEvent } from '@/dashboard2/types'
+import ConstraintsDetailPage from '@/components/ConstraintsDetailPage'
 import { useAreaSources } from '@/dashboard2/state/areaSources'
 import AreaChart from '@/components/AreaChart'
 import type { AreaId } from '@/config/areas'
 import { AREAS, getArea } from '@/config/areas'
 import { computeAreaStatus } from '@/utils/areaAggregates'
 
-type Tab = 'dashboard' | 'dashboard2' | 'workspace' | 'chart' | 'promoted' | 'redeclare' | 'graph' | 'requirements'
+type Tab = 'dashboard' | 'dashboard2' | 'constraints' | 'workspace' | 'chart' | 'promoted' | 'redeclare' | 'graph' | 'requirements'
 type BatteryTab = 'summary' | 'redeclare' | 'reliability'
 
 interface ConfirmState {
@@ -281,6 +283,21 @@ export default function Home() {
   const handleDashboardTileClick = useCallback((area: AreaId) => {
     setActiveAreaTab(area)
     setActiveTab('chart')
+  }, [])
+
+  // Dashboard 2 drill-down. CONSTRAINTS opens its level-2 detail page on the same horizon
+  // Dashboard 2 was showing; other areas have no detail view yet.
+  const [constraintsSpCount, setConstraintsSpCount] = useState(8)
+  const handleDashboard2DrillDown = useCallback((e: DrillDownEvent) => {
+    if (e.areaId !== 'constraints') {
+      console.debug('[dashboard2] drill-down', e)
+      return
+    }
+    if (e.window) {
+      const sps = Math.round((Date.parse(e.window.end) - Date.parse(e.window.start)) / 1_800_000)
+      if (sps > 0) setConstraintsSpCount(sps)
+    }
+    setActiveTab('constraints')
   }, [])
 
   // ── derived data ──
@@ -593,7 +610,7 @@ export default function Home() {
             Dashboard
           </button>
           <button
-            className={`tab-btn${activeTab === 'dashboard2' ? ' active' : ''}`}
+            className={`tab-btn${activeTab === 'dashboard2' || activeTab === 'constraints' ? ' active' : ''}`}
             onClick={() => setActiveTab('dashboard2')}
           >
             Dashboard 2
@@ -684,7 +701,20 @@ export default function Home() {
 
         {/* Dashboard 2 tab — cross-area operational awareness view */}
         {activeTab === 'dashboard2' && (
-          <OperationalDashboard reservePct={tweaks.reservePct} areaSources={d2Sources} hiddenDraftIds={hiddenDraftIds} />
+          <OperationalDashboard
+            reservePct={tweaks.reservePct}
+            areaSources={d2Sources}
+            hiddenDraftIds={hiddenDraftIds}
+            onDrillDown={handleDashboard2DrillDown}
+          />
+        )}
+
+        {/* Constraints — level-2 detail page opened from Dashboard 2's CONSTRAINTS row */}
+        {activeTab === 'constraints' && (
+          <ConstraintsDetailPage
+            initialSpCount={constraintsSpCount}
+            onBack={() => setActiveTab('dashboard2')}
+          />
         )}
 
         {/* Workspace tab */}

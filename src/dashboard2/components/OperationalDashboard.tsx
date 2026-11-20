@@ -108,6 +108,11 @@ export default function OperationalDashboard({
     cursorStore.set({ pinnedMs: next, hoverMs: null, hover: null })
   }, [cursorStore, win.startMs, win.endMs, nowMs])
 
+  // Every drill-down carries the window it was made from, so the host's detail view can match it.
+  const handleDrillDown = useCallback((e: DrillDownEvent) => {
+    onDrillDown({ ...e, window: { start: new Date(win.startMs).toISOString(), end: new Date(win.endMs).toISOString() } })
+  }, [onDrillDown, win.startMs, win.endMs])
+
   const areasById = useMemo(() => new Map((data?.areas ?? []).map(a => [a.id, a])), [data])
 
   // Drafts drawn on at least one line row, for the legend (first occurrence wins).
@@ -145,7 +150,7 @@ export default function OperationalDashboard({
             </div>
           </div>
           {chartWidth > 0 && AREA_CONFIG.map(cfg => (
-            <AreaRow key={cfg.id} cfg={cfg} area={areasById.get(cfg.id)} scale={scale} nowMs={nowMs} onDrillDown={onDrillDown} />
+            <AreaRow key={cfg.id} cfg={cfg} area={areasById.get(cfg.id)} scale={scale} nowMs={nowMs} onDrillDown={handleDrillDown} />
           ))}
           <Legend mockSources={data?.mockSources ?? []} drafts={overlayDrafts} />
         </div>

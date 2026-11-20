@@ -99,4 +99,10 @@ export interface HoverPayload {
   data: unknown
 }
 
-export interface DrillDownEvent { areaId: AreaId; spStart: ISO }
+export interface DrillDownEvent {
+  areaId: AreaId
+  spStart: ISO
+  // The dashboard window at the moment of the click — added by OperationalDashboard so a
+  // detail view can open on the same horizon.
+  window?: { start: ISO; end: ISO }
+}

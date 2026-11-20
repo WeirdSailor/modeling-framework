@@ -143,6 +143,13 @@
 .chartCell { min-width: 0; }
 .chartCell svg { display: block; }
 .name { font-size: 17px; font-weight: 600; letter-spacing: .3px; white-space: nowrap; }
+/* Left column of a row that opens a level-2 detail view */
+.leftLink { cursor: pointer; transition: background .12s; }
+.leftLink:hover { background: var(--panel2); }
+.leftLink:focus-visible { outline: 2px solid var(--accent, #6366f1); outline-offset: -2px; }
+.nameBlock { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.detailHint { font-size: 12px; color: var(--muted); }
+.leftLink:hover .detailHint { color: inherit; text-decoration: underline; }
 .worst { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; text-align: right; }
 .worstBig { font-size: 20px; font-weight: 700; }
 .worstSub { font-size: 12px; color: var(--muted); }

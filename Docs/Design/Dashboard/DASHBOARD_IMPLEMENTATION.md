@@ -446,7 +446,9 @@ The cursor state lives in **one shared store** (a context or a single state atom
 
 ### 9.5 Drill-down event
 
-Clicking a strip cell, an IC bar or a line-row SP emits `onDrillDown({ areaId, spStart })`. For now the handler is a no-op plus a `console.debug`.
+Clicking a strip cell, an IC bar or a line-row SP emits `onDrillDown({ areaId, spStart })`. `OperationalDashboard` adds the current dashboard `window` (`{ start, end }`) to every event.
+
+Only CONSTRAINTS has a destination so far: the host (`page.tsx`) opens the Constraints level-2 page (`src/components/ConstraintsDetailPage.tsx`, the full per-constraint `ConstraintsTile`) on the same horizon. That row also has `detailView: true` in `AREA_CONFIG`, which turns its left column into a "View details ›" link. Drill-downs for other areas are still a `console.debug`.
 
 ## 10. Accessibility and robustness
 

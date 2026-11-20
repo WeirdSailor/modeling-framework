@@ -21,6 +21,9 @@ export interface StripAreaConfig {
   // never happened. Default 'none'. A row whose AREA_SOURCES entry is 'mock' always keeps its own
   // (internally consistent) mock actions.
   actionsSource: 'none' | 'mock'
+  // True when the host app has a level-2 detail view for this row: the left column becomes a link
+  // that emits a drill-down event for the window start.
+  detailView?: boolean
 }
 export interface IcAreaConfig {
   id: 'interconnectors'; label: string; ariaName: string; kind: 'ic'
@@ -35,7 +38,7 @@ export type AreaConfig = LineAreaConfig | StripAreaConfig | IcAreaConfig
 export const AREA_CONFIG: AreaConfig[] = [
   { id: 'posMargin',       label: '+ve MARGIN',      ariaName: '+ve margin',      kind: 'line',  bandAbove: 10000, bandBelow: 2000, tight: 500, unit: 'MW' },
   { id: 'negMargin',       label: '−ve MARGIN',      ariaName: '−ve margin',      kind: 'line',  bandAbove: 2000, bandBelow: 2000, tight: 500, unit: 'MW' },
-  { id: 'constraints',     label: 'CONSTRAINTS',     ariaName: 'Constraints',     kind: 'strip', noun: 'constraint', unit: '',   actionsSource: 'none' },
+  { id: 'constraints',     label: 'CONSTRAINTS',     ariaName: 'Constraints',     kind: 'strip', noun: 'constraint', unit: '',   actionsSource: 'none', detailView: true },
   { id: 'inertia',         label: 'INERTIA',         ariaName: 'Inertia',         kind: 'line',  bandAbove: 40,   bandBelow: 40,   tight: 6,   unit: 'GVA·s' },
   { id: 'reserve',         label: 'RESERVE',         ariaName: 'Reserve',         kind: 'strip', noun: 'product', unit: 'MW', actionsSource: 'none' },
   { id: 'response',        label: 'RESPONSE',        ariaName: 'Response',        kind: 'strip', noun: 'product', unit: 'MW', actionsSource: 'none' },
