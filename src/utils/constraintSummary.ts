@@ -295,6 +295,7 @@ export interface ConstraintTileViewModel {
   runTime: string
   activeRows: ConstraintRowSummary[]
   nearRows: ConstraintRowSummary[]
+  withinRows: ConstraintRowSummary[]   // below 95% for the whole window
   withinCount: number
   activeCountPerSlot: number[]
   totals: { active: number; near: number; peakTogether: number }
@@ -338,7 +339,7 @@ export function buildConstraintTileViewModel(input: ConstraintTileInput): Constr
     slotTimes, windowStartMs, windowEndMs, nowMs,
     nowInWindow: nowMs >= windowStartMs && nowMs <= windowEndMs,
     runTime: input.current.runTime,
-    activeRows, nearRows, withinCount: withinRows.length,
+    activeRows, nearRows, withinRows, withinCount: withinRows.length,
     activeCountPerSlot,
     totals: { active: activeRows.length, near: nearRows.length, peakTogether },
     changes, closestWithinLimits,
@@ -350,10 +351,12 @@ export function buildConstraintTileViewModel(input: ConstraintTileInput): Constr
 
 export type ConstraintSortMode = 'firstViolation' | 'severity'
 
+/** Active rows (by `mode`), then near rows, then within-limits rows — each by worst utilisation. */
 export function sortConstraintRows(
   activeRows: ConstraintRowSummary[],
   nearRows: ConstraintRowSummary[],
   mode: ConstraintSortMode,
+  withinRows: ConstraintRowSummary[] = [],
 ): ConstraintRowSummary[] {
   const active = [...activeRows].sort((a, b) => {
     if (mode === 'firstViolation') {
@@ -369,8 +372,11 @@ export function sortConstraintRows(
     if (oa !== ob) return ob - oa
     return a.id.localeCompare(b.id)
   })
-  const near = [...nearRows].sort((a, b) => (b.worstUtilisationPct ?? -Infinity) - (a.worstUtilisationPct ?? -Infinity))
-  return [...active, ...near]
+  const byWorstUtil = (a: ConstraintRowSummary, b: ConstraintRowSummary) =>
+    (b.worstUtilisationPct ?? -Infinity) - (a.worstUtilisationPct ?? -Infinity) || a.id.localeCompare(b.id)
+  const near = [...nearRows].sort(byWorstUtil)
+  const within = [...withinRows].sort(byWorstUtil)
+  return [...active, ...near, ...within]
 }
 
 // ── Period tooltip content ──────────────────────────────────────────────

@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { ConstraintTileInput } from '@/models/types'
 import {
@@ -106,7 +106,12 @@ export default function ConstraintsTile({ spCount, onOpenConstraint }: Constrain
 
   const vm = useMemo(() => buildConstraintTileViewModel(input), [input])
 
-  const sortedRows = useMemo(() => sortConstraintRows(vm.activeRows, vm.nearRows, sortMode), [vm, sortMode])
+  // Every monitored constraint is listed: active, then near, then within limits.
+  const sortedRows = useMemo(
+    () => sortConstraintRows(vm.activeRows, vm.nearRows, sortMode, vm.withinRows),
+    [vm, sortMode],
+  )
+  const flaggedRowCount = vm.activeRows.length + vm.nearRows.length
 
   // Shared column template — guarantees any active/near cell keeps a minimum
   // visible width, and is identical across the aggregate strip + every row so
@@ -169,9 +174,9 @@ export default function ConstraintsTile({ spCount, onOpenConstraint }: Constrain
         </div>
       )}
 
-      {vm.activeRows.length === 0 && vm.nearRows.length === 0 ? (
-        <EmptyState vm={vm} />
-      ) : (
+      {flaggedRowCount === 0 && <EmptyState vm={vm} />}
+
+      {sortedRows.length > 0 && (
         <>
           <div style={{ display: 'flex', alignItems: 'stretch' }}>
             <div style={{ flex: 1, minWidth: 0 }}>
@@ -180,34 +185,37 @@ export default function ConstraintsTile({ spCount, onOpenConstraint }: Constrain
 
               {/* Rows */}
               <div style={{ padding: '2px 16px 6px' }}>
-                {sortedRows.map(row => (
-                  <ConstraintRow
-                    key={row.id}
-                    row={row}
-                    vm={vm}
-                    gridTemplateColumns={gridTemplateColumns}
-                    denseMode={denseMode}
-                    onOpen={() => onOpenConstraint?.(row.id)}
-                    activeCell={activeCell}
-                    selectedCell={selectedCell}
-                    showCellTooltip={showCellTooltip}
-                    scheduleHideTooltip={scheduleHideTooltip}
-                    hideTooltipImmediate={hideTooltipImmediate}
-                    selectCell={selectCell}
-                  />
+                {sortedRows.map((row, i) => (
+                  <Fragment key={row.id}>
+                    {/* Divider before the first within-limits row */}
+                    {i === flaggedRowCount && (
+                      <div style={{
+                        fontSize: 9, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--text-faint)',
+                        padding: i === 0 ? '4px 0' : '10px 0 4px', marginTop: i === 0 ? 0 : 6,
+                        borderTop: i === 0 ? 'none' : '1px solid var(--border)',
+                      }}>
+                        Within limits all window · {vm.withinCount}
+                      </div>
+                    )}
+                    <ConstraintRow
+                      row={row}
+                      vm={vm}
+                      gridTemplateColumns={gridTemplateColumns}
+                      denseMode={denseMode}
+                      onOpen={() => onOpenConstraint?.(row.id)}
+                      activeCell={activeCell}
+                      selectedCell={selectedCell}
+                      showCellTooltip={showCellTooltip}
+                      scheduleHideTooltip={scheduleHideTooltip}
+                      hideTooltipImmediate={hideTooltipImmediate}
+                      selectCell={selectCell}
+                    />
+                  </Fragment>
                 ))}
               </div>
             </div>
 
             <DetailSidebar selected={selectedCell} />
-          </div>
-
-          {/* Collapsed within-limits line */}
-          <div style={{ padding: '8px 16px 12px', fontSize: 11, color: 'var(--text-soft)', borderTop: '1px solid var(--border)', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            <span>+{vm.withinCount} within limits all window</span>
-            {vm.closestWithinLimits && (
-              <span>· closest: <span className="mono">{vm.closestWithinLimits.id}</span> at {Math.round(vm.closestWithinLimits.worstUtilisationPct)}% ({formatHHMM(vm.closestWithinLimits.worstAtMs)})</span>
-            )}
           </div>
         </>
       )}
@@ -348,7 +356,8 @@ function ConstraintRow({ row, vm, gridTemplateColumns, denseMode, onOpen, active
   selectCell: (row: ConstraintRowSummary, index: number) => void
 }) {
   const isActive = row.status === 'active'
-  const color = isActive ? 'var(--red)' : 'var(--amber)'
+  const isWithin = row.status === 'within'
+  const color = isActive ? 'var(--red)' : isWithin ? 'var(--text-faint)' : 'var(--amber)'
   const [mouseHover, setMouseHover] = useState(false)
   const [focusedIndex, setFocusedIndex] = useState(0)
   const cellRefs = useRef<(HTMLDivElement | null)[]>([])
@@ -375,8 +384,10 @@ function ConstraintRow({ row, vm, gridTemplateColumns, denseMode, onOpen, active
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
         {isActive
           ? <span aria-hidden style={{ width: 8, height: 8, background: color, flexShrink: 0 }} />
-          : <span aria-hidden style={{ width: 8, height: 8, borderRadius: '50%', background: color, flexShrink: 0 }} />}
-        <span className="mono" style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{row.id}</span>
+          : isWithin
+            ? <span aria-hidden style={{ width: 8, height: 8, borderRadius: '50%', border: `1px solid ${color}`, boxSizing: 'border-box', flexShrink: 0 }} />
+            : <span aria-hidden style={{ width: 8, height: 8, borderRadius: '50%', background: color, flexShrink: 0 }} />}
+        <span className="mono" style={{ fontSize: 12, fontWeight: 600, color: isWithin ? 'var(--text-muted)' : 'var(--text)' }}>{row.id}</span>
         {row.change === 'new' && (
           <span style={{ fontSize: 8, fontWeight: 700, color: 'var(--accent)', border: '1px solid var(--accent)', borderRadius: 3, padding: '1px 4px' }}>NEW</span>
         )}
@@ -660,7 +671,7 @@ function PeriodTooltip({ content, cellEl, containerEl }: {
 
 function EmptyState({ vm }: { vm: ConstraintTileViewModel }) {
   return (
-    <div style={{ padding: '20px 16px 24px', textAlign: 'center' }}>
+    <div style={{ padding: '8px 16px 14px', textAlign: 'center' }}>
       <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>No constraints forecast active in selected window</div>
       <div style={{ fontSize: 12, color: 'var(--text-soft)', marginTop: 4 }}>
         All {vm.activeRows.length + vm.nearRows.length + vm.withinCount} monitored constraints stay below 95% utilisation
