@@ -1,8 +1,13 @@
 import { create } from 'zustand'
-import type { BMUnit, SettlementPeriodData, ModellingAction, DraftPlan, OperationType, UserId, UnitSnapshot, ServiceType, AreaRequirementRow } from '@/models/types'
+import type {
+  ActionType, AreaRequirementRow, BMUnit, DraftPlan, ModellingAction, OperationType, ServiceType,
+  SettlementPeriodData, UnitSnapshot, UserId, WorkingPlanAction, WorkingPlanPatch,
+} from '@/models/types'
 import { USERS } from '@/models/types'
 import { computeAggregates } from '@/utils/margin'
 import { computeAreaAvailabilities } from '@/utils/areaAggregates'
+import { slotValues } from '@/utils/actionEffects'
+import { toModellingActions } from '@/utils/workingPlan'
 
 const DRAFT_COLORS = ['#f59e0b', '#8b5cf6', '#06b6d4', '#f97316', '#ec4899']
 
@@ -66,6 +71,16 @@ interface ModellingState {
   fillAreaRequirements: (area: string, requirement?: number, contracted?: number, constrained?: number) => void
   setAllAreaRequirements: (reqs: Record<string, AreaRequirementRow[]>) => void
   areaThresholds: Record<string, number>
+  // Scheduling Actions (spec §4.2): one working plan per operator, in memory only.
+  workingPlans: Partial<Record<UserId, WorkingPlanAction[]>>
+  workingPlanWindow: { fromPeriod: number; toPeriod: number }
+  setWorkingPlanWindow: (fromPeriod: number, toPeriod: number) => void
+  addToWorkingPlan: (items: { bmUnitId: string; actionType: ActionType }[], reasonCode?: ModellingAction['reasonCode']) => number
+  updateWorkingPlanAction: (bmUnitId: string, patch: WorkingPlanPatch) => void
+  removeFromWorkingPlan: (bmUnitId: string) => void
+  clearWorkingPlan: () => void
+  applyWindowToAll: () => void
+  commitWorkingPlan: (name: string, description: string) => string | null
   setAreaThreshold: (area: string, value: number) => void
   setAllAreaThresholds: (thresholds: Record<string, number>) => void
 
@@ -106,6 +121,15 @@ interface ModellingState {
   clearAllDrafts: () => void
 }
 
+// Returns a state patch that replaces the current operator's working plan.
+function withPlan(
+  state: ModellingState,
+  fn: (plan: WorkingPlanAction[]) => WorkingPlanAction[],
+): Pick<ModellingState, 'workingPlans'> {
+  const user = state.currentUser
+  return { workingPlans: { ...state.workingPlans, [user]: fn(state.workingPlans[user] ?? []) } }
+}
+
 export const useModellingStore = create<ModellingState>((set, get) => ({
   units: [],
   settlementPeriods: [],
@@ -119,6 +143,65 @@ export const useModellingStore = create<ModellingState>((set, get) => ({
   unitServices: {},
   areaRequirements: initialAreaRequirements(),
   areaThresholds: Object.fromEntries(NON_MARGIN_AREA_IDS.map(id => [id, 0])),
+
+  workingPlans: {},
+  workingPlanWindow: { fromPeriod: 1, toPeriod: 48 },
+
+  setWorkingPlanWindow: (fromPeriod, toPeriod) => set({ workingPlanWindow: { fromPeriod, toPeriod } }),
+
+  addToWorkingPlan: (items, reasonCode = 'MARGIN') => {
+    const state = get()
+    const user = state.currentUser
+    const existing = new Set((state.workingPlans[user] ?? []).map(a => a.bmUnitId))
+    const { fromPeriod, toPeriod } = state.workingPlanWindow
+    const sp = state.settlementPeriods.find(s => s.settlementPeriod === fromPeriod)
+    const added: WorkingPlanAction[] = []
+    for (const { bmUnitId, actionType } of items) {
+      if (existing.has(bmUnitId)) continue
+      existing.add(bmUnitId)
+      const unit = state.units.find(u => u.bmUnitId === bmUnitId)
+      const outputLevel = actionType !== 'start'
+        ? 0
+        : sp ? slotValues(bmUnitId, sp, unit).startMel : (unit?.registeredCapacity ?? 0)
+      added.push({ bmUnitId, actionType, fromPeriod, toPeriod, outputLevel, reasonCode, timestamp: new Date() })
+    }
+    if (added.length > 0) set(s => withPlan(s, plan => [...plan, ...added]))
+    return added.length
+  },
+
+  updateWorkingPlanAction: (bmUnitId, patch) =>
+    set(s => withPlan(s, plan => plan.map(a => (a.bmUnitId === bmUnitId ? { ...a, ...patch } : a)))),
+
+  removeFromWorkingPlan: (bmUnitId) =>
+    set(s => withPlan(s, plan => plan.filter(a => a.bmUnitId !== bmUnitId))),
+
+  clearWorkingPlan: () => set(s => withPlan(s, () => [])),
+
+  applyWindowToAll: () =>
+    set(s => withPlan(s, plan => plan.map(a => ({
+      ...a, fromPeriod: s.workingPlanWindow.fromPeriod, toPeriod: s.workingPlanWindow.toPeriod,
+    })))),
+
+  // Saves the plan as a new draft and promotes it with the existing promoteDraft, which
+  // snapshots unit data and runs refreshAllAggregates. Spec §4.2.
+  commitWorkingPlan: (name, description) => {
+    const state = get()
+    const user = state.currentUser
+    const plan = state.workingPlans[user] ?? []
+    if (plan.length === 0) return null
+    const { actions, unitNotes } = toModellingActions(plan)
+    const id = crypto.randomUUID()
+    const draft: DraftPlan = {
+      id, name, description, actions, status: 'draft',
+      color: DRAFT_COLORS[state.drafts.length % DRAFT_COLORS.length],
+      fromPeriod: Math.min(...actions.map(a => a.fromPeriod)),
+      toPeriod: Math.max(...actions.map(a => a.toPeriod ?? 48)),
+      unitNotes, createdAt: Date.now(), ownerId: user, sharedWith: [],
+    }
+    set(s => ({ drafts: [...s.drafts, draft], ...withPlan(s, () => []) }))
+    get().promoteDraft(id)
+    return id
+  },
 
   setDataOverride: (bmUnitId, field, value) =>
     set(state => ({
@@ -478,6 +561,7 @@ export const useModellingStore = create<ModellingState>((set, get) => ({
         drafts: [],
         activeDraftId: null,
         selectedUnits: new Set<string>(),
+        workingPlans: {},
         settlementPeriods: hadPromoted
           ? refreshAllAggregates(state.settlementPeriods, [], state.units, state.areaRequirements)
           : state.settlementPeriods,
