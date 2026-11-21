@@ -562,6 +562,7 @@ export const useModellingStore = create<ModellingState>((set, get) => ({
         activeDraftId: null,
         selectedUnits: new Set<string>(),
         workingPlans: {},
+        workingPlanWindow: { fromPeriod: 1, toPeriod: 48 },
         settlementPeriods: hadPromoted
           ? refreshAllAggregates(state.settlementPeriods, [], state.units, state.areaRequirements)
           : state.settlementPeriods,
