@@ -88,6 +88,10 @@
 :root[data-theme="dark"] .chip-interconn { background: rgba(148,163,184,.16); color: #cbd5e1; }
 :root[data-theme="dark"] .chip-sr        { background: rgba(14,165,233,.16);  color: #7dd3fc; }
 :root[data-theme="dark"] .chip-qr        { background: rgba(139,92,246,.16);  color: #c4b5fd; }
+:root[data-theme="dark"] .chip-act-start    { background: rgba(34,197,94,.16);  color: #86efac; }
+:root[data-theme="dark"] .chip-act-deload   { background: rgba(245,158,11,.16); color: #fcd34d; }
+:root[data-theme="dark"] .chip-act-desync   { background: rgba(239,68,68,.16);  color: #fca5a5; }
+:root[data-theme="dark"] .chip-act-capacity { background: rgba(59,130,246,.16); color: #93c5fd; }
 
 /* Explicit dark-mode select colours — needed on Windows where native controls ignore CSS vars */
 :root[data-theme="dark"] select {
@@ -587,6 +591,25 @@ input[type="checkbox"]:disabled { cursor: not-allowed; opacity: .4; }
 .chip-hydro     { background: #ecfeff; color: #155e75; }
 .chip-sr        { background: #e0f2fe; color: #0369a1; }
 .chip-qr        { background: #ede9fe; color: #6d28d9; }
+.chip-act-start    { background: #dcfce7; color: #15803d; }
+.chip-act-deload   { background: #fef3c7; color: #b45309; }
+.chip-act-desync   { background: #fee2e2; color: #b91c1c; }
+.chip-act-capacity { background: #dbeafe; color: #1d4ed8; }
+
+/* ── Schedule tab (Scheduling Actions) ── */
+.schedule-tab { display: flex; flex-direction: column; gap: 10px; flex: 1; min-height: 0; overflow: auto; padding: 10px 14px; }
+.schedule-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.schedule-section { border: 1px solid var(--border); border-radius: 8px; background: var(--bg-panel); display: flex; flex-direction: column; }
+.schedule-section-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 12px; border-bottom: 1px solid var(--border); font-size: 12px; }
+.schedule-section .table-scroll { max-height: 340px; overflow: auto; }
+.schedule-hint { font-size: 11px; color: var(--text-faint); }
+.schedule-spacer { flex: 1; }
+.schedule-notice { font-size: 11px; color: #d97706; padding: 6px 12px; }
+.schedule-shortfall { font-size: 11px; font-weight: 700; color: #ef4444; border: 1px solid rgba(239,68,68,.4); background: rgba(239,68,68,.08); border-radius: 4px; padding: 2px 8px; }
+.schedule-menu { position: absolute; top: calc(100% + 4px); left: 0; z-index: 50; min-width: 220px; background: var(--bg-panel); border: 1px solid var(--border-strong); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.35); overflow: hidden; }
+.schedule-menu button { display: block; width: 100%; text-align: left; padding: 7px 12px; font-size: 12px; border: none; background: var(--bg-panel); color: var(--text); cursor: pointer; }
+.schedule-menu button:hover:not(:disabled) { background: var(--bg-hover); }
+.schedule-menu button:disabled { color: var(--text-faint); cursor: default; }
 
 .badge { display: inline-flex; align-items: center; font-size: 10px; font-weight: 500; padding: 1px 6px; border-radius: 3px; margin-left: 4px; }
 .badge-in    { background: var(--accent-soft); color: var(--accent-strong); }
