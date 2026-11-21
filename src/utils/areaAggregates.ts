@@ -1,4 +1,5 @@
 import type { BMUnit, SettlementPeriodData, ModellingAction, AreaRequirementRow } from '@/models/types'
+import { actionTypeOf, areaDelta, covers } from '@/utils/actionEffects'
 
 // Fuel types that contribute inertia (synchronous machines only)
 const SYNCHRONOUS_FUEL_TYPES = new Set(['CCGT', 'NUCLEAR', 'NPSHYD', 'OCGT', 'PS', 'COAL'])
@@ -43,6 +44,18 @@ export function unitAreaContribution(
   }
 }
 
+// One action's contribution to an area in one SP. Start keeps the original promote-a-unit
+// formula; the other action types use actionEffects.areaDelta (which can be negative).
+function actionAreaContribution(
+  action: ModellingAction,
+  area: string,
+  sp: SettlementPeriodData,
+  units: BMUnit[]
+): number {
+  if (actionTypeOf(action) === 'start') return unitAreaContribution(action.bmUnitId, area, sp, units)
+  return areaDelta(action, area, sp, units.find(u => u.bmUnitId === action.bmUnitId))
+}
+
 // Compute effective availability for all non-Margin areas across all SPs.
 // Returns a new array of SPs with areaAvailability filled.
 // Called after refreshAggregates so sp.emx/eol/emi are already fresh.
@@ -64,16 +77,12 @@ export function computeAreaAvailabilities(
       const seen = new Set<string>()
       let contribution = 0
       for (const action of promotedActions) {
-        if (
-          action.fromPeriod <= spIdx &&
-          (action.toPeriod === undefined || action.toPeriod >= spIdx) &&
-          !seen.has(action.bmUnitId)
-        ) {
-          seen.add(action.bmUnitId)
-          contribution += unitAreaContribution(action.bmUnitId, area, sp, units)
-        }
+        if (!covers(action, spIdx) || seen.has(action.bmUnitId)) continue
+        seen.add(action.bmUnitId)
+        contribution += actionAreaContribution(action, area, sp, units)
       }
-      areaAvailability[area] = base + contribution
+      // Desync can push the sum below zero (prototype approximation, spec §6.2).
+      areaAvailability[area] = Math.max(0, base + contribution)
     }
 
     return { ...sp, areaAvailability }
@@ -82,6 +91,7 @@ export function computeAreaAvailabilities(
 
 // For draft overlay rendering: compute projected availability if draft actions were promoted.
 // alreadyModelled = bmUnitIds already counted in sp.areaAvailability[area] (promoted draft units).
+// It only blocks Start actions; the other action types act on running units by definition.
 export function applyDraftToAreaBaseline(
   sp: SettlementPeriodData,
   baseAvailability: number,
@@ -96,17 +106,12 @@ export function applyDraftToAreaBaseline(
   let addition = 0
 
   for (const action of draftActions) {
-    if (
-      action.fromPeriod <= spIdx &&
-      (action.toPeriod === undefined || action.toPeriod >= spIdx) &&
-      !seen.has(action.bmUnitId) &&
-      !alreadyModelled.has(action.bmUnitId)
-    ) {
-      seen.add(action.bmUnitId)
-      addition += unitAreaContribution(action.bmUnitId, area, sp, units)
-    }
+    if (!covers(action, spIdx) || seen.has(action.bmUnitId)) continue
+    if (actionTypeOf(action) === 'start' && alreadyModelled.has(action.bmUnitId)) continue
+    seen.add(action.bmUnitId)
+    addition += actionAreaContribution(action, area, sp, units)
   }
-  return baseAvailability + addition
+  return Math.max(0, baseAvailability + addition)
 }
 
 export type AreaStatus = 'ok' | 'tight' | 'shortfall'
