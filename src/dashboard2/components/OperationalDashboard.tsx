@@ -58,9 +58,10 @@ export default function OperationalDashboard({
   const areaRequirements = useModellingStore(s => s.areaRequirements)
   const drafts = useModellingStore(s => s.drafts)
   const units = useModellingStore(s => s.units)
+  const workingPlans = useModellingStore(s => s.workingPlans)
   const refreshKey = useMemo(
-    () => ({ settlementPeriods, areaRequirements, reservePct, areaSources, drafts, units, hiddenDraftIds }),
-    [settlementPeriods, areaRequirements, reservePct, areaSources, drafts, units, hiddenDraftIds],
+    () => ({ settlementPeriods, areaRequirements, reservePct, areaSources, drafts, units, hiddenDraftIds, workingPlans }),
+    [settlementPeriods, areaRequirements, reservePct, areaSources, drafts, units, hiddenDraftIds, workingPlans],
   )
   const { data, lastFetchFailed } = useDashboardData(provider, win.startMs, win.endMs, refreshKey)
 

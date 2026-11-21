@@ -17,6 +17,7 @@ import {
 import type { TooltipContentProps, TooltipPayloadEntry } from 'recharts'
 import { useModellingStore } from '@/store/useModellingStore'
 import { applyDraftToBaseline } from '@/utils/margin'
+import { workingPlanAsDraft } from '@/utils/workingPlan'
 import type { DraftPlan, AreaRequirementRow } from '@/models/types'
 
 function useDarkMode() {
@@ -197,6 +198,8 @@ export function MarginChart({
   const settlementPeriods = useModellingStore(state => state.settlementPeriods)
   const drafts            = useModellingStore(state => state.drafts)
   const units             = useModellingStore(state => state.units)
+  const workingPlans      = useModellingStore(state => state.workingPlans)
+  const currentUser       = useModellingStore(state => state.currentUser)
   const isLoading         = useModellingStore(state => state.isLoading)
   const isDark            = useDarkMode()
   const t                 = isDark ? DARK : LIGHT
@@ -302,7 +305,10 @@ export function MarginChart({
     )
   }
 
-  const activeDrafts = drafts.filter(d => d.status === 'draft' && !hiddenDraftIds.has(d.id))
+  // Drafts plus the current operator's working plan (spec §8.4), minus anything hidden.
+  const workingPlanDraft = workingPlanAsDraft(workingPlans[currentUser], currentUser)
+  const overlaySource = workingPlanDraft ? [...drafts, workingPlanDraft] : drafts
+  const activeDrafts = overlaySource.filter(d => d.status === 'draft' && !hiddenDraftIds.has(d.id))
   const promotedActions = drafts
     .filter(d => d.status === 'promoted')
     .flatMap(d => d.actions)

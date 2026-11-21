@@ -8,6 +8,7 @@ import { buildDemo24hRun, buildDemo4hRuns } from '@/config/constraintFixtures'
 import { bandForUtilisation } from '@/utils/constraintSummary'
 import { applyDraftToBaseline } from '@/utils/margin'
 import { applyDraftToAreaBaseline } from '@/utils/areaAggregates'
+import { workingPlanAsDraft } from '@/utils/workingPlan'
 import type {
   AreaRequirementRow, BMUnit, ConstraintBand, DraftPlan, ModellingAction, SettlementPeriodData,
 } from '@/models/types'
@@ -45,11 +46,14 @@ export function realDataLoadedAt(): number | null {
 }
 
 export function readRealContext(reservePct: number, nowMs: number, hiddenDraftIds: ReadonlySet<string>): RealContext {
-  const { settlementPeriods, areaRequirements, units, drafts } = useModellingStore.getState()
+  const { settlementPeriods, areaRequirements, units, drafts, workingPlans, currentUser } = useModellingStore.getState()
+  // The current operator's working plan overlays like a draft (Scheduling Actions spec §8.4).
+  const workingPlanDraft = workingPlanAsDraft(workingPlans[currentUser], currentUser)
+  const overlaySource = workingPlanDraft ? [...drafts, workingPlanDraft] : drafts
   return {
     settlementPeriods, areaRequirements, reservePct, nowMs, units,
     // Same draft set as MarginChart / AreaChart: every 'draft'-status plan the sidebar has not hidden.
-    overlayDrafts: drafts.filter(d => d.status === 'draft' && !hiddenDraftIds.has(d.id)),
+    overlayDrafts: overlaySource.filter(d => d.status === 'draft' && !hiddenDraftIds.has(d.id)),
     promotedActions: drafts.filter(d => d.status === 'promoted').flatMap(d => d.actions),
   }
 }
