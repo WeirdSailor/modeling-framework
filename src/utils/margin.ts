@@ -1,4 +1,5 @@
 import type { BMUnit, SettlementPeriodData, ModellingAction } from '@/models/types'
+import { actionTypeOf, covers, marginDelta } from '@/utils/actionEffects'
 
 // Returns true if the unit has a non-trivial PN (> 1 MW) in the given SP.
 // Does not account for modelling actions — use computeAggregates for the full picture.
@@ -6,9 +7,8 @@ export function isUnitPnCommitted(bmUnitId: string, sp: SettlementPeriodData): b
   return (sp.pn[bmUnitId] ?? 0) > 1
 }
 
-// Build a SEL lookup map from the reference units array.
-function buildSelMap(units: BMUnit[]): Map<string, number | undefined> {
-  return new Map(units.map(u => [u.bmUnitId, u.sel]))
+function buildUnitMap(units: BMUnit[]): Map<string, BMUnit> {
+  return new Map(units.map(u => [u.bmUnitId, u]))
 }
 
 // Compute EMX, EOL, EMI, and margin for a SP.
@@ -17,14 +17,15 @@ function buildSelMap(units: BMUnit[]): Map<string, number | undefined> {
 // through the reference units array, so committed units outside the dispatchable
 // reference list are still counted).
 //
-// Actions: units covered by the supplied actions list are added on top of the
-// baseline, skipping any unit already PN-committed to avoid double-counting.
+// Actions: one action per unit per SP, each applying its type's change
+// (actionEffects.marginDelta). Start does nothing for a unit that is already running,
+// which is the old "skip if PN-committed" rule.
 export function computeAggregates(
   sp: SettlementPeriodData,
   actions: ModellingAction[],
   units: BMUnit[]
 ): { emx: number; eol: number; emi: number; margin: number } {
-  const selMap = buildSelMap(units)
+  const unitMap = buildUnitMap(units)
   const spNum = sp.settlementPeriod
 
   let emx = 0, eol = 0, emi = 0
@@ -35,23 +36,19 @@ export function computeAggregates(
     if (pn > 1) {
       emx += sp.mel[bmUnit] ?? pn
       eol += pn
-      const sel = selMap.get(bmUnit)
+      const sel = unitMap.get(bmUnit)?.sel
       emi += sel !== undefined ? sel : (sp.mil[bmUnit] ?? 0)
     }
   }
 
-  // Modelled units — deduplicated per unit, skipped if already PN-committed
   const seen = new Set<string>()
   for (const action of actions) {
-    if (action.fromPeriod <= spNum && (action.toPeriod === undefined || action.toPeriod >= spNum) && !seen.has(action.bmUnitId)) {
-      seen.add(action.bmUnitId)
-      if ((sp.pn[action.bmUnitId] ?? 0) <= 1) {
-        emx += sp.mel[action.bmUnitId] ?? 0
-        eol += action.outputLevel
-        const sel = selMap.get(action.bmUnitId)
-        emi += sel !== undefined ? sel : (sp.mil[action.bmUnitId] ?? 0)
-      }
-    }
+    if (!covers(action, spNum) || seen.has(action.bmUnitId)) continue
+    seen.add(action.bmUnitId)
+    const d = marginDelta(action, sp, unitMap.get(action.bmUnitId))
+    emx += d.emx
+    eol += d.eol
+    emi += d.emi
   }
 
   return { emx, eol, emi, margin: emx - sp.demand }
@@ -59,11 +56,12 @@ export function computeAggregates(
 
 // Apply a draft's actions on top of an already-computed baseline (sp.emx/eol/emi
 // from the store, which already includes PN-committed units + any committed plan
-// actions). Used by the chart to render per-draft dotted overlays without
+// actions). Used by the charts to render per-draft dotted overlays without
 // recomputing the full baseline from scratch each render.
 //
-// alreadyModelled: set of bmUnitIds already counted in the baseline for this SP
-// (PN-committed + committed plan units). Draft units in this set are skipped.
+// alreadyModelled: bmUnitIds already counted in the baseline for this SP
+// (PN-committed + committed plan units). It only blocks Start actions: the other
+// action types act on running units by definition.
 export function applyDraftToBaseline(
   sp: SettlementPeriodData,
   baseEmx: number,
@@ -73,25 +71,20 @@ export function applyDraftToBaseline(
   alreadyModelled: Set<string>,
   units: BMUnit[]
 ): { emx: number; eol: number; emi: number; margin: number } {
-  const selMap = buildSelMap(units)
+  const unitMap = buildUnitMap(units)
   const spNum = sp.settlementPeriod
 
   let addEmx = 0, addEol = 0, addEmi = 0
   const seen = new Set<string>()
 
   for (const action of draftActions) {
-    if (
-      action.fromPeriod <= spNum &&
-      (action.toPeriod === undefined || action.toPeriod >= spNum) &&
-      !seen.has(action.bmUnitId) &&
-      !alreadyModelled.has(action.bmUnitId)
-    ) {
-      seen.add(action.bmUnitId)
-      addEmx += sp.mel[action.bmUnitId] ?? 0
-      addEol += action.outputLevel
-      const sel = selMap.get(action.bmUnitId)
-      addEmi += sel !== undefined ? sel : (sp.mil[action.bmUnitId] ?? 0)
-    }
+    if (!covers(action, spNum) || seen.has(action.bmUnitId)) continue
+    if (actionTypeOf(action) === 'start' && alreadyModelled.has(action.bmUnitId)) continue
+    seen.add(action.bmUnitId)
+    const d = marginDelta(action, sp, unitMap.get(action.bmUnitId))
+    addEmx += d.emx
+    addEol += d.eol
+    addEmi += d.emi
   }
 
   const emx = baseEmx + addEmx
