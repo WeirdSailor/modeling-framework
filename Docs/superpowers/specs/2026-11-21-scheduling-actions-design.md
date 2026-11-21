@@ -15,7 +15,7 @@ This design adds **action types**. An operator picks a window, finds candidate u
 | **Start** | Synchronise a unit that is off (today's behaviour) |
 | **Deload to SEL** | Reduce a running unit's output to its SEL |
 | **Desync** | Reduce a running unit to zero |
-| **Model capacity** | Raise a running unit's MEL from its declared level to its registered capacity |
+| **Model capacity** | Raise a running unit's MEL from its operating level (assumed = PN) to its registered capacity |
 
 The new journey lives in a new **Schedule** tab. Workspace and drafts are not changed. A committed working plan is saved as a promoted draft, so everything downstream (baseline, Promoted, Redeclare, dashboards) keeps working.
 
@@ -28,7 +28,7 @@ Three versions of the candidate picker are built (A, B, C). **Config → Tweaks*
 | D1 | Action types in v1 | Start, Deload to SEL, Desync, Model capacity |
 | D2 | Order of choosing type vs units | Build all three pickers (A type first, B units first, C type tabs + basket). One active at a time, set in Config → Tweaks, default **C** |
 | D3 | Where actions go | One **working plan** per operator (dotted lines), then **Commit** |
-| D4 | Baseline MEL | Real declared MEL via the MELS `/stream` endpoint, registered capacity as fallback. Minimal effort, no data cleaning beyond "latest notification wins" |
+| D4 | Baseline MEL | **Revised during planning.** Baseline unchanged (registered capacity, as today). Model capacity assumes a running unit's MEL has been cut to its operating level (PN) and adds `registered capacity − PN`. Real declared MEL was rejected: the MELS stream is ~38 MB per day (see §7) |
 | D5 | Ranking | Reuse the existing scenario ranking (`scenarioScore` in `AvailableTable`) for every type, plus column-header sort |
 | D6 | Solve ↗ destination | Config switch: Workspace or Schedule. Default **Schedule** |
 | D7 | Where the journey lives | New **Schedule** tab in Balancing. Workspace and drafts untouched |
@@ -85,9 +85,9 @@ Store actions:
 
 | Action | Behaviour |
 |---|---|
-| `addToWorkingPlan(units: {bmUnitId, actionType}[])` | Adds one action per unit not already in the plan. Window = `workingPlanWindow`. Start output = declared MEL for the window's first slot (`sp.mel[u]`), else `registeredCapacity`. Reason = the reason for the current scenario (`SCENARIO_REASON`, as today) |
+| `addToWorkingPlan(units: {bmUnitId, actionType}[])` | Adds one action per unit not already in the plan. Window = `workingPlanWindow`. Start output = `startMel` for the window's first slot: `sp.mel[u]` when it is above 0, else `registeredCapacity`. Reason = the reason for the current scenario (`SCENARIO_REASON`, as today) |
 | `updateWorkingPlanAction(bmUnitId, patch)` | Edits from, to, output, reason, event type or note |
-| `setWorkingPlanWindowForAll(from, to)` | "Set all From/To…" |
+| `applyWindowToAll()` | "Apply window to all": sets every action's From/To to `workingPlanWindow` |
 | `removeFromWorkingPlan(bmUnitId)` / `clearWorkingPlan()` | — |
 | `setWorkingPlanWindow(from, to)` | Changes the Schedule tab window. Does not touch existing actions |
 | `commitWorkingPlan(name, description)` | Creates a `DraftPlan` (owner = current user, next colour, actions = the plan) and runs the existing `promoteDraft` on it, which snapshots unit data and calls `refreshAllAggregates`. Then clears the plan |
@@ -103,7 +103,7 @@ Notes: drafts keep notes in `DraftPlan.unitNotes`, not on the action. The workin
 | Start | `pn ≤ 1` (off) |
 | Deload to SEL | `pn > 1` and `sel` known and `pn > sel` |
 | Desync | `pn > 1` |
-| Model capacity | `pn > 1` and `registeredCapacity > (sp.mel[u] ?? registeredCapacity)` |
+| Model capacity | `pn > 1` and `registeredCapacity > pn` |
 
 Every candidate list also excludes:
 - units already in any promoted draft (one commitment per unit),
@@ -126,10 +126,10 @@ Per-slot values for unit `u`:
 
 | Type | Applies in slot when | ΔEMX | ΔEOL | ΔEMI |
 |---|---|---|---|---|
-| Start | `pn ≤ 1` | `+(sp.mel[u] ?? 0)` | `+outputLevel` | `+sel` |
+| Start | `pn ≤ 1` | `+startMel` (`sp.mel[u]` if > 0, else `reg`) | `+outputLevel` | `+sel` |
 | Deload | `pn > sel` | 0 | `−(pn − sel)` | 0 |
 | Desync | `pn > 1` | `−mel` | `−pn` | `−sel` |
-| Capacity | `reg > mel` | `+(reg − mel)` | 0 | 0 |
+| Capacity | `reg > pn` | `+(reg − pn)` | 0 | 0 |
 
 Start is exactly today's rule. The change: the "skip if already PN-committed" rule in `computeAggregates` and the `alreadyModelled` skip in `applyDraftToBaseline` now apply **to Start actions only**. Other types act on running units by definition.
 
@@ -142,7 +142,7 @@ Today area availability = `max(0, contracted − constrained) + Σ unitAreaContr
 | Start | `unitAreaContribution` (unchanged) | unchanged | unchanged |
 | Deload | `+(pn − sel)` | 0 | 0 |
 | Desync | `−max(0, mel − pn)` | `−reg × 0.05` | `−reg × 0.3` |
-| Capacity | `+(reg − mel)` | 0 | 0 |
+| Capacity | `+(reg − pn)` | 0 | 0 |
 
 ¹ Response only for `RESPONSE_FUEL_TYPES`, as today. ² Inertia only for `SYNCHRONOUS_FUEL_TYPES`, as today.
 
@@ -160,15 +160,11 @@ One new module, `src/utils/actionEffects.ts`, with:
 
 `computeAggregates`, `applyDraftToBaseline` (`margin.ts`) and `computeAreaAvailabilities`, `applyDraftToAreaBaseline` (`areaAggregates.ts`) call these instead of their inline Start-only logic. Their signatures do not change, so callers (charts, store, Dashboard 2 adapters) are untouched. With only Start actions, results must equal today's results exactly (see §11).
 
-## 7. Data fix: declared MEL
+## 7. MEL data (not changed)
 
-`fetchMELS` in `src/services/elexon.ts` currently calls `/datasets/MELS?from=<day>&to=<day>`. That endpoint rejects ranges over 1 hour (HTTP 400), so the app has always used mock MELS = registered capacity.
+`fetchMELS` calls `/datasets/MELS?from=<day>&to=<day>`. That endpoint rejects ranges over 1 hour (HTTP 400), so the app has always used mock MELS = registered capacity. `CLAUDE.md`'s "MELS always returns empty" is wrong about the cause.
 
-Change: call `/datasets/MELS/stream?from=<dayStartISO>&to=<dayEndISO>` (returns a bare array). For each `(settlementPeriod, bmUnit)` keep the entry with the highest `notificationSequence`. Value = `(levelFrom + levelTo) / 2`, as today. Units with no entry keep the registered-capacity fallback. Do not attempt any further cleaning.
-
-Side effect: baseline EMX and margin across the app move to declared MELs (probably lower). Update `CLAUDE.md` to remove "MELS always returns empty" and describe the stream endpoint.
-
-The same fix applies to `fetchHistoricalData` (it uses `fetchMELS`). `MILS` has the same bug but is out of scope.
+Real declared MEL exists, but it is too heavy for a prototype page load: `/datasets/MELS/stream` is about 38 MB per day (minute-level segments, up to ~46 rows per unit per period) and `/balancing/physical/all?dataset=MELS` is about 0.6 MB per period (~27 MB per window). So the fetch stays as it is, and Model capacity uses PN as the reduced MEL (D4). Only `CLAUDE.md` changes, to record the real cause and these sizes.
 
 ## 8. UI
 
@@ -191,7 +187,7 @@ Columns shared by all pickers: checkbox, BMU (+ GSP sub-label), Type chip, NDZ, 
 | Start | +MW | `mel` |
 | Deload | −MW | `pn − sel` |
 | Desync | −MW | `pn` |
-| Capacity | +MW | `reg − mel` |
+| Capacity | +MW | `reg − pn` |
 
 **Picker A — type first** (`PickerTypeFirst.tsx`)
 - An "Action ▾" select (default Start) above the list.
@@ -216,8 +212,8 @@ In every picker, units already in the working plan are greyed out and cannot be 
 Component: `WorkingPlanSummary.tsx`.
 
 - **Header:** action count, a total MW chip per type (Start +x, Deload −y, Desync −z, Capacity +w, from the change figures), and "worst margin in window: before → after". After = the minimum over the window of `EMX − TR2` with the plan applied via `applyDraftToBaseline`.
-- **Buttons:** Set all From/To…, Clear, **Commit…** (disabled when empty).
-- **Table, one row per action:** BMU | Action chip | Change ("off → 600 MW", "420 → SEL 180 MW", "380 → 0 MW", "MEL 431 → 501 MW") | From | To (with "—" = open-ended) | Output (editable for Start only, otherwise shown dimmed as "SEL", "0" or "—") | Reason | Event (`OPERATION_TYPE_LABELS`) | Note | ✕.
+- **Buttons:** Apply window to all, Clear, **Commit…** (disabled when empty).
+- **Table, one row per action:** BMU | Action chip | Change ("off → 600 MW", "420 → SEL 180 MW", "380 → 0 MW", "MEL 431 → 501 MW" (from PN to registered capacity)) | From | To (with "—" = open-ended) | Output (editable for Start only, otherwise shown dimmed as "SEL", "0" or "—") | Reason | Event (`OPERATION_TYPE_LABELS`) | Note | ✕.
 - **Commit…** opens a modal (same style as `ConfirmModal`) with Name (required) and Description. Confirm calls `commitWorkingPlan`.
 
 Chips: Start green, Deload amber, Desync red, Capacity blue. Light and dark variants go in `globals.css` next to the SR/QR chips.
@@ -259,7 +255,7 @@ Config → Tweaks gets two `SegControl`s: "Scheduling picker: A · B · C" and "
 | Window changed after actions were added | Existing actions keep their own windows. Candidate lists recompute for the new first slot |
 | Action no longer qualifies in some slots (e.g. PN changed on refresh) | Calculation skips those slots (§5). The summary row still shows. No warning in v1 |
 | Unit committed elsewhere while in the plan | Commit still succeeds (prototype, no clash check) |
-| Data reload (Refresh or historical load) | Working plans are kept. Actions whose units have disappeared are skipped by the calculation |
+| Data reload (Refresh or historical load) | Working plans are cleared, like drafts (`loadData` already calls `clearAllDrafts`, which now also clears working plans) |
 | `loadHistoricalData` "delete all drafts" confirm | Also clears working plans |
 
 ## 10. How drafts plug in later
@@ -288,5 +284,5 @@ Update `CLAUDE.md`:
 - Component map: Schedule tab components, `actionEffects.ts`, `scenarioRanking.ts`.
 - Store state: `workingPlans`, `workingPlanWindow`.
 - New "Scheduling Actions" section: types, candidate rules, deltas, working plan → commit.
-- MELS facts (§7) replacing "MELS always returns empty".
+- MELS facts (§7): the real cause of the empty response and why it isn't used.
 - "What not to change": the Start-only skip rule, `actionTypeOf` default, `wp:<user>` overlay id.
