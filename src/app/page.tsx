@@ -28,13 +28,15 @@ import Dashboard from '@/components/Dashboard'
 import OperationalDashboard from '@/dashboard2/components/OperationalDashboard'
 import type { DrillDownEvent } from '@/dashboard2/types'
 import ConstraintsDetailPage from '@/components/ConstraintsDetailPage'
+import ScheduleTab from '@/components/schedule/ScheduleTab'
+import { workingPlanAsDraft, workingPlanDraftId } from '@/utils/workingPlan'
 import { useAreaSources } from '@/dashboard2/state/areaSources'
 import AreaChart from '@/components/AreaChart'
 import type { AreaId } from '@/config/areas'
 import { AREAS, getArea } from '@/config/areas'
 import { computeAreaStatus } from '@/utils/areaAggregates'
 
-type Tab = 'dashboard' | 'dashboard2' | 'constraints' | 'workspace' | 'chart' | 'promoted' | 'redeclare' | 'graph' | 'requirements'
+type Tab = 'dashboard' | 'dashboard2' | 'constraints' | 'workspace' | 'schedule' | 'chart' | 'promoted' | 'redeclare' | 'graph' | 'requirements'
 type BatteryTab = 'summary' | 'redeclare' | 'reliability'
 
 interface ConfirmState {
@@ -169,6 +171,8 @@ export default function Home() {
   const setAllAreaRequirements = useModellingStore(s => s.setAllAreaRequirements)
   const areaThresholds         = useModellingStore(s => s.areaThresholds)
   const setAllAreaThresholds   = useModellingStore(s => s.setAllAreaThresholds)
+  const workingPlans          = useModellingStore(s => s.workingPlans)
+  const setWorkingPlanWindow  = useModellingStore(s => s.setWorkingPlanWindow)
 
   // ── requirements sync ──
   const requirementsReady = useRef(false)
@@ -274,13 +278,21 @@ export default function Home() {
 
   const handleSolveNavigate = useCallback(() => {
     if (!solveTarget) return
+    if (tweaks.solveDestination === 'schedule') {
+      setWorkingPlanWindow(solveTarget.fromSp, solveTarget.toSp)
+      setSolvePanelVisible(false)
+      setClearSelectionKey(k => k + 1)
+      setScenario(getArea(activeAreaTab).defaultScenario)
+      setActiveTab('schedule')
+      return
+    }
     const draftId = createDraft()
     updateDraftWindow(draftId, solveTarget.fromSp, solveTarget.toSp)
     setSolvePanelVisible(false)
     setClearSelectionKey(k => k + 1)
     setScenario(getArea(activeAreaTab).defaultScenario)
     setActiveTab('workspace')
-  }, [solveTarget, createDraft, updateDraftWindow, setScenario, activeAreaTab])
+  }, [solveTarget, createDraft, updateDraftWindow, setScenario, activeAreaTab, tweaks.solveDestination, setWorkingPlanWindow])
 
   const handleDashboardTileClick = useCallback((area: AreaId) => {
     setActiveAreaTab(area)
@@ -308,6 +320,12 @@ export default function Home() {
   const promotedUnitIds = useMemo(() => new Set(
     drafts.filter(d => d.status === 'promoted').flatMap(d => d.actions.map(a => a.bmUnitId))
   ), [drafts])
+
+  // The current operator's working plan, drawn like a draft on AreaChart (spec §8.4).
+  const draftsWithWorkingPlan = useMemo(() => {
+    const wp = workingPlanAsDraft(workingPlans[currentUser], currentUser)
+    return wp ? [...drafts, wp] : drafts
+  }, [drafts, workingPlans, currentUser])
 
   const pnCommittedUnitIds = useMemo(() => new Set(
     units
@@ -630,6 +648,12 @@ export default function Home() {
             Workspace
           </button>
           <button
+            className={`tab-btn${activeTab === 'schedule' ? ' active' : ''}`}
+            onClick={() => setActiveTab('schedule')}
+          >
+            Schedule
+          </button>
+          <button
             className={`tab-btn${activeTab === 'promoted' ? ' active' : ''}`}
             onClick={() => setActiveTab('promoted')}
           >
@@ -716,6 +740,26 @@ export default function Home() {
           <ConstraintsDetailPage
             initialSpCount={constraintsSpCount}
             onBack={() => setActiveTab('dashboard2')}
+          />
+        )}
+
+        {/* Schedule tab — Scheduling Actions (Docs/superpowers/specs/2026-11-21-scheduling-actions-design.md) */}
+        {activeTab === 'schedule' && (
+          <ScheduleTab
+            picker={tweaks.schedulePicker}
+            scenario={scenario}
+            onScenarioChange={setScenario}
+            gspFilter={gspFilter}
+            onGspFilterChange={setGspFilter}
+            voltageArea={voltageArea}
+            reservePct={tweaks.reservePct}
+            reasonCode={SCENARIO_REASON[scenario] ?? 'MARGIN'}
+            solveMw={solveTarget?.adjustedMw ?? null}
+            showOnCharts={!hiddenDraftIds.has(workingPlanDraftId(currentUser))}
+            onToggleShowOnCharts={() => toggleDraftChartVisibility(workingPlanDraftId(currentUser))}
+            onWindowEdited={() => setSolveTarget(null)}
+            onAdded={n => flashToast(n === 1 ? 'Added 1 action' : `Added ${n} actions`)}
+            onCommitted={name => { setSolveTarget(null); flashToast(`Committed "${name}"`) }}
           />
         )}
 
@@ -882,7 +926,7 @@ export default function Home() {
                     area={areaConfig}
                     settlementPeriods={settlementPeriods}
                     areaRequirements={reqs}
-                    drafts={drafts}
+                    drafts={draftsWithWorkingPlan}
                     units={units}
                     hiddenDraftIds={hiddenDraftIds}
                     chartInteractionMode={tweaks.chartInteractionMode}
