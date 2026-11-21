@@ -15,6 +15,7 @@ npm run dev       # http://localhost:3000
 npm run build     # production build check
 npx tsc --noEmit  # type check
 npm run test:dashboard2  # Dashboard 2 unit tests (node --test, no framework; Node ≥ 23.6 for built-in TS type stripping)
+npm run test:actions   # Scheduling Actions unit tests (node --test)
 ```
 
 ---
@@ -100,6 +101,8 @@ error: string | null
 dataOverrides: Record<string, Partial<UnitSnapshot>>  // per-unit data redeclarations (prototype)
 unitServices: Record<string, ServiceType>             // per-unit service assignment (SR | QR)
 areaRequirements: Record<string, AreaRequirementRow[]> // 48 HH rows per non-Margin area (in Zustand)
+workingPlans: Partial<Record<UserId, WorkingPlanAction[]>>  // Scheduling Actions working plan per operator
+workingPlanWindow: { fromPeriod: number; toPeriod: number }
 ```
 
 `updateUnitWindow(draftId, bmUnitId, fromPeriod, toPeriod)` updates a single action's from/to independently of the draft-level window. If the draft is promoted, it triggers `refreshAllAggregates`. Note: calling `updateDraftWindow` afterwards overwrites per-unit customisations (it bulk-sets all actions to the draft's from/to).
@@ -185,8 +188,8 @@ For units that appear in `sp.pn` but have no entry in `sp.mel` (e.g., units drop
 ### Settlement period numbering — BST offset (known issue, not fixed)
 Elexon SPs are BST-based (local GB time). The app's `dateToSp` and `spToStartTime` utilities use UTC. During BST (late March–late October), SP numbers are off by 2 (e.g. BST SP 27 = UTC SP 25). This causes the 24h window to start ~1 hour earlier than the actual current SP in BST. Does not affect correctness significantly for a prototype — flag if precision matters.
 
-### MELS always returns empty from the public API
-`/datasets/MELS` returns no data. The app falls back to `registeredCapacity` for every unit's MEL. This is accounted for in the code — do not add logic expecting MELS data.
+### MELS — app falls back to registered capacity
+`fetchMELS` calls `/datasets/MELS?from=<day>&to=<day>`, which Elexon rejects (HTTP 400: ranges over 1 hour are not allowed), so the app always uses mock MELS = `registeredCapacity`. Real declared MEL exists but is too heavy for a page load: `/datasets/MELS/stream` is ~38 MB per day, `/balancing/physical/all?dataset=MELS` ~0.6 MB per SP. Kept as is on purpose (Scheduling Actions spec D4). Do not add logic that expects real MEL values.
 
 ### D-1 proxy for unconfirmed SPs
 For slots beyond the gate-closure frontier (where real PN = 0), `fetchAllData` fetches yesterday's full-day PN (`fetchPN(yesterdayDate)`) and:
@@ -207,7 +210,7 @@ These values are also persisted in a **localStorage cache** (see Standing Data C
 
 | File | Role |
 |------|------|
-| `src/app/page.tsx` | Top-level: data loading, layout, tab switching, derived data, confirm modals, sharing actions; owns `activeSection: AppSection` (Balancing/Battery, default `'balancing'`) and `handleSectionChange`; owns `activeBatteryTab: 'summary' \| 'redeclare'` (default `'summary'`) and `batteryUnits` (units filtered to `fuelType === 'BATTERY'`); owns `hiddenDraftIds` state for chart draft visibility; owns `solveTarget` state for the Deficit Solver; owns `activeAreaTab: AreaId` for Chart subtab; tab order (Balancing section): Dashboard \| Dashboard 2 \| Chart \| Workspace \| Promoted \| BMU Summary, with Redeclare \| Requirements as buttons on the right of the tab bar; plus a hidden `'constraints'` tab (the Constraints level-2 page, no tab button — the Dashboard 2 button stays highlighted while it is open), reached via `handleDashboard2DrillDown` and seeded with `constraintsSpCount` from the Dashboard 2 window |
+| `src/app/page.tsx` | Top-level: data loading, layout, tab switching, derived data, confirm modals, sharing actions; owns `activeSection: AppSection` (Balancing/Battery, default `'balancing'`) and `handleSectionChange`; owns `activeBatteryTab: 'summary' \| 'redeclare'` (default `'summary'`) and `batteryUnits` (units filtered to `fuelType === 'BATTERY'`); owns `hiddenDraftIds` state for chart draft visibility; owns `solveTarget` state for the Deficit Solver; owns `activeAreaTab: AreaId` for Chart subtab; tab order (Balancing section): Dashboard \| Dashboard 2 \| Chart \| Workspace \| Schedule \| Promoted \| BMU Summary (`activeTab` also takes `'schedule'` and `'constraints'`), with Redeclare \| Requirements as buttons on the right of the tab bar; plus a hidden `'constraints'` tab (the Constraints level-2 page, no tab button — the Dashboard 2 button stays highlighted while it is open), reached via `handleDashboard2DrillDown` and seeded with `constraintsSpCount` from the Dashboard 2 window |
 | `src/components/DraftSidebar.tsx` | "Balancing \| Battery" `SegControl` section switcher at top, then identity picker ("You are: [NSE ▼]"), window time + Refresh, draft list filtered to current user, "Shared with me" collapsible section; coloured circle visibility toggle per active draft; collapse button (‹/›) at top; New Draft button pinned to bottom footer |
 | `src/components/SegControl.tsx` | Shared pill-style segmented control (`twk-seg`/`twk-seg-thumb` CSS); used by `ConfigPanel` and `DraftSidebar`'s section switcher |
 | `src/components/BatterySummaryTab.tsx` | Battery section "Summary" tab: GSP filter + AS Services filter + timeframe selector (30min/1h/1.5h/2h) above Total/Contracted/Constrained/Usable cost-card-style cards (Σ capacity = `max(0, MEL − worstPn)`), click-to-filter table of battery units (BMU, Type, Service, NDZ, MZT, MNZT, SEL, MEL, £SEL, £MEL, PN, Capacity) |
@@ -225,7 +228,7 @@ These values are also persisted in a **localStorage cache** (see Standing Data C
 | `src/components/PromotedTab.tsx` | Promoted-tab view: cost breakdown cards (Total + per-reason, 8 reason codes), click-to-filter table, change-indicator arrows (↑/↓), service chip, bulk remove; **From/To columns** (read-only, before Event) |
 | `src/components/RedeclareTab.tsx` | Redeclare-tab view: editable data columns for promoted units (simulates redeclarations); amber row highlight on override; Reset per-row and Reset all; Service (SR/QR) assign select |
 | `src/components/MarginChart.tsx` | Recharts chart: solid EMX/EOL/EMI baseline for all SPs + solid orange TR2 line (demand × reserve multiplier) + partial draft overlays (dotted only where draft has actions) + gate-closure frontier + midnight marker; draft visibility controlled via `hiddenDraftIds` prop; `reservePct` prop (default 10) controls TR2; dark-mode aware via MutationObserver; **Deficit Solver**: `chartInteractionMode` prop enables drag / 2-click / deficit-zone selection; fires `onSolveSelect(fromSp, toSp, worstDeficitMw)` callback |
-| `src/components/ConfigPanel.tsx` | Floating config panel (4 tabs): **tweaks** (theme/layout/sidebar/selection/TR2 reserve %, **chart interaction mode** — drag/2-click/deficit zone), **scenarios** (ranking criteria), **data** (Real-time/Historical mode switch, date picker, start-time select, Load button), **standing data** (backfill + sync controls) |
+| `src/components/ConfigPanel.tsx` | Floating config panel (4 tabs): **tweaks** (theme/layout/sidebar/selection/TR2 reserve %, **chart interaction mode** — drag/2-click/deficit zone, **Scheduling picker** A/B/C, **Solve ↗ destination** Workspace/Schedule), **scenarios** (ranking criteria), **data** (Real-time/Historical mode switch, date picker, start-time select, Load button), **standing data** (backfill + sync controls) |
 | `src/components/GraphTab.tsx` | BMU Summary tab: read-only table of all units contributing to the margin chart — units with PN > 1 in any SP (including those outside the reference list) plus promoted-draft units; Source badge differentiates "PN" (green) vs "User" (blue) vs "Both"; columns match AvailableTable with PN inserted before SEL; sorted by PN descending |
 | `src/components/StandingDataTab.tsx` | Standing data tab UI: shows coverage (NDZ/MZT/MNZT/SEL per unit count), runs one-time backfill, shows per-batch progress, Sync Recent button after backfill completes |
 | `src/components/ConfirmModal.tsx` | Dark-mode-aware confirm dialog (replaces native browser confirm) |
@@ -236,6 +239,10 @@ These values are also persisted in a **localStorage cache** (see Standing Data C
 | `src/services/standingDataSync.ts` | localStorage-based standing data cache: backfill, incremental sync, coverage computation; keys `so:standing_data` and `so:sync_metadata` |
 | `src/services/requirementsSync.ts` | Firestore persistence for `areaRequirements`; single shared document `config/area_requirements`; `loadAreaRequirements()` on mount, `saveAreaRequirements()` debounced 500ms on every change |
 | `src/store/useModellingStore.ts` | Zustand store |
+| `src/components/schedule/` | Schedule tab (Scheduling Actions): `ScheduleTab`, `PickerTypeFirst` / `PickerUnitsFirst` / `PickerTabs`, `CandidateTable`, `WorkingPlanSummary`, `CommitPlanModal`, `candidates.ts`, `pickerTypes.ts`, `scheduleUi.tsx` |
+| `src/utils/actionEffects.ts` | Per-type candidate rules and per-slot effects (pure, no value imports) |
+| `src/utils/workingPlan.ts` | Working plan → draft-shaped `wp:<user>` overlay; `toModellingActions` (pure, no value imports) |
+| `src/utils/scenarioRanking.ts` | `scenarioScore`, shared by `AvailableTable` and the Schedule pickers |
 | `src/utils/margin.ts` | `computeAggregates`, `applyDraftToBaseline`, `isUnitPnCommitted` |
 | `src/utils/settlements.ts` | SP ↔ time helpers (UTC-based, see BST note above) |
 | `src/utils/fuelTypes.ts` | `EXCLUDED_FUEL_TYPES` (display filter) and `FETCH_EXCLUDED_FUEL_TYPES` (fetch filter) — shared by `elexon.ts` and `AvailableTable.tsx` |
@@ -285,6 +292,10 @@ These values are also persisted in a **localStorage cache** (see Standing Data C
 - **Dashboard 2's BST correction is local to its real adapters** — `slotStartMs` in `src/dashboard2/data/realAdapters.ts` re-derives true UTC SP starts (gated by `CORRECT_ELEXON_SP_TO_UTC`). The rest of the app still uses the UTC-labelled `sp.startTime`. Do not "fix" `settlements.ts` to match without reviewing every consumer.
 - **`src/dashboard2/time.ts` and `derive.ts` must have no value imports** (type-only imports are fine) — the `node --test` runner imports them directly with type stripping and cannot resolve extensionless relative imports or the `@/` alias.
 - **`activeSection` in `page.tsx` is local state, not Zustand** — same pattern as `reservePct`, `hiddenDraftIds`, `solveTarget`. `handleSectionChange` always resets `activeTab` to `'dashboard'` on switch (no per-section tab memory). The sidebar (`DraftSidebar`) is rendered unconditionally regardless of `activeSection` — do not gate it behind a section check.
+- **Start-only skip rule** — in `computeAggregates`, `applyDraftToBaseline` and the area functions, the "skip if already PN-committed / already modelled" rule applies to **Start** actions only. Deload, Desync and Model capacity act on running units by definition; do not apply the skip to them.
+- **`actionTypeOf()` default** — `ModellingAction.actionType` is optional and `undefined` means `start` (every older draft). Always read it through `actionTypeOf()` and do not make the field required.
+- **`wp:<user>` overlay id** — the working plan is drawn via `workingPlanAsDraft(...)` with id `wp:<user>`. It is never stored in `drafts`; "Show on charts" toggles that id in `hiddenDraftIds`.
+- **`actionEffects.ts` and `workingPlan.ts` must keep type-only imports** — the `node --test` runner (`npm run test:actions`) loads them directly and cannot resolve the `@/` alias or extensionless value imports. Same rule as `dashboard2/time.ts`.
 
 ---
 
@@ -419,6 +430,19 @@ export interface TweakState {
 ```
 
 Default: `'drag'`. Controlled via a `SegControl` in Config → Tweaks tab. Changing mode resets all drag/click state in `MarginChart` via a `useEffect` on `chartInteractionMode`.
+
+---
+
+## Scheduling Actions (Schedule tab)
+
+Spec: `Docs/superpowers/specs/2026-11-21-scheduling-actions-design.md`. Plan: `Docs/superpowers/plans/2026-11-21-scheduling-actions.md`.
+
+- **Action types** (`ActionType` in `types.ts`): `start` (off unit runs at `outputLevel`), `deload` (running → SEL), `desync` (running → 0), `capacity` (MEL raised from PN to registered capacity). `ModellingAction.actionType` is optional; `undefined` = `start`, so every older draft keeps working. Always read it through `actionTypeOf()`.
+- **`src/utils/actionEffects.ts`** (pure, no value imports, tested by `npm run test:actions`): `actionTypeOf`, `isCandidate`, `marginDelta`, `areaDelta`, `changeMw`, `covers`, `slotValues`. `computeAggregates`, `applyDraftToBaseline`, `computeAreaAvailabilities` and `applyDraftToAreaBaseline` call it. The "skip if already PN-committed / already modelled" rule applies to **Start only**. Area availability is clamped to ≥ 0.
+- **Working plan**: `workingPlans[currentUser]` (Zustand, in memory, cleared by `clearAllDrafts`), `workingPlanWindow` for the Schedule tab. One action per unit per plan. `commitWorkingPlan(name, description)` saves it as a draft and calls `promoteDraft`. It is drawn as a draft-shaped overlay with id `wp:<user>` (`src/utils/workingPlan.ts`) on MarginChart, AreaChart and Dashboard 2; "Show on charts" toggles that id in `hiddenDraftIds`.
+- **Schedule tab** (`src/components/schedule/`): window + Scenario/GSP bar, one of three pickers (Config → Tweaks → Scheduling picker: A type first, B units first, C tabs + basket; default C), and `WorkingPlanSummary`. Candidates come from `buildCandidateRows` (window's first slot; excludes `EXCLUDED_FUEL_TYPES`, promoted units and GSP-filtered units) ranked by `scenarioScore` (`src/utils/scenarioRanking.ts`). Pickers A and C drop stale ticks (units that no longer qualify) when adding. `WorkingPlanSummary` keeps each row's From ≤ To, and the Schedule window bar keeps From ≤ To.
+- **Solve ↗**: `TweakState.solveDestination` (`'schedule'` default, or `'workspace'`). The deficit-solver workspace branch is unchanged; with `'schedule'`, Solve ↗ sets `workingPlanWindow` and opens the Schedule tab without creating a draft.
+- Workspace and the draft sidebar are unchanged.
 
 ---
 
@@ -629,7 +653,7 @@ Units where all four of `sel`, `ndz`, `mnzt`, `mzt` are still `undefined` after 
 
 - **BST/UTC offset** — window starts ~1 hour early in summer. Low priority for prototype.
 - **£120 static price** — real BM offer prices not yet integrated; cost figures are indicative only.
-- **Minimal test coverage** — only Dashboard 2's `time.ts`/`derive.ts` have unit tests (`npm run test:dashboard2`). Margin calculation logic is a good candidate for more.
+- **Minimal test coverage** — only Dashboard 2's `time.ts`/`derive.ts` (`npm run test:dashboard2`) and the Scheduling Actions pure utils (`npm run test:actions`) have unit tests. Margin calculation logic is a good candidate for more.
 - **D-1 proxy + tomorrow slots** — tomorrow's SPs always have zero confirmed PN; they use yesterday's same-SP data as proxy. This is a reasonable heuristic but not operationally precise.
 - **NDZ/MZT/MNZT blank — root cause found and fixed** — Two bugs: (1) `notice` field in the NDZ endpoint is in **minutes** not seconds; the code was dividing by 60 again, collapsing most values to 0. (2) Standing data is change-only — units only submit new entries when parameters change. CNQPS-2 last submitted NDZ 8–9 weeks ago, outside the old 35-day window. Both fixed: division removed, lookback extended to 84 days. The localStorage backfill now covers up to 6 years, so even infrequently-updated units are captured. Key format is confirmed consistent: `bmUnit: "T_CNQPS-2"` in dynamic param endpoints matches `elexonBmUnit: "T_CNQPS-2"` in reference data — key mismatch is **not** an issue.
 - **Units with partial standing data still show `—` for missing params** — A unit that has SEL but no NDZ/MZT/MNZT (e.g. a unit that never submitted dynamic params) will pass the decommissioned filter but still show dashes in those columns. This is a data reality; no fix planned.
@@ -646,3 +670,4 @@ Units where all four of `sel`, `ndz`, `mnzt`, `mzt` are still `undefined` after 
 - **Response sub-classification** — Dynamic Containment, Moderation, Regulation treated uniformly. No sub-type distinction yet.
 - **Dashboard 2 data gaps** — no real source for −ve margin or largest loss (mock) or for strip actions (not shown); no +/− reserve direction or LF/HF/pre-/post-fault response split in the store, so RESERVE has 4 upward items and RESPONSE has 1. CONSTRAINTS uses the dummy ConstraintsTile fixtures.
 - **Dashboard 2 IC rows are mostly D-1 estimates** — beyond the PN gate-closure frontier the interconnector values are yesterday's PN. Swings across the confirmed→estimate frontier and the midnight wrap inside the estimates are suppressed (gaps); estimated bars render at reduced opacity. See "Interconnector seams" in `Docs/Design/Dashboard/DATA_MAPPING.md`.
+- **Scheduling Actions effects are approximations** — Model capacity treats PN as the reduced MEL and adds on top of a baseline that already counts registered capacity; Desync subtracts from area availability that never included the unit (clamped at 0).
