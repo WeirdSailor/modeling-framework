@@ -36,7 +36,7 @@ function slotLabel(slot: number, periods: SettlementPeriodData[]): string {
 }
 
 
-function ScenarioPopover({ scenario, onChange, onClose, wrapperRef }: {
+export function ScenarioPopover({ scenario, onChange, onClose, wrapperRef }: {
   scenario: string
   onChange: (s: string) => void
   onClose: () => void

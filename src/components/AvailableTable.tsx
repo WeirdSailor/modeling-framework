@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useCallback, useEffect, type Dispatch, type SetStateAction } from 'react'
 import type { BMUnit, ServiceType } from '@/models/types'
+import { scenarioScore } from '@/utils/scenarioRanking'
 
 
 interface Props {
@@ -48,29 +49,6 @@ interface UnitRow {
   priceToMel: number
 }
 
-const SYNCHRONOUS_TYPES = new Set(['CCGT', 'COAL', 'NUCLEAR', 'OCGT', 'NPSHYD', 'PS', 'BIOMASS', 'OIL', 'GAS'])
-const RESPONSE_PREF: Record<string, number> = { PS: 3000, NPSHYD: 2000, OCGT: 1000 }
-
-function scenarioScore(row: UnitRow, scenarioId: string, voltageArea: string): number {
-  const available = Math.max(0, row.mel - row.pn)
-  switch (scenarioId) {
-    case 'margin':
-      return available
-    case 'inertia':
-      return (SYNCHRONOUS_TYPES.has(row.fuelType) ? 100000 : 0) + row.mel
-    case 'voltage':
-      return (voltageArea && row.gspGroup === voltageArea ? 100000 : 0) + row.mel
-    case 'reserve':
-      return (row.ndz > 0 ? -row.ndz * 10 : -99999) + available / 1000
-    case 'response':
-      return (RESPONSE_PREF[row.fuelType] ?? 0) + (row.ndz > 0 ? -row.ndz : -9999)
-    case 'pullback':
-      return row.pn  // units generating most have the most to give back
-    default:
-      return 0
-  }
-}
-
 function getFuelDisplay(fuelType: string): { label: string; chipClass: string } {
   const map: Record<string, { label: string; chipClass: string }> = {
     CCGT:    { label: 'CCGT',    chipClass: 'chip-ccgt' },
@@ -89,7 +67,7 @@ function getFuelDisplay(fuelType: string): { label: string; chipClass: string } 
   return map[fuelType] ?? { label: fuelType, chipClass: '' }
 }
 
-function TypeChip({ fuelType }: { fuelType: string }) {
+export function TypeChip({ fuelType }: { fuelType: string }) {
   const { label, chipClass } = getFuelDisplay(fuelType)
   return <span className={`chip ${chipClass}`}>{label}</span>
 }
