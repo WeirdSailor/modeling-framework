@@ -229,9 +229,10 @@ export default function Home() {
       }
     }
 
-    if (drafts.length > 0) {
+    const hasWorkingPlans = Object.values(workingPlans).some(p => (p?.length ?? 0) > 0)
+    if (drafts.length > 0 || hasWorkingPlans) {
       setConfirmState({
-        message: 'Loading new data will delete all current drafts. Continue?',
+        message: 'Loading new data will delete all current drafts and working plans. Continue?',
         confirmLabel: 'Load data',
         danger: true,
         onConfirm: () => {
@@ -242,7 +243,7 @@ export default function Home() {
     } else {
       await doLoad()
     }
-  }, [clearAllDrafts, setLoading, setError, setUnits, setSPs, drafts, setConfirmState])
+  }, [clearAllDrafts, setLoading, setError, setUnits, setSPs, drafts, workingPlans, setConfirmState])
 
   useEffect(() => { loadData() }, [loadData])
 

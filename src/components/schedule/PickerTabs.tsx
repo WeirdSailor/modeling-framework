@@ -43,9 +43,11 @@ export default function PickerTabs({ rows, inPlan, onAdd, timeLabel }: PickerPro
     })
   }
 
+  const byId = new Map(rows.map(r => [r.bmUnitId, r]))
+  const addable = [...basket].filter(([id, t]) => byId.get(id)?.qualifies.includes(t))
+
   function addBasket() {
-    const byId = new Map(rows.map(r => [r.bmUnitId, r]))
-    onAdd([...basket].filter(([id, t]) => byId.get(id)?.qualifies.includes(t)).map(([bmUnitId, actionType]) => ({ bmUnitId, actionType })))
+    onAdd(addable.map(([bmUnitId, actionType]) => ({ bmUnitId, actionType })))
     setBasket(new Map())
   }
 
@@ -67,8 +69,8 @@ export default function PickerTabs({ rows, inPlan, onAdd, timeLabel }: PickerPro
         <span className="schedule-hint">
           Basket: {basketCounts.length === 0 ? 'empty' : basketCounts.map(x => `${x.n} ${ACTION_TYPE_LABELS[x.t]}`).join(' · ')}
         </span>
-        <button className="btn btn-primary" disabled={basket.size === 0} onClick={addBasket}>
-          Add basket to plan ({basket.size}) ↓
+        <button className="btn btn-primary" disabled={addable.length === 0} onClick={addBasket}>
+          Add basket to plan ({addable.length}) ↓
         </button>
       </div>
       <CandidateTable

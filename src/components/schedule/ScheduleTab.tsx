@@ -44,6 +44,7 @@ export default function ScheduleTab({
   picker, scenario, onScenarioChange, gspFilter, onGspFilterChange, voltageArea, reservePct, reasonCode,
   solveMw, showOnCharts, onToggleShowOnCharts, onWindowEdited, onAdded, onCommitted,
 }: Props) {
+  const currentUser       = useModellingStore(s => s.currentUser)
   const units             = useModellingStore(s => s.units)
   const settlementPeriods = useModellingStore(s => s.settlementPeriods)
   const drafts            = useModellingStore(s => s.drafts)
@@ -148,9 +149,9 @@ export default function ScheduleTab({
       </div>
 
       <section className="schedule-section">
-        {picker === 'typeFirst' && <PickerTypeFirst {...pickerProps} />}
-        {picker === 'unitsFirst' && <PickerUnitsFirst {...pickerProps} />}
-        {picker === 'tabs' && <PickerTabs {...pickerProps} />}
+        {picker === 'typeFirst' && <PickerTypeFirst key={currentUser} {...pickerProps} />}
+        {picker === 'unitsFirst' && <PickerUnitsFirst key={currentUser} {...pickerProps} />}
+        {picker === 'tabs' && <PickerTabs key={currentUser} {...pickerProps} />}
       </section>
 
       <section className="schedule-section">

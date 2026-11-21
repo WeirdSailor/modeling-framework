@@ -158,7 +158,7 @@ export default function WorkingPlanSummary({
                       <select className="reason-select" value={a.operationType ?? ''}
                         onChange={e => onUpdate(a.bmUnitId, { operationType: e.target.value === '' ? undefined : e.target.value as OperationType })}>
                         <option value="">—</option>
-                        {OPERATION_TYPES.map(o => <option key={o} value={o}>{o}</option>)}
+                        {OPERATION_TYPES.map(o => <option key={o} value={o} title={OPERATION_TYPE_LABELS[o]}>{o}</option>)}
                       </select>
                     </td>
                     <td>

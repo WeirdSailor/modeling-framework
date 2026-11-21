@@ -18,9 +18,11 @@ export default function PickerTypeFirst({ rows, inPlan, onAdd, timeLabel }: Pick
     return planned ? `in plan as ${ACTION_TYPE_LABELS[planned]}` : null
   }
 
+  const validIds = new Set(list.map(r => r.bmUnitId))
+  const addable = [...ticked].filter(id => validIds.has(id))
+
   function add() {
-    const valid = new Set(list.map(r => r.bmUnitId))
-    onAdd([...ticked].filter(id => valid.has(id)).map(bmUnitId => ({ bmUnitId, actionType: type })))
+    onAdd(addable.map(bmUnitId => ({ bmUnitId, actionType: type })))
     setTicked(new Set())
   }
 
@@ -35,8 +37,8 @@ export default function PickerTypeFirst({ rows, inPlan, onAdd, timeLabel }: Pick
         </label>
         <span className="schedule-hint">{list.length} units qualify at {timeLabel}</span>
         <span className="schedule-spacer" />
-        <button className="btn btn-primary" disabled={ticked.size === 0} onClick={add}>
-          Add {ticked.size} as {ACTION_TYPE_LABELS[type]} ↓
+        <button className="btn btn-primary" disabled={addable.length === 0} onClick={add}>
+          Add {addable.length} as {ACTION_TYPE_LABELS[type]} ↓
         </button>
       </div>
       <CandidateTable
