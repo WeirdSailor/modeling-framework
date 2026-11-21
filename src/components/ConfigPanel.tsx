@@ -19,6 +19,8 @@ export interface TweakState {
   selectionPattern: 'buttons' | 'click'
   reservePct: number
   chartInteractionMode: 'drag' | 'twoClick' | 'deficit'
+  schedulePicker: 'typeFirst' | 'unitsFirst' | 'tabs'   // Schedule tab candidate picker (A/B/C)
+  solveDestination: 'workspace' | 'schedule'            // where Solve ↗ takes the operator
 }
 
 function Toggle({ value, onChange, disabled, label }: {
@@ -98,6 +100,27 @@ function TweaksTab({
           { value: 'deficit',  label: 'Shortfall zone' },
         ]}
         onChange={v => onChangeTweak('chartInteractionMode', v)}
+      />
+
+      <div className="twk-sect">Scheduling picker</div>
+      <SegControl
+        value={tweaks.schedulePicker}
+        options={[
+          { value: 'typeFirst',  label: 'A · Type first' },
+          { value: 'unitsFirst', label: 'B · Units first' },
+          { value: 'tabs',       label: 'C · Tabs' },
+        ]}
+        onChange={v => onChangeTweak('schedulePicker', v)}
+      />
+
+      <div className="twk-sect">Solve ↗ goes to</div>
+      <SegControl
+        value={tweaks.solveDestination}
+        options={[
+          { value: 'workspace', label: 'Workspace' },
+          { value: 'schedule',  label: 'Schedule' },
+        ]}
+        onChange={v => onChangeTweak('solveDestination', v)}
       />
     </div>
   )
