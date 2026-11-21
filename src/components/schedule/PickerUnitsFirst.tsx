@@ -19,7 +19,7 @@ function ActionMenu({ tickedRows, onChoose, onClose, wrapperRef }: {
   const ref = useRef<HTMLDivElement>(null)
   usePopoverDismiss(ref, wrapperRef, onClose)
   return (
-    <div ref={ref} className="schedule-menu" role="menu">
+    <div ref={ref} className="schedule-menu" role="menu" style={{ left: 'auto', right: 0 }}>
       {ACTION_TYPES.map(t => {
         const n = tickedRows.filter(r => r.qualifies.includes(t)).length
         return (

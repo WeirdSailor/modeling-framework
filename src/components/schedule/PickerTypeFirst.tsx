@@ -19,7 +19,8 @@ export default function PickerTypeFirst({ rows, inPlan, onAdd, timeLabel }: Pick
   }
 
   function add() {
-    onAdd([...ticked].map(bmUnitId => ({ bmUnitId, actionType: type })))
+    const valid = new Set(list.map(r => r.bmUnitId))
+    onAdd([...ticked].filter(id => valid.has(id)).map(bmUnitId => ({ bmUnitId, actionType: type })))
     setTicked(new Set())
   }
 

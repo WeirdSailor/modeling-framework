@@ -44,7 +44,8 @@ export default function PickerTabs({ rows, inPlan, onAdd, timeLabel }: PickerPro
   }
 
   function addBasket() {
-    onAdd([...basket].map(([bmUnitId, actionType]) => ({ bmUnitId, actionType })))
+    const byId = new Map(rows.map(r => [r.bmUnitId, r]))
+    onAdd([...basket].filter(([id, t]) => byId.get(id)?.qualifies.includes(t)).map(([bmUnitId, actionType]) => ({ bmUnitId, actionType })))
     setBasket(new Map())
   }
 

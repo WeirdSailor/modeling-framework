@@ -50,11 +50,12 @@ export default function CandidateTable({
     setSort(s => (!s || s.key !== key ? { key, dir: 'desc' } : s.dir === 'desc' ? { key, dir: 'asc' } : null))
   }
 
-  function Th({ k, label, numeric = true }: { k: SortKey; label: string; numeric?: boolean }) {
+  function th(k: SortKey, label: string, numeric = true) {
     const active = sort !== null && sort.key === k
     const caret = sort !== null && sort.key === k ? (sort.dir === 'asc' ? '▲' : '▼') : '↕'
     return (
       <th
+        key={k}
         className={['sortable', numeric ? 'num' : '', active ? 'col-active' : ''].filter(Boolean).join(' ')}
         onClick={() => cycleSort(k)}
       >
@@ -79,17 +80,17 @@ export default function CandidateTable({
                 onChange={e => onSetTicked(selectable, e.target.checked)}
               />
             </th>
-            <Th k="nationalGridBmUnit" label="BMU" numeric={false} />
-            <Th k="fuelType" label="Type" numeric={false} />
+            {th('nationalGridBmUnit', 'BMU', false)}
+            {th('fuelType', 'Type', false)}
             {showState && <th>State</th>}
-            {changeType && <Th k="change" label={changeLabel} />}
-            <Th k="ndz" label="NDZ" />
-            <Th k="sel" label="SEL" />
-            <Th k="pn" label="PN" />
-            <Th k="mel" label="MEL" />
-            <Th k="reg" label="Reg. cap" />
-            <Th k="priceToSel" label="£ SEL" />
-            <Th k="priceToMel" label="£ MEL" />
+            {changeType && th('change', changeLabel)}
+            {th('ndz', 'NDZ')}
+            {th('sel', 'SEL')}
+            {th('pn', 'PN')}
+            {th('mel', 'MEL')}
+            {th('reg', 'Reg. cap')}
+            {th('priceToSel', '£ SEL')}
+            {th('priceToMel', '£ MEL')}
             <th />
           </tr>
         </thead>
