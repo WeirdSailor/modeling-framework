@@ -122,13 +122,20 @@ export default function WorkingPlanSummary({
                     <td className="mono">{describeChange(a, spBySlot.get(a.fromPeriod), unit)}</td>
                     <td>
                       <select className="reason-select" value={a.fromPeriod}
-                        onChange={e => onUpdate(a.bmUnitId, { fromPeriod: Number(e.target.value) })}>
+                        onChange={e => {
+                          const f = Number(e.target.value)
+                          onUpdate(a.bmUnitId, a.toPeriod !== undefined && f > a.toPeriod ? { fromPeriod: f, toPeriod: f } : { fromPeriod: f })
+                        }}>
                         {slotOptions}
                       </select>
                     </td>
                     <td>
                       <select className="reason-select" value={a.toPeriod ?? ''}
-                        onChange={e => onUpdate(a.bmUnitId, { toPeriod: e.target.value === '' ? undefined : Number(e.target.value) })}>
+                        onChange={e => {
+                          if (e.target.value === '') { onUpdate(a.bmUnitId, { toPeriod: undefined }); return }
+                          const t = Number(e.target.value)
+                          onUpdate(a.bmUnitId, t < a.fromPeriod ? { fromPeriod: t, toPeriod: t } : { toPeriod: t })
+                        }}>
                         <option value="">—</option>
                         {slotOptions}
                       </select>

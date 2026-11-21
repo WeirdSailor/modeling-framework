@@ -27,6 +27,7 @@ export default function CommitPlanModal({ actionCount, onCommit, onCancel }: Pro
       onClick={onCancel}
     >
       <form
+        role="dialog" aria-modal="true" aria-label="Commit working plan"
         onClick={e => e.stopPropagation()}
         onSubmit={e => { e.preventDefault(); if (canCommit) onCommit(name.trim(), description.trim()) }}
         style={{
@@ -40,11 +41,11 @@ export default function CommitPlanModal({ actionCount, onCommit, onCancel }: Pro
         </p>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: 'var(--text-muted)' }}>
           Name
-          <input className="reason-select" autoFocus value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Evening margin cover" />
+          <input className="reason-select" style={{ border: '1px solid var(--border)', background: 'var(--bg)', cursor: 'text', padding: '6px 8px' }} autoFocus value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Evening margin cover" />
         </label>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: 'var(--text-muted)' }}>
           Description
-          <textarea className="reason-select" rows={3} value={description} onChange={e => setDescription(e.target.value)} />
+          <textarea className="reason-select" style={{ border: '1px solid var(--border)', background: 'var(--bg)', cursor: 'text', padding: '6px 8px', resize: 'vertical' }} rows={3} value={description} onChange={e => setDescription(e.target.value)} />
         </label>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
           <button type="button" className="btn btn-ghost" onClick={onCancel}>Cancel</button>
