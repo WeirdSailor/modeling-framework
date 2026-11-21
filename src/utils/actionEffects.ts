@@ -109,7 +109,7 @@ export function changeMw(type: ActionType, bmUnitId: string, sp: SlotData, unit:
   switch (type) {
     case 'start':    return v.startMel
     case 'deload':   return 0 - Math.max(0, v.pn - v.sel)  // 0 - x avoids returning -0
-    case 'desync':   return -v.pn
+    case 'desync':   return 0 - v.pn
     case 'capacity': return Math.max(0, v.reg - v.pn)
   }
 }

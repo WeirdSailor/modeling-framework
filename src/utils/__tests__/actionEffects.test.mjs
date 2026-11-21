@@ -100,5 +100,6 @@ test('changeMw per type', () => {
   assert.equal(changeMw('deload', 'ON', sp, ccgt), -200)
   assert.equal(changeMw('deload', 'LOW', sp, ccgt), 0)
   assert.equal(changeMw('desync', 'ON', sp, ccgt), -400)
+  assert.equal(changeMw('desync', 'OFF', sp, ccgt), 0)
   assert.equal(changeMw('capacity', 'ON', sp, ccgt), 300)
 })
