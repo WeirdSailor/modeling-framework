@@ -50,6 +50,18 @@ export const OPERATION_TYPE_LABELS: Record<OperationType, string> = {
   RT:  'Run Through',
 }
 
+// Scheduling action types (Docs/superpowers/specs/2026-11-21-scheduling-actions-design.md).
+export type ActionType = 'start' | 'deload' | 'desync' | 'capacity'
+
+export const ACTION_TYPES: ActionType[] = ['start', 'deload', 'desync', 'capacity']
+
+export const ACTION_TYPE_LABELS: Record<ActionType, string> = {
+  start:    'Start',
+  deload:   'Deload to SEL',
+  desync:   'Desync',
+  capacity: 'Model capacity',
+}
+
 export interface ModellingAction {
   bmUnitId: string;
   fromPeriod: number;              // Settlement period start (1-48)
@@ -57,8 +69,16 @@ export interface ModellingAction {
   outputLevel: number;             // MW
   reasonCode: 'MARGIN' | 'RECOVERY_RESERVE' | 'FREQ_CONTROL_RESERVE' | 'GENERAL_RESERVE' | 'CONTINGENCY_RESERVE' | 'RESPONSE' | 'INERTIA' | 'VOLTAGE';
   operationType?: OperationType;
+  actionType?: ActionType;         // undefined = 'start' (every draft created before Scheduling Actions)
   timestamp: Date;
 }
+
+// A working-plan row: an action plus its note (drafts keep notes in DraftPlan.unitNotes instead).
+export type WorkingPlanAction = ModellingAction & { note?: string }
+
+export type WorkingPlanPatch = Partial<Pick<
+  WorkingPlanAction, 'fromPeriod' | 'toPeriod' | 'outputLevel' | 'reasonCode' | 'operationType' | 'note'
+>>
 
 export const USERS = ['ANSE', 'NSE', 'OSM', 'OEM', 'NBE', 'TSM', 'TSE'] as const
 export type UserId = typeof USERS[number]
