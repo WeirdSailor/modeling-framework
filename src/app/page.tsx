@@ -29,6 +29,7 @@ import OperationalDashboard from '@/dashboard2/components/OperationalDashboard'
 import type { DrillDownEvent } from '@/dashboard2/types'
 import ConstraintsDetailPage from '@/components/ConstraintsDetailPage'
 import ScheduleTab from '@/components/schedule/ScheduleTab'
+import type { ScheduleFilters } from '@/utils/candidateFilters'
 import { workingPlanAsDraft, workingPlanDraftId } from '@/utils/workingPlan'
 import { useAreaSources } from '@/dashboard2/state/areaSources'
 import AreaChart from '@/components/AreaChart'
@@ -74,7 +75,7 @@ export default function Home() {
     document.documentElement.setAttribute('data-theme', tweaks.theme)
   }, [tweaks.theme])
 
-  const [activeTab, setActiveTab] = useState<Tab>('dashboard')
+  const [activeTab, setActiveTab] = useState<Tab>('dashboard2')
   const [activeSection, setActiveSection] = useState<AppSection>('balancing')
   const [activeBatteryTab, setActiveBatteryTab] = useState<BatteryTab>('summary')
   const handleSectionChange = useCallback((section: AppSection) => {
@@ -100,6 +101,10 @@ export default function Home() {
   const [voltageArea, setVoltageArea] = useState('')
   const [scenario, setScenario] = useState('none')
   const [gspFilter, setGspFilter] = useState<Record<string, 'include' | 'exclude'>>({})
+  const [scheduleFilters, setScheduleFilters] = useState<ScheduleFilters>({
+    typeFilter: new Set(), gspFilter: {}, asFilter: { sr: false, qr: false },
+    deRatePct: 0, priceThreshold: '', selectedCard: 'usable',
+  })
   const [batteryGspFilter, setBatteryGspFilter] = useState<Record<string, 'include' | 'exclude'>>({})
   const [batteryAsFilter, setBatteryAsFilter] = useState<AsServicesFilter>({ sr: false, qr: false })
   const [batteryTfIndex, setBatteryTfIndex] = useState(0)
@@ -625,14 +630,14 @@ export default function Home() {
         {/* Tab bar */}
         <div className="tab-bar">
           <button
-            className={`tab-btn${activeTab === 'dashboard' ? ' active' : ''}`}
-            onClick={() => setActiveTab('dashboard')}
+            className={`tab-btn${activeTab === 'dashboard2' || activeTab === 'constraints' ? ' active' : ''}`}
+            onClick={() => setActiveTab('dashboard2')}
           >
             Dashboard
           </button>
           <button
-            className={`tab-btn${activeTab === 'dashboard2' || activeTab === 'constraints' ? ' active' : ''}`}
-            onClick={() => setActiveTab('dashboard2')}
+            className={`tab-btn${activeTab === 'dashboard' ? ' active' : ''}`}
+            onClick={() => setActiveTab('dashboard')}
           >
             Dashboard 2
           </button>
@@ -749,9 +754,8 @@ export default function Home() {
           <ScheduleTab
             picker={tweaks.schedulePicker}
             scenario={scenario}
-            onScenarioChange={setScenario}
-            gspFilter={gspFilter}
-            onGspFilterChange={setGspFilter}
+            filters={scheduleFilters}
+            onFiltersChange={setScheduleFilters}
             voltageArea={voltageArea}
             reservePct={tweaks.reservePct}
             reasonCode={SCENARIO_REASON[scenario] ?? 'MARGIN'}

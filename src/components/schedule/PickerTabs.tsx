@@ -5,17 +5,18 @@
 import { useState } from 'react'
 import { ACTION_TYPES, ACTION_TYPE_LABELS, type ActionType } from '@/models/types'
 import CandidateTable from './CandidateTable'
-import type { CandidateRow } from './candidates'
-import type { PickerProps } from './pickerTypes'
+import type { FilteredCandidateRow } from '@/utils/candidateFilters'
+import { filteredReason, type PickerProps } from './pickerTypes'
 
-export default function PickerTabs({ rows, inPlan, onAdd, timeLabel }: PickerProps) {
-  const [tab, setTab] = useState<ActionType>('start')
+export default function PickerTabs({ rows, inPlan, onAdd, timeLabel, activeAction: tab, onActionChange: setTab }: PickerProps) {
   const [basket, setBasket] = useState<Map<string, ActionType>>(new Map())
 
   const list = rows.filter(r => r.qualifies.includes(tab))
   const ticked = new Set([...basket].filter(([, t]) => t === tab).map(([id]) => id))
 
-  const blockedReason = (r: CandidateRow) => {
+  const blockedReason = (r: FilteredCandidateRow) => {
+    const excluded = filteredReason(r)
+    if (excluded) return excluded
     const planned = inPlan.get(r.bmUnitId)
     if (planned) return `in plan as ${ACTION_TYPE_LABELS[planned]}`
     const inBasket = basket.get(r.bmUnitId)
@@ -44,7 +45,10 @@ export default function PickerTabs({ rows, inPlan, onAdd, timeLabel }: PickerPro
   }
 
   const byId = new Map(rows.map(r => [r.bmUnitId, r]))
-  const addable = [...basket].filter(([id, t]) => byId.get(id)?.qualifies.includes(t))
+  const addable = [...basket].filter(([id, t]) => {
+    const row = byId.get(id)
+    return row?.category === 'usable' && row.qualifies.includes(t) && !inPlan.has(id)
+  })
 
   function addBasket() {
     onAdd(addable.map(([bmUnitId, actionType]) => ({ bmUnitId, actionType })))
@@ -52,7 +56,7 @@ export default function PickerTabs({ rows, inPlan, onAdd, timeLabel }: PickerPro
   }
 
   const basketCounts = ACTION_TYPES
-    .map(t => ({ t, n: [...basket.values()].filter(v => v === t).length }))
+    .map(t => ({ t, n: addable.filter(([, value]) => value === t).length }))
     .filter(x => x.n > 0)
 
   return (

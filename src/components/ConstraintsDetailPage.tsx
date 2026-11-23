@@ -42,10 +42,10 @@ export default function ConstraintsDetailPage({ initialSpCount, onBack }: Props)
             background: 'var(--surface)', color: 'var(--text-muted)', border: '1px solid var(--border)',
           }}
         >
-          ← Dashboard 2
+          ← Dashboard
         </button>
         <nav aria-label="Breadcrumb" style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-          <span>Dashboard 2</span>
+          <span>Dashboard</span>
           <span aria-hidden style={{ margin: '0 6px' }}>/</span>
           <span aria-current="page" style={{ fontWeight: 700, letterSpacing: '.06em', color: 'var(--text)' }}>
             Constraints — {label}

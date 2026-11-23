@@ -6,19 +6,19 @@
 import { useMemo, useState } from 'react'
 import type { ActionType } from '@/models/types'
 import { TypeChip } from '@/components/AvailableTable'
-import type { CandidateRow } from './candidates'
+import { cumulativeAvailability, type FilteredCandidateRow } from '@/utils/candidateFilters'
 import { fmtMw } from './scheduleUi'
 
-type SortKey = 'nationalGridBmUnit' | 'fuelType' | 'ndz' | 'sel' | 'pn' | 'mel' | 'reg' | 'priceToSel' | 'priceToMel' | 'change'
+type SortKey = 'nationalGridBmUnit' | 'fuelType' | 'ndz' | 'sel' | 'pn' | 'mel' | 'reg' | 'priceToSel' | 'priceToMel' | 'change' | 'availableMw' | 'usableMw'
 
 interface Props {
-  rows: CandidateRow[]
+  rows: FilteredCandidateRow[]
   changeType?: ActionType                          // shows that type's +MW / −MW column
   showState?: boolean                              // shows Running / Off
   ticked: Set<string>
   onToggle: (bmUnitId: string) => void
   onSetTicked: (bmUnitIds: string[], on: boolean) => void
-  blockedReason: (row: CandidateRow) => string | null  // non-null = greyed out, can't tick
+  blockedReason: (row: FilteredCandidateRow) => string | null  // non-null = greyed out, can't tick
   emptyText: string
 }
 
@@ -30,7 +30,7 @@ export default function CandidateTable({
   const sorted = useMemo(() => {
     if (!sort) return rows
     const { key, dir } = sort
-    const value = (r: CandidateRow): number | string =>
+    const value = (r: FilteredCandidateRow): number | string =>
       key === 'change' ? (changeType ? Math.abs(r.change[changeType]) : 0) : r[key]
     return [...rows].sort((a, b) => {
       const av = value(a), bv = value(b)
@@ -38,6 +38,7 @@ export default function CandidateTable({
       return dir === 'asc' ? cmp : -cmp
     })
   }, [rows, sort, changeType])
+  const displayedRows = useMemo(() => cumulativeAvailability(sorted), [sorted])
 
   if (rows.length === 0) {
     return <div className="workspace-empty" style={{ padding: 24 }}><p>{emptyText}</p></div>
@@ -82,12 +83,16 @@ export default function CandidateTable({
             </th>
             {th('nationalGridBmUnit', 'BMU', false)}
             {th('fuelType', 'Type', false)}
+            <th>Service</th>
             {showState && <th>State</th>}
             {changeType && th('change', changeLabel)}
             {th('ndz', 'NDZ')}
             {th('sel', 'SEL')}
             {th('pn', 'PN')}
             {th('mel', 'MEL')}
+            {th('availableMw', 'AVAIL.')}
+            <th className="num" title="Running total of AVAIL. for displayed units">CUMUL</th>
+            {th('usableMw', 'Usable MW')}
             {th('reg', 'Reg. cap')}
             {th('priceToSel', '£ SEL')}
             {th('priceToMel', '£ MEL')}
@@ -95,7 +100,7 @@ export default function CandidateTable({
           </tr>
         </thead>
         <tbody>
-          {sorted.map(r => {
+          {displayedRows.map(r => {
             const blocked = blockedReason(r)
             return (
               <tr
@@ -120,12 +125,16 @@ export default function CandidateTable({
                   </div>
                 </td>
                 <td><TypeChip fuelType={r.fuelType} /></td>
+                <td>{r.service ? <span className={`chip chip-${r.service.toLowerCase()}`}>{r.service}</span> : '—'}</td>
                 {showState && <td>{r.running ? 'Running' : 'Off'}</td>}
                 {changeType && <td className="num">{fmtMw(Math.abs(r.change[changeType]))}</td>}
                 <td className="num">{r.ndz || '—'}</td>
                 <td className="num">{r.sel ? fmtMw(r.sel) : '—'}</td>
                 <td className="num">{fmtMw(r.pn)}</td>
                 <td className="num">{fmtMw(r.mel)}</td>
+                <td className="num">{fmtMw(r.availableMw)}</td>
+                <td className="num">{fmtMw(r.cumulativeMw)}</td>
+                <td className="num">{fmtMw(r.usableMw)}</td>
                 <td className="num">{fmtMw(r.reg)}</td>
                 <td className="num">{r.priceToSel || '—'}</td>
                 <td className="num">{r.priceToMel || '—'}</td>

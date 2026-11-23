@@ -5,6 +5,7 @@ import { ACTION_TYPES } from '@/models/types'
 import { changeMw, isCandidate, slotValues } from '@/utils/actionEffects'
 import { scenarioScore } from '@/utils/scenarioRanking'
 import { EXCLUDED_FUEL_TYPES } from '@/utils/fuelTypes'
+import { scheduleAvailability } from '@/utils/scheduleAvailability'
 
 export interface CandidateRow {
   bmUnitId: string
@@ -25,37 +26,35 @@ export interface CandidateRow {
 
 /**
  * Every unit that qualifies for at least one action type in `sp` (the window's first slot),
- * after the display exclusions, promoted units and the GSP filter. Ranked by the scenario
- * (existing scenarioScore), else by BMU name.
+ * after display exclusions and promoted units. Keep GSP/service/price exclusions here
+ * so their cards can explain what was filtered. Ranked by scenario, else by BMU name.
  */
-export function buildCandidateRows({ units, sp, promotedUnitIds, gspFilter, scenario, voltageArea }: {
+export function buildCandidateRows({ units, sp, settlementPeriods, planWindow, promotedUnitIds, scenario, voltageArea }: {
   units: BMUnit[]
   sp: SettlementPeriodData | undefined
+  settlementPeriods: SettlementPeriodData[]
+  planWindow: { fromPeriod: number; toPeriod: number }
   promotedUnitIds: Set<string>
-  gspFilter: Record<string, 'include' | 'exclude'>
   scenario: string
   voltageArea: string
 }): CandidateRow[] {
   if (!sp) return []
-  const included = Object.entries(gspFilter).filter(([, v]) => v === 'include').map(([k]) => k)
-  const excluded = new Set(Object.entries(gspFilter).filter(([, v]) => v === 'exclude').map(([k]) => k))
 
   const rows: CandidateRow[] = []
   for (const u of units) {
     if (EXCLUDED_FUEL_TYPES.has(u.fuelType) || u.registeredCapacity <= 0) continue
     if (promotedUnitIds.has(u.bmUnitId)) continue
-    if (included.length > 0 && !included.includes(u.gspGroup)) continue
-    if (excluded.has(u.gspGroup)) continue
     const qualifies = ACTION_TYPES.filter(t => isCandidate(t, u.bmUnitId, sp, u))
     if (qualifies.length === 0) continue
     const v = slotValues(u.bmUnitId, sp, u)
+    const availability = scheduleAvailability(u.bmUnitId, settlementPeriods, planWindow) ?? v
     rows.push({
       bmUnitId: u.bmUnitId,
       nationalGridBmUnit: u.nationalGridBmUnit,
       gspGroup: u.gspGroup,
       fuelType: u.fuelType,
-      pn: v.pn,
-      mel: v.mel,
+      pn: availability.pn,
+      mel: availability.mel,
       reg: v.reg,
       sel: u.sel ?? 0,
       ndz: u.ndz ?? 0,

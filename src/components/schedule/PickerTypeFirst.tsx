@@ -5,20 +5,21 @@
 import { useState } from 'react'
 import { ACTION_TYPES, ACTION_TYPE_LABELS, type ActionType } from '@/models/types'
 import CandidateTable from './CandidateTable'
-import type { CandidateRow } from './candidates'
-import { setManyIn, toggleIn, type PickerProps } from './pickerTypes'
+import type { FilteredCandidateRow } from '@/utils/candidateFilters'
+import { filteredReason, setManyIn, toggleIn, type PickerProps } from './pickerTypes'
 
-export default function PickerTypeFirst({ rows, inPlan, onAdd, timeLabel }: PickerProps) {
-  const [type, setType] = useState<ActionType>('start')
+export default function PickerTypeFirst({ rows, inPlan, onAdd, timeLabel, activeAction: type, onActionChange: setType }: PickerProps) {
   const [ticked, setTicked] = useState<Set<string>>(new Set())
 
   const list = rows.filter(r => r.qualifies.includes(type))
-  const blockedReason = (r: CandidateRow) => {
+  const blockedReason = (r: FilteredCandidateRow) => {
+    const excluded = filteredReason(r)
+    if (excluded) return excluded
     const planned = inPlan.get(r.bmUnitId)
     return planned ? `in plan as ${ACTION_TYPE_LABELS[planned]}` : null
   }
 
-  const validIds = new Set(list.map(r => r.bmUnitId))
+  const validIds = new Set(list.filter(r => blockedReason(r) === null).map(r => r.bmUnitId))
   const addable = [...ticked].filter(id => validIds.has(id))
 
   function add() {
