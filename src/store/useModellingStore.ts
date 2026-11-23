@@ -3,10 +3,10 @@ import type {
   ActionType, AreaRequirementRow, BMUnit, DraftPlan, ModellingAction, OperationType, ServiceType,
   SettlementPeriodData, UnitSnapshot, UserId, WorkingPlanAction, WorkingPlanPatch, PromotionAvailabilitySnapshot,
 } from '@/models/types'
-import { USERS } from '@/models/types'
+import { ACTION_TYPE_LABELS, USERS } from '@/models/types'
 import { computeAggregates } from '@/utils/margin'
 import { computeAreaAvailabilities } from '@/utils/areaAggregates'
-import { slotValues } from '@/utils/actionEffects'
+import { actionTypeOf, isCandidate, slotValues } from '@/utils/actionEffects'
 import { toModellingActions } from '@/utils/workingPlan'
 import { scheduleAvailability } from '@/utils/scheduleAvailability'
 import { classifyCandidates, type PromotionFilters } from '@/utils/candidateFilters'
@@ -81,8 +81,7 @@ interface ModellingState {
   updateWorkingPlanAction: (bmUnitId: string, patch: WorkingPlanPatch) => void
   removeFromWorkingPlan: (bmUnitId: string) => void
   clearWorkingPlan: () => void
-  applyWindowToAll: () => void
-  commitWorkingPlan: (name: string, description: string, filters?: PromotionFilters) => string | null
+  commitWorkingPlan: (name: string, description: string, filters?: PromotionFilters, actionType?: ActionType, allocatedService?: ServiceType) => string | null
   setAreaThreshold: (area: string, value: number) => void
   setAllAreaThresholds: (thresholds: Record<string, number>) => void
 
@@ -179,18 +178,53 @@ export const useModellingStore = create<ModellingState>((set, get) => ({
 
   clearWorkingPlan: () => set(s => withPlan(s, () => [])),
 
-  applyWindowToAll: () =>
-    set(s => withPlan(s, plan => plan.map(a => ({
-      ...a, fromPeriod: s.workingPlanWindow.fromPeriod, toPeriod: s.workingPlanWindow.toPeriod,
-    })))),
-
   // Saves the plan as a new draft and promotes it with the existing promoteDraft, which
   // snapshots unit data and runs refreshAllAggregates. Spec §4.2.
-  commitWorkingPlan: (name, description, filters) => {
+  commitWorkingPlan: (name, description, filters, selectedAction, allocatedService) => {
     const state = get()
     const user = state.currentUser
-    const plan = state.workingPlans[user] ?? []
+    let plan = state.workingPlans[user] ?? []
     if (plan.length === 0) return null
+    if (selectedAction) {
+      if (selectedAction === 'allocate' && allocatedService !== 'SR' && allocatedService !== 'QR') {
+        throw new Error('Choose a service before allocating units.')
+      }
+      const invalid: string[] = []
+      plan = plan.map(action => {
+        const unit = state.units.find(u => u.bmUnitId === action.bmUnitId)
+        const sp = state.settlementPeriods.find(s => s.settlementPeriod === action.fromPeriod)
+        if (!unit || !sp || !isCandidate(selectedAction, action.bmUnitId, sp, unit)) {
+          invalid.push(unit?.nationalGridBmUnit ?? action.bmUnitId)
+          return action
+        }
+        const service = selectedAction === 'allocate' ? allocatedService
+          : selectedAction === 'unusable' ? state.unitServices[action.bmUnitId] : undefined
+        if (selectedAction === 'unusable' && !service) {
+          invalid.push(`${unit.nationalGridBmUnit} (no SR/QR contract)`)
+          return action
+        }
+        const capacity = scheduleAvailability(action.bmUnitId, state.settlementPeriods, {
+          fromPeriod: action.fromPeriod, toPeriod: action.toPeriod ?? 48,
+        })
+        const spareMw = capacity ? Math.max(0, capacity.mel - capacity.pn) : 0
+        if (selectedAction === 'allocate' && spareMw <= 0) {
+          invalid.push(`${unit.nationalGridBmUnit} (no spare capacity in the selected window)`)
+          return action
+        }
+        return {
+          ...action,
+          actionType: selectedAction,
+          allocatedService: service,
+          serviceCapacityMw: selectedAction === 'allocate' ? spareMw : selectedAction === 'unusable' ? 0 : undefined,
+          outputLevel: selectedAction === 'start'
+            ? actionTypeOf(action) === 'start' ? action.outputLevel : slotValues(action.bmUnitId, sp, unit).startMel
+            : selectedAction === 'deload' ? slotValues(action.bmUnitId, sp, unit).sel : 0,
+        }
+      })
+      if (invalid.length > 0) {
+        throw new Error(`${ACTION_TYPE_LABELS[selectedAction]} is not applicable to ${invalid.join(', ')} at their selected From times. No units were promoted.`)
+      }
+    }
     const { actions, unitNotes } = toModellingActions(plan)
     const id = crypto.randomUUID()
     const draft: DraftPlan = {

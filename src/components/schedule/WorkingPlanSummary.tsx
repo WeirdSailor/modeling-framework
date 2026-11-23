@@ -15,7 +15,7 @@ import { ActionChip, REASON_LABEL, describeChange, fmtMw, slotLabel } from './sc
 
 const OPERATION_TYPES = Object.keys(OPERATION_TYPE_LABELS) as OperationType[]
 const REASON_CODES = Object.keys(REASON_LABEL) as ModellingAction['reasonCode'][]
-const DIMMED_OUTPUT: Record<ActionType, string> = { start: '', deload: 'SEL', desync: '0', capacity: '—' }
+const DIMMED_OUTPUT: Record<ActionType, string> = { start: '', deload: 'SEL', deloadZero: '0', desync: '0', capacity: '—', unusable: '—', allocate: '—' }
 
 interface Props {
   plan: WorkingPlanAction[]
@@ -28,19 +28,18 @@ interface Props {
   onUpdate: (bmUnitId: string, patch: WorkingPlanPatch) => void
   onRemove: (bmUnitId: string) => void
   onClear: () => void
-  onApplyWindowToAll: () => void
   onCommit: () => void
 }
 
 export default function WorkingPlanSummary({
   plan, settlementPeriods, units, promotedActions, planWindow, reservePct, generalReserveRequirements,
-  onUpdate, onRemove, onClear, onApplyWindowToAll, onCommit,
+  onUpdate, onRemove, onClear, onCommit,
 }: Props) {
   const unitById = useMemo(() => new Map(units.map(u => [u.bmUnitId, u])), [units])
   const spBySlot = useMemo(() => new Map(settlementPeriods.map(sp => [sp.settlementPeriod, sp])), [settlementPeriods])
 
   const totals = useMemo(() => {
-    const t: Record<ActionType, number> = { start: 0, deload: 0, desync: 0, capacity: 0 }
+    const t: Record<ActionType, number> = { start: 0, deload: 0, deloadZero: 0, desync: 0, capacity: 0, unusable: 0, allocate: 0 }
     for (const a of plan) {
       const sp = spBySlot.get(a.fromPeriod)
       if (sp) t[actionTypeOf(a)] += changeMw(actionTypeOf(a), a.bmUnitId, sp, unitById.get(a.bmUnitId))
@@ -87,9 +86,8 @@ export default function WorkingPlanSummary({
           </span>
         )}
         <span className="schedule-spacer" />
-        <button className="btn btn-ghost" disabled={plan.length === 0} onClick={onApplyWindowToAll}>Apply window to all</button>
         <button className="btn btn-ghost" disabled={plan.length === 0} onClick={onClear}>Clear</button>
-        <button className="btn btn-primary" disabled={plan.length === 0} onClick={onCommit}>Commit…</button>
+        <button className="btn btn-primary" disabled={plan.length === 0} onClick={onCommit}>Action…</button>
       </div>
 
       {plan.length === 0 ? (

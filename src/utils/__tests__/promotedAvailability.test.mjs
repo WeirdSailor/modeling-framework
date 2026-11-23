@@ -121,3 +121,99 @@ test('no source periods leaves the snapshot unavailable rather than inventing a 
   s.promoteDraft(id)
   assert.equal(store.getState().drafts.find(d => d.id === id).availabilitySnapshot.A, undefined)
 })
+
+for (const [actionType, pn, service, expected] of [
+  ['start', 0, undefined, { emx: 100, eol: 100, emi: 20, outputLevel: 100 }],
+  ['deload', 60, undefined, { emx: 100, eol: 20, emi: 20, outputLevel: 20 }],
+  ['deloadZero', 60, undefined, { emx: 100, eol: 0, emi: 20, outputLevel: 0 }],
+  ['desync', 60, undefined, { emx: 0, eol: 0, emi: 0, outputLevel: 0 }],
+  ['capacity', 60, undefined, { emx: 140, eol: 60, emi: 20, outputLevel: 0 }],
+  ['unusable', 60, undefined, { emx: 100, eol: 60, emi: 20, outputLevel: 0, serviceCapacityMw: 0 }],
+  ['allocate', 60, 'SR', { emx: 100, eol: 60, emi: 20, outputLevel: 0, serviceCapacityMw: 40 }],
+  ['allocate', 60, 'QR', { emx: 100, eol: 60, emi: 20, outputLevel: 0, serviceCapacityMw: 40 }],
+]) {
+  test(`Type A Action promotes ${actionType}${service ? ` to ${service}` : ''} with the chosen effect and existing window`, () => {
+    const s = store.getState()
+    s.setUnits([unit('A')])
+    s.setSettlementPeriods([period(1, { A: pn }), period(2, { A: pn }), period(3, { A: pn })])
+    s.setUnitService('A', 'SR')
+    s.setWorkingPlanWindow(2, 2)
+    s.addToWorkingPlan([{ bmUnitId: 'A', actionType: 'desync' }])
+    s.updateWorkingPlanAction('A', { note: 'Keep this note', reasonCode: 'INERTIA' })
+    const before = store.getState().settlementPeriods[0]
+    const id = s.commitWorkingPlan('Chosen action', '', filters({}), actionType, service)
+    const state = store.getState()
+    const draft = state.drafts.find(d => d.id === id)
+    const [action] = draft.actions
+    assert.equal(draft.status, 'promoted')
+    assert.equal(action.actionType, actionType, 'chosen action overrides temporary assignment')
+    assert.equal(action.fromPeriod, 2)
+    assert.equal(action.toPeriod, 2)
+    assert.equal(action.reasonCode, 'INERTIA')
+    assert.equal(action.outputLevel, expected.outputLevel)
+    assert.equal(draft.unitNotes.A, 'Keep this note')
+    assert.equal(state.workingPlans[state.currentUser].length, 0)
+    for (const field of ['emx', 'eol', 'emi']) {
+      assert.equal(state.settlementPeriods[1][field], expected[field], field)
+      assert.equal(state.settlementPeriods[0][field], before[field], `${field} outside window`)
+      assert.equal(state.settlementPeriods[2][field], before[field], `${field} after window`)
+    }
+    if (actionType === 'allocate' || actionType === 'unusable') {
+      assert.equal(action.allocatedService, service ?? 'SR')
+      assert.equal(action.serviceCapacityMw, expected.serviceCapacityMw)
+      assert.equal(state.unitServices.A, 'SR', 'windowed action leaves standing service data intact')
+    }
+    assert.deepEqual(draft.availabilitySnapshot.A, { availableMw: 100 - pn, usableMw: 100 - pn })
+  })
+}
+
+test('invalid action for any selected unit leaves the entire working plan and drafts unchanged', () => {
+  const s = store.getState()
+  s.setUnits([unit('ON'), unit('OFF')])
+  s.setSettlementPeriods([period(1, { ON: 60, OFF: 0 }, { ON: 100, OFF: 100 })])
+  s.setWorkingPlanWindow(1, 1)
+  s.addToWorkingPlan([{ bmUnitId: 'ON', actionType: 'deload' }, { bmUnitId: 'OFF', actionType: 'start' }])
+  const before = store.getState()
+  assert.throws(() => s.commitWorkingPlan('Invalid', '', filters({}), 'desync'), /OFF/)
+  assert.equal(store.getState().workingPlans, before.workingPlans)
+  assert.equal(store.getState().drafts, before.drafts)
+  assert.equal(store.getState().settlementPeriods, before.settlementPeriods)
+})
+
+test('allocation requires a service and spare capacity throughout the selected window', () => {
+  const s = store.getState()
+  s.setUnits([unit('A')])
+  s.setSettlementPeriods([period(1, { A: 60 }), period(2, { A: 100 })])
+  s.setWorkingPlanWindow(1, 2)
+  s.addToWorkingPlan([{ bmUnitId: 'A', actionType: 'deload' }])
+  assert.throws(() => s.commitWorkingPlan('Missing service', '', filters({}), 'allocate'), /Choose a service/)
+  assert.throws(() => s.commitWorkingPlan('No spare', '', filters({}), 'allocate', 'QR'), /no spare capacity/)
+  assert.equal(store.getState().drafts.length, 0)
+  assert.equal(store.getState().workingPlans[s.currentUser].length, 1)
+})
+
+test('allocation contracts the minimum spare MW in the unit window', () => {
+  const s = store.getState()
+  s.setUnits([unit('A')])
+  s.setSettlementPeriods([period(1, { A: 60 }), period(2, { A: 85 })])
+  s.setWorkingPlanWindow(1, 2)
+  s.addToWorkingPlan([{ bmUnitId: 'A', actionType: 'deload' }])
+  const id = s.commitWorkingPlan('Spare QR', '', filters({}), 'allocate', 'QR')
+  assert.equal(store.getState().drafts.find(d => d.id === id).actions[0].serviceCapacityMw, 15)
+})
+
+test('Flag Unusable requires an existing contract and preserves QR while zeroing its usable service MW', () => {
+  const s = store.getState()
+  s.setUnits([unit('A')])
+  s.setSettlementPeriods([period(1, { A: 100 })])
+  s.setWorkingPlanWindow(1, 1)
+  s.addToWorkingPlan([{ bmUnitId: 'A', actionType: 'desync' }])
+  assert.throws(() => s.commitWorkingPlan('Uncontracted', '', filters({}), 'unusable'), /no SR\/QR contract/)
+  s.setUnitService('A', 'QR')
+  const id = s.commitWorkingPlan('QR unavailable', '', filters({}), 'unusable')
+  const [action] = store.getState().drafts.find(d => d.id === id).actions
+  assert.equal(action.allocatedService, 'QR')
+  assert.equal(action.serviceCapacityMw, 0)
+  assert.equal(store.getState().settlementPeriods[0].eol, 100)
+  assert.equal(store.getState().unitServices.A, 'QR')
+})

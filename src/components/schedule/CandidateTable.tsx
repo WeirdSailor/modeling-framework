@@ -4,6 +4,7 @@
 
 import { useMemo, useState } from 'react'
 import { TypeChip } from '@/components/AvailableTable'
+import type { ActionType } from '@/models/types'
 import { cumulativeAvailability, type FilteredCandidateRow } from '@/utils/candidateFilters'
 import { fmtMw } from './scheduleUi'
 
@@ -13,6 +14,7 @@ interface Props {
   rows: FilteredCandidateRow[]
   showState?: boolean                              // shows Running / Off
   ticked: Set<string>
+  inPlan: ReadonlyMap<string, ActionType>
   onToggle: (bmUnitId: string) => void
   onSetTicked: (bmUnitIds: string[], on: boolean) => void
   blockedReason: (row: FilteredCandidateRow) => string | null  // non-null = greyed out, can't tick
@@ -20,7 +22,7 @@ interface Props {
 }
 
 export default function CandidateTable({
-  rows, showState = false, ticked, onToggle, onSetTicked, blockedReason, emptyText,
+  rows, showState = false, ticked, inPlan, onToggle, onSetTicked, blockedReason, emptyText,
 }: Props) {
   const [sort, setSort] = useState<{ key: SortKey; dir: 'asc' | 'desc' } | null>({ key: 'priceToSel', dir: 'asc' })
 
@@ -140,7 +142,7 @@ export default function CandidateTable({
                 <td className="num">{r.priceToSel || '—'}</td>
                 <td className="num">{r.priceToMel || '—'}</td>
                 <td className="num">{r.inertiaGvas.toLocaleString('en-GB', { maximumFractionDigits: 2 })}</td>
-                <td className="schedule-hint">{blocked ?? ''}</td>
+                <td className="schedule-hint">{inPlan.has(r.bmUnitId) ? '' : blocked ?? ''}</td>
                 <td className="num">{fmtMw(r.availableMw)}</td>
                 <td className="num">{fmtMw(r.usableMw)}</td>
                 <td className="num">{fmtMw(r.cumulativeMw)}</td>

@@ -1,8 +1,10 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import type { DraftPlan, BMUnit, ModellingAction, OperationType, UnitSnapshot, ServiceType, SettlementPeriodData, UserId, PromotionAvailabilitySnapshot } from '@/models/types'
+import type { ActionType, DraftPlan, BMUnit, ModellingAction, OperationType, UnitSnapshot, ServiceType, SettlementPeriodData, UserId, PromotionAvailabilitySnapshot } from '@/models/types'
 import { OPERATION_TYPE_LABELS } from '@/models/types'
+import { actionTypeOf } from '@/utils/actionEffects'
+import { ActionChip } from './schedule/scheduleUi'
 
 const CHANGE_THRESHOLD = 10 // percent
 
@@ -77,6 +79,9 @@ interface PromotedRow {
   toPeriod: number | undefined
   reasonCode: ModellingAction['reasonCode']
   operationType?: OperationType
+  actionType: ActionType
+  allocatedService?: ServiceType
+  serviceCapacityMw?: number
   notes: string
   snapshot?: UnitSnapshot
   availabilitySnapshot?: PromotionAvailabilitySnapshot
@@ -173,6 +178,9 @@ export default function PromotedTab({
           toPeriod: action.toPeriod,
           reasonCode: action.reasonCode,
           operationType: action.operationType,
+          actionType: actionTypeOf(action),
+          allocatedService: action.allocatedService,
+          serviceCapacityMw: action.serviceCapacityMw,
           notes: draft.unitNotes[action.bmUnitId] ?? '',
           snapshot: draft.dataSnapshot?.[action.bmUnitId],
           availabilitySnapshot: draft.availabilitySnapshot?.[action.bmUnitId],
@@ -355,6 +363,8 @@ export default function PromotedTab({
               <th>BMU</th>
               <th>Type</th>
               <th>Service</th>
+              <th className="num">Service MW</th>
+              <th>Action</th>
               <th className="num">NDZ</th>
               <th className="num">MZT</th>
               <th className="num">MNZT</th>
@@ -405,7 +415,12 @@ export default function PromotedTab({
                     </div>
                   </td>
                   <td><TypeChip fuelType={row.fuelType} /></td>
-                  <td><ServiceChip service={unitServices[row.bmUnitId]} /></td>
+                  <td>
+                    <ServiceChip service={row.allocatedService ?? unitServices[row.bmUnitId]} />
+                    {row.actionType === 'unusable' && <span className="chip chip-act-unusable" style={{ marginLeft: 4 }}>Unusable</span>}
+                  </td>
+                  <td className="mono num">{row.serviceCapacityMw === undefined ? '—' : row.serviceCapacityMw.toFixed(0)}</td>
+                  <td><ActionChip type={row.actionType} /></td>
                   <td className="mono num">
                     {effNdz > 0 ? effNdz : '—'}
                     {snap && <ChangeArrow current={effNdz} snapshotVal={snap.ndz} />}

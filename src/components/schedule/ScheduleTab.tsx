@@ -11,6 +11,7 @@ import { UnitAvailabilityFilters, UnitAvailabilityCards } from '@/components/Uni
 import { classifyCandidates, candidateCards, matchesCandidateCard, type ScheduleFilters } from '@/utils/candidateFilters'
 import { actionTypeOf } from '@/utils/actionEffects'
 import { buildCandidateRows } from './candidates'
+import { candidateGroupAction, matchesCandidateGroup, type CandidateGroup } from './candidateGroups'
 import type { PickerProps } from './pickerTypes'
 import { fmtMw, slotLabel } from './scheduleUi'
 import PickerTypeFirst from './PickerTypeFirst'
@@ -18,6 +19,8 @@ import PickerUnitsFirst from './PickerUnitsFirst'
 import PickerTabs from './PickerTabs'
 import WorkingPlanSummary from './WorkingPlanSummary'
 import CommitPlanModal from './CommitPlanModal'
+import ScheduleActionModal from './ScheduleActionModal'
+import { SCHEDULE_ACTION_CHOICES } from './ScheduleActionSelect'
 
 const EMPTY_PLAN: WorkingPlanAction[] = []
 const EMPTY_REQS: AreaRequirementRow[] = []
@@ -55,11 +58,13 @@ export default function ScheduleTab({
   const updateAction      = useModellingStore(s => s.updateWorkingPlanAction)
   const removeAction      = useModellingStore(s => s.removeFromWorkingPlan)
   const clearPlan         = useModellingStore(s => s.clearWorkingPlan)
-  const applyWindowToAll  = useModellingStore(s => s.applyWindowToAll)
   const commitWorkingPlan = useModellingStore(s => s.commitWorkingPlan)
 
   const [actionByUser, setActionByUser] = useState<Record<string, ActionType>>({})
   const activeAction = actionByUser[currentUser] ?? 'start'
+  const [candidateGroupByUser, setCandidateGroupByUser] = useState<Record<string, CandidateGroup>>({})
+  const candidateGroup = candidateGroupByUser[currentUser] ?? 'syncs'
+  const includeAllFuelTypes = picker === 'typeFirst' && ['all', 'inertia', 'pullback'].includes(candidateGroup)
   const [committing, setCommitting] = useState(false)
 
   const promotedActions = useMemo(
@@ -69,17 +74,18 @@ export default function ScheduleTab({
   const promotedUnitIds = useMemo(() => new Set(promotedActions.map(a => a.bmUnitId)), [promotedActions])
   const firstSp = settlementPeriods.find(sp => sp.settlementPeriod === planWindow.fromPeriod)
   const candidates = useMemo(
-    () => buildCandidateRows({ units, sp: firstSp, settlementPeriods, planWindow, promotedUnitIds, scenario, voltageArea }),
-    [units, firstSp, settlementPeriods, planWindow, promotedUnitIds, scenario, voltageArea],
+    () => buildCandidateRows({ units, sp: firstSp, settlementPeriods, planWindow, promotedUnitIds, scenario, voltageArea, includeAllFuelTypes }),
+    [units, firstSp, settlementPeriods, planWindow, promotedUnitIds, scenario, voltageArea, includeAllFuelTypes],
   )
   const availableTypes = useMemo(() => [...new Set(candidates.map(row => row.fuelType))].sort(), [candidates])
   const classified = useMemo(
     () => classifyCandidates(candidates, filters, unitServices),
     [candidates, filters, unitServices],
   )
-  const scopedRows = picker === 'unitsFirst' ? classified : classified.filter(row => row.qualifies.includes(activeAction))
+  const scopedRows = picker === 'typeFirst' ? classified.filter(row => matchesCandidateGroup(row, candidateGroup))
+    : picker === 'tabs' ? classified.filter(row => row.qualifies.includes(activeAction)) : classified
   const cards = candidateCards(scopedRows)
-  const rows = classified.filter(row => matchesCandidateCard(row, filters.selectedCard))
+  const rows = (picker === 'typeFirst' ? scopedRows : classified).filter(row => matchesCandidateCard(row, filters.selectedCard))
   function updateFilter<K extends keyof ScheduleFilters>(key: K, value: ScheduleFilters[K]) {
     onFiltersChange({ ...filters, [key]: value })
   }
@@ -111,6 +117,7 @@ export default function ScheduleTab({
       const valid = items.filter(item => {
         const row = visibleById.get(item.bmUnitId)
         return row?.category === 'usable' && row.qualifies.includes(item.actionType) && !inPlan.has(item.bmUnitId)
+          && (picker !== 'typeFirst' || (matchesCandidateGroup(row, candidateGroup) && candidateGroupAction(row, candidateGroup) === item.actionType))
       })
       const n = addToWorkingPlan(valid, reasonCode)
       if (n > 0) onAdded(n)
@@ -125,7 +132,7 @@ export default function ScheduleTab({
         </div>
       )}
 
-      <section className="schedule-section">
+      <section className="schedule-section schedule-candidates">
         <UnitAvailabilityFilters
           availableTypes={availableTypes}
           typeFilter={filters.typeFilter} onTypeFilterChange={value => updateFilter('typeFilter', value)}
@@ -164,12 +171,15 @@ export default function ScheduleTab({
             </label>
           }
         />
-        {picker === 'typeFirst' && <PickerTypeFirst key={currentUser} {...pickerProps} />}
+        {picker === 'typeFirst' && <PickerTypeFirst key={currentUser} {...pickerProps}
+          candidateGroup={candidateGroup}
+          onCandidateGroupChange={group => setCandidateGroupByUser(prev => ({ ...prev, [currentUser]: group }))}
+        />}
         {picker === 'unitsFirst' && <PickerUnitsFirst key={currentUser} {...pickerProps} />}
         {picker === 'tabs' && <PickerTabs key={currentUser} {...pickerProps} />}
       </section>
 
-      <section className="schedule-section">
+      <section className="schedule-section schedule-working-plan">
         <WorkingPlanSummary
           plan={plan}
           settlementPeriods={settlementPeriods}
@@ -181,12 +191,31 @@ export default function ScheduleTab({
           onUpdate={updateAction}
           onRemove={removeAction}
           onClear={clearPlan}
-          onApplyWindowToAll={applyWindowToAll}
           onCommit={() => setCommitting(true)}
         />
       </section>
 
-      {committing && (
+      {committing && picker === 'typeFirst' && (
+        <ScheduleActionModal
+          unitCount={plan.length}
+          onClose={() => setCommitting(false)}
+          onAction={(choice, service) => {
+            const selected = SCHEDULE_ACTION_CHOICES.find(item => item.id === choice)!
+            const name = service && selected.actionType === 'allocate' ? `${selected.label} · ${service}` : selected.label
+            let id: string | null
+            try {
+              id = commitWorkingPlan(name, '', filters, selected.actionType, service)
+            } catch (error) {
+              return error instanceof Error ? error.message : 'Could not promote the selected units.'
+            }
+            if (!id) return 'Select units before running an action.'
+            setCommitting(false)
+            onCommitted(name)
+            return null
+          }}
+        />
+      )}
+      {committing && picker !== 'typeFirst' && (
         <CommitPlanModal
           actionCount={plan.length}
           onCancel={() => setCommitting(false)}

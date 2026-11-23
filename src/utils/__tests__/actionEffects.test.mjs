@@ -103,3 +103,21 @@ test('changeMw per type', () => {
   assert.equal(changeMw('desync', 'OFF', sp, ccgt), 0)
   assert.equal(changeMw('capacity', 'ON', sp, ccgt), 300)
 })
+
+test('Deload to 0 changes operating output while retaining export capacity and inertia', () => {
+  assert.equal(isCandidate('deloadZero', 'ON', sp, ccgt), true)
+  assert.equal(isCandidate('deloadZero', 'OFF', sp, ccgt), false)
+  assert.deepEqual(marginDelta(act('ON', 'deloadZero'), sp, ccgt), { emx: 0, eol: -400, emi: 0 })
+  assert.equal(areaDelta(act('ON', 'deloadZero'), 'general_reserve', sp, ccgt), 400)
+  assert.equal(areaDelta(act('ON', 'deloadZero'), 'inertia', sp, ccgt), 0)
+  assert.equal(changeMw('deloadZero', 'ON', sp, ccgt), -400)
+})
+
+test('SR/QR allocation and unusable flags do not change physical generation or remove inertia', () => {
+  for (const type of ['allocate', 'unusable']) {
+    assert.deepEqual(marginDelta(act('ON', type), sp, ccgt), { emx: 0, eol: 0, emi: 0 })
+    for (const area of ['general_reserve', 'response', 'inertia', 'voltage']) {
+      assert.equal(areaDelta(act('ON', type), area, sp, ccgt), 0)
+    }
+  }
+})

@@ -55,8 +55,11 @@ export function isCandidate(type: ActionType, bmUnitId: string, sp: SlotData, un
   switch (type) {
     case 'start':    return !running
     case 'deload':   return running && unit?.sel !== undefined && v.pn > unit.sel
+    case 'deloadZero': return running
     case 'desync':   return running
     case 'capacity': return running && v.reg > v.pn
+    case 'allocate': return v.mel > v.pn
+    case 'unusable': return true // the store additionally requires an existing SR/QR contract
   }
 }
 
@@ -71,8 +74,11 @@ export function marginDelta(
   switch (actionTypeOf(action)) {
     case 'start':    return running ? ZERO : { emx: v.startMel, eol: action.outputLevel, emi: v.sel }
     case 'deload':   return running && v.pn > v.sel ? { emx: 0, eol: -(v.pn - v.sel), emi: 0 } : ZERO
+    case 'deloadZero': return running ? { emx: 0, eol: -v.pn, emi: 0 } : ZERO
     case 'desync':   return running ? { emx: -v.mel, eol: -v.pn, emi: -v.sel } : ZERO
     case 'capacity': return running && v.reg > v.pn ? { emx: v.reg - v.pn, eol: 0, emi: 0 } : ZERO
+    case 'unusable':
+    case 'allocate': return ZERO
   }
 }
 
@@ -94,12 +100,15 @@ export function areaDelta(
     || (area === 'response' && unit !== undefined && RESPONSE_FUEL_TYPES.has(unit.fuelType))
   switch (type) {
     case 'deload':   return headroomArea && v.pn > v.sel ? v.pn - v.sel : 0
+    case 'deloadZero': return headroomArea ? v.pn : 0
     case 'capacity': return headroomArea && v.reg > v.pn ? v.reg - v.pn : 0
     case 'desync':
       if (headroomArea) return -Math.max(0, v.mel - v.pn)
       if (area === 'inertia') return unit !== undefined && SYNCHRONOUS_FUEL_TYPES.has(unit.fuelType) ? -v.reg * 0.05 : 0
       if (area === 'voltage') return -v.reg * 0.3
       return 0
+    case 'unusable':
+    case 'allocate': return 0
   }
 }
 
@@ -109,7 +118,10 @@ export function changeMw(type: ActionType, bmUnitId: string, sp: SlotData, unit:
   switch (type) {
     case 'start':    return v.startMel
     case 'deload':   return 0 - Math.max(0, v.pn - v.sel)  // 0 - x avoids returning -0
+    case 'deloadZero': return 0 - v.pn
     case 'desync':   return 0 - v.pn
     case 'capacity': return Math.max(0, v.reg - v.pn)
+    case 'unusable': return 0
+    case 'allocate': return Math.max(0, v.mel - v.pn)
   }
 }

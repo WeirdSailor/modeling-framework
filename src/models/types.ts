@@ -51,15 +51,19 @@ export const OPERATION_TYPE_LABELS: Record<OperationType, string> = {
 }
 
 // Scheduling action types (Docs/superpowers/specs/2026-11-21-scheduling-actions-design.md).
-export type ActionType = 'start' | 'deload' | 'desync' | 'capacity'
+export type ActionType = 'start' | 'deload' | 'deloadZero' | 'desync' | 'capacity' | 'unusable' | 'allocate'
 
+// Legacy B/C pickers retain their existing four actions; Type A chooses all seven in its popup.
 export const ACTION_TYPES: ActionType[] = ['start', 'deload', 'desync', 'capacity']
 
 export const ACTION_TYPE_LABELS: Record<ActionType, string> = {
-  start:    'Start',
+  start:    'Sync',
   deload:   'Deload to SEL',
+  deloadZero: 'Deload to 0',
   desync:   'Desync',
-  capacity: 'Model capacity',
+  capacity: 'Model Capacity',
+  unusable: 'Flag Unusable',
+  allocate: 'Allocate to Service',
 }
 
 export interface ModellingAction {
@@ -70,6 +74,8 @@ export interface ModellingAction {
   reasonCode: 'MARGIN' | 'RECOVERY_RESERVE' | 'FREQ_CONTROL_RESERVE' | 'GENERAL_RESERVE' | 'CONTINGENCY_RESERVE' | 'RESPONSE' | 'INERTIA' | 'VOLTAGE';
   operationType?: OperationType;
   actionType?: ActionType;         // undefined = 'start' (every draft created before Scheduling Actions)
+  allocatedService?: ServiceType;
+  serviceCapacityMw?: number;      // contracted SR/QR MW; zero for Flag Unusable, without changing generation
   timestamp: Date;
 }
 

@@ -595,13 +595,18 @@ input[type="checkbox"]:disabled { cursor: not-allowed; opacity: .4; }
 .chip-act-deload   { background: #fef3c7; color: #b45309; }
 .chip-act-desync   { background: #fee2e2; color: #b91c1c; }
 .chip-act-capacity { background: #dbeafe; color: #1d4ed8; }
+.chip-act-deloadZero { background: #fef3c7; color: #b45309; }
+.chip-act-unusable { background: #fee2e2; color: #b91c1c; }
+.chip-act-allocate { background: #e0e7ff; color: #4338ca; }
 
 /* ── Schedule tab (Scheduling Actions) ── */
 .schedule-tab { display: flex; flex-direction: column; gap: 10px; flex: 1; min-height: 0; overflow: auto; padding: 10px 14px; }
 .schedule-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .schedule-section { border: 1px solid var(--border); border-radius: 8px; background: var(--bg-panel); display: flex; flex-direction: column; }
 .schedule-section-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 12px; border-bottom: 1px solid var(--border); font-size: 12px; }
-.schedule-section .table-scroll { max-height: 340px; overflow: auto; }
+.schedule-candidates { flex-shrink: 0; }
+.schedule-candidates .table-scroll { flex: 0 0 490px; height: 490px; overflow: auto; }
+.schedule-working-plan .table-scroll { max-height: 240px; overflow: auto; }
 .schedule-hint { font-size: 11px; color: var(--text-faint); }
 .schedule-spacer { flex: 1; }
 .schedule-notice { font-size: 11px; color: #d97706; padding: 6px 12px; }

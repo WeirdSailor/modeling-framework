@@ -80,6 +80,7 @@ export default function PickerTabs({ rows, inPlan, onAdd, timeLabel, activeActio
       <CandidateTable
         rows={list}
         ticked={ticked}
+        inPlan={inPlan}
         onToggle={toggle}
         onSetTicked={setMany}
         blockedReason={blockedReason}

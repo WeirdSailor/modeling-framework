@@ -76,6 +76,7 @@ export default function PickerUnitsFirst({ rows, inPlan, onAdd, timeLabel }: Pic
         rows={rows}
         showState
         ticked={ticked}
+        inPlan={inPlan}
         onToggle={id => setTicked(t => toggleIn(t, id))}
         onSetTicked={(ids, on) => setTicked(t => setManyIn(t, ids, on))}
         blockedReason={blockedReason}

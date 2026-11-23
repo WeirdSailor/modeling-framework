@@ -106,7 +106,7 @@ function TweaksTab({
       <SegControl
         value={tweaks.schedulePicker}
         options={[
-          { value: 'typeFirst',  label: 'A · Type first' },
+          { value: 'typeFirst',  label: 'A · Candidate units' },
           { value: 'unitsFirst', label: 'B · Units first' },
           { value: 'tabs',       label: 'C · Tabs' },
         ]}

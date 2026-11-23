@@ -40,7 +40,10 @@ export function describeChange(
   switch (actionTypeOf(action)) {
     case 'start':    return `off → ${fmtMw(action.outputLevel)} MW`
     case 'deload':   return `${fmtMw(v.pn)} → SEL ${fmtMw(v.sel)} MW`
+    case 'deloadZero': return `${fmtMw(v.pn)} → 0 MW`
     case 'desync':   return `${fmtMw(v.pn)} → 0 MW`
     case 'capacity': return `MEL ${fmtMw(v.pn)} → ${fmtMw(v.reg)} MW`
+    case 'unusable': return `${action.allocatedService ?? 'SR/QR'} → 0 MW usable`
+    case 'allocate': return `${fmtMw(action.serviceCapacityMw ?? Math.max(0, v.mel - v.pn))} MW → ${action.allocatedService ?? 'service'}`
   }
 }

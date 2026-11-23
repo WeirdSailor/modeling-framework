@@ -32,7 +32,7 @@ export interface CandidateRow {
  * after display exclusions and promoted units. Keep GSP/service/price exclusions here
  * so their cards can explain what was filtered. Ranked by scenario, else by BMU name.
  */
-export function buildCandidateRows({ units, sp, settlementPeriods, planWindow, promotedUnitIds, scenario, voltageArea }: {
+export function buildCandidateRows({ units, sp, settlementPeriods, planWindow, promotedUnitIds, scenario, voltageArea, includeAllFuelTypes = false }: {
   units: BMUnit[]
   sp: SettlementPeriodData | undefined
   settlementPeriods: SettlementPeriodData[]
@@ -40,13 +40,14 @@ export function buildCandidateRows({ units, sp, settlementPeriods, planWindow, p
   promotedUnitIds: Set<string>
   scenario: string
   voltageArea: string
+  includeAllFuelTypes?: boolean
 }): CandidateRow[] {
   if (!sp) return []
 
   const rows: CandidateRow[] = []
   for (const u of units) {
     // Schedule includes batteries; the Workspace display exclusions still apply to other types.
-    if ((u.fuelType !== 'BATTERY' && EXCLUDED_FUEL_TYPES.has(u.fuelType)) || u.registeredCapacity <= 0) continue
+    if ((!includeAllFuelTypes && u.fuelType !== 'BATTERY' && EXCLUDED_FUEL_TYPES.has(u.fuelType)) || u.registeredCapacity <= 0) continue
     if (promotedUnitIds.has(u.bmUnitId)) continue
     const qualifies = ACTION_TYPES.filter(t => isCandidate(t, u.bmUnitId, sp, u))
     if (qualifies.length === 0) continue
