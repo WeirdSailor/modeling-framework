@@ -65,7 +65,7 @@ export default function Home() {
     selectionPattern: 'buttons',
     reservePct: 10,
     chartInteractionMode: 'twoClick',
-    schedulePicker: 'tabs',
+    schedulePicker: 'typeFirst',
     solveDestination: 'schedule',
   })
   const setTweak = useCallback(<K extends keyof TweakState>(key: K, value: TweakState[K]) => {

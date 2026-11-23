@@ -132,7 +132,7 @@ export default function InterconnectorsDetailPage({ initialWindow, source, onBac
                 <div key={row.id} className={styles.grid} role="group" aria-label={row.name} style={{ height: DETAIL_ROW_HEIGHT }}>
                   <div className={styles.left}>
                     <span className={styles.interconnectorName} title={row.id}>{row.name}</span>
-                    <WorstValue cfg={{ ...cfg, label: row.name, ariaName: row.name }} area={row.area} startMs={win.startMs} endMs={win.endMs} />
+                    <WorstValue cfg={{ ...cfg, label: row.name, ariaName: row.name }} area={row.area} startMs={win.startMs} endMs={win.endMs} showSwingTime />
                   </div>
                   <div className={styles.chartCell}>
                     {width > 0 && <IcChart area={row.area} cfg={cfg} scale={scale} height={DETAIL_ROW_HEIGHT} nowMs={nowMs} showDirectionLabels={false} onDrillDown={noDrillDown} />}

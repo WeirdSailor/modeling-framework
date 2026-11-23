@@ -2,6 +2,7 @@
 
 import { icSwings, icTone, largestSwing, lineTone, lineWorst, stripWorst } from '../derive'
 import { formatInt, formatSigned, formatSwingMagnitude, plural, spokenSigned } from '../format'
+import { formatDayDateTime, formatHHMM } from '../time'
 import type { AreaConfig } from '../dashboard.config'
 import type { AreaData } from '../types'
 import styles from '../dashboard2.module.css'
@@ -11,9 +12,10 @@ interface Props {
   area: AreaData | undefined
   startMs: number
   endMs: number
+  showSwingTime?: boolean
 }
 
-interface Block { big: string; tone: 'crit' | 'warn' | 'muted'; sub?: string; aria: string }
+interface Block { big: string; tone: 'crit' | 'warn' | 'muted'; sub?: string; timeMs?: number; aria: string }
 
 function compute(cfg: AreaConfig, area: AreaData | undefined, startMs: number, endMs: number): Block | null {
   if (!area) return null
@@ -46,13 +48,14 @@ function compute(cfg: AreaConfig, area: AreaData | undefined, startMs: number, e
       big: formatSwingMagnitude(abs),
       tone: tone === 'red' ? 'crit' : tone === 'amber' ? 'warn' : 'muted',
       sub: s.estimated ? 'largest swing (est.)' : 'largest swing',
-      aria: `${cfg.ariaName}, largest swing ${formatSwingMagnitude(abs)}${s.estimated ? ', estimated' : ''}`,
+      timeMs: s.boundaryMs,
+      aria: `${cfg.ariaName}, largest swing ${formatSwingMagnitude(abs)} at ${formatDayDateTime(s.boundaryMs)}${s.estimated ? ', estimated' : ''}`,
     }
   }
   return null
 }
 
-export default function WorstValue({ cfg, area, startMs, endMs }: Props) {
+export default function WorstValue({ cfg, area, startMs, endMs, showSwingTime = false }: Props) {
   const b = compute(cfg, area, startMs, endMs)
   if (!b) {
     return (
@@ -64,7 +67,11 @@ export default function WorstValue({ cfg, area, startMs, endMs }: Props) {
   return (
     <div className={styles.worst} aria-label={b.aria}>
       <div className={`${styles.worstBig} ${styles[b.tone]}`} aria-hidden="true">{b.big}</div>
-      {b.sub && <div className={styles.worstSub} aria-hidden="true">{b.sub}</div>}
+      {showSwingTime && b.timeMs !== undefined ? (
+        <time className={styles.worstSub} dateTime={new Date(b.timeMs).toISOString()} title={formatDayDateTime(b.timeMs)} aria-hidden="true">
+          {formatHHMM(b.timeMs)}
+        </time>
+      ) : b.sub && <div className={styles.worstSub} aria-hidden="true">{b.sub}</div>}
     </div>
   )
 }
