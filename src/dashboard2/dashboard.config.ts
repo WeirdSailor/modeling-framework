@@ -33,14 +33,14 @@ export type AreaConfig = LineAreaConfig | StripAreaConfig | IcAreaConfig
 
 // Display order is fixed (spec §8.0).
 export const AREA_CONFIG: AreaConfig[] = [
-  { id: 'posMargin',       label: '+ve MARGIN',      ariaName: '+ve margin',      kind: 'line',  bandAbove: 10000, bandBelow: 2000, tight: 500, unit: 'MW' },
-  { id: 'negMargin',       label: '−ve MARGIN',      ariaName: '−ve margin',      kind: 'line',  bandAbove: 2000, bandBelow: 2000, tight: 500, unit: 'MW' },
-  { id: 'constraints',     label: 'CONSTRAINTS',     ariaName: 'Constraints',     kind: 'strip', noun: 'constraint', unit: '',   actionsSource: 'none' },
-  { id: 'inertia',         label: 'INERTIA',         ariaName: 'Inertia',         kind: 'line',  bandAbove: 40,   bandBelow: 40,   tight: 6,   unit: 'GVA·s' },
-  { id: 'reserve',         label: 'RESERVE',         ariaName: 'Reserve',         kind: 'strip', noun: 'product', unit: 'MW', actionsSource: 'none' },
-  { id: 'response',        label: 'RESPONSE',        ariaName: 'Response',        kind: 'strip', noun: 'product', unit: 'MW', actionsSource: 'none' },
-  { id: 'largestLoss',     label: 'LARGEST LOSS',    ariaName: 'Largest loss',    kind: 'line',  bandAbove: 1000, bandBelow: 1000, tight: 100, unit: 'MW' },
-  { id: 'interconnectors', label: 'INTERCONNECTORS', ariaName: 'Interconnectors', kind: 'ic',    band: 3000, amber: 1500, red: 2000, unit: 'MW' },
+  { id: 'posMargin',       label: '+ve Marg', ariaName: '+ve margin',      kind: 'line',  bandAbove: 10000, bandBelow: 2000, tight: 500, unit: 'MW' },
+  { id: 'negMargin',       label: '-ve Marg', ariaName: '−ve margin',      kind: 'line',  bandAbove: 2000, bandBelow: 2000, tight: 500, unit: 'MW' },
+  { id: 'constraints',     label: 'Constr.',  ariaName: 'Constraints',     kind: 'strip', noun: 'constraint', unit: '',   actionsSource: 'none' },
+  { id: 'inertia',         label: 'Inetria',  ariaName: 'Inertia',         kind: 'line',  bandAbove: 40,   bandBelow: 40,   tight: 6,   unit: 'GVA·s' },
+  { id: 'reserve',         label: 'Reserve',  ariaName: 'Reserve',         kind: 'strip', noun: 'product', unit: 'MW', actionsSource: 'none' },
+  { id: 'response',        label: 'Resp',     ariaName: 'Response',        kind: 'strip', noun: 'product', unit: 'MW', actionsSource: 'none' },
+  { id: 'largestLoss',     label: 'Lrg Loss', ariaName: 'Largest loss',    kind: 'line',  bandAbove: 1000, bandBelow: 1000, tight: 100, unit: 'MW' },
+  { id: 'interconnectors', label: 'IntConnr', ariaName: 'Interconnectors', kind: 'ic',    band: 3000, amber: 1500, red: 2000, unit: 'MW' },
 ]
 
 export const ROW_HEIGHT: Record<AreaKind, number> = { line: 84, strip: 62, ic: 96 }
