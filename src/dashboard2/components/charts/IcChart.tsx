@@ -20,10 +20,11 @@ interface Props {
   scale: XScale
   height: number
   nowMs: number
+  showDirectionLabels?: boolean
   onDrillDown: (e: DrillDownEvent) => void
 }
 
-export default function IcChart({ area, cfg, scale, height, nowMs, onDrillDown }: Props) {
+export default function IcChart({ area, cfg, scale, height, nowMs, showDirectionLabels = true, onDrillDown }: Props) {
   const swings = useMemo(
     () => icSwings(area?.periods ?? [], scale.startMs, scale.endMs),
     [area, scale.startMs, scale.endMs],
@@ -39,8 +40,10 @@ export default function IcChart({ area, cfg, scale, height, nowMs, onDrillDown }
       <Grid scale={scale} height={height} />
       <line x1={0} x2={scale.width} y1={mid} y2={mid} stroke="#56627A" />
       <Bars swings={swings} scale={scale} height={height} cfg={cfg} />
-      <text x={scale.width - 6} y={14} textAnchor="end" fontSize={10.5} fill="#6B7789">▲ Import to GB</text>
-      <text x={scale.width - 6} y={height - 6} textAnchor="end" fontSize={10.5} fill="#6B7789">▼ Export from GB</text>
+      {showDirectionLabels && <>
+        <text x={scale.width - 6} y={14} textAnchor="end" fontSize={10.5} fill="#6B7789">▲ Import to GB</text>
+        <text x={scale.width - 6} y={height - 6} textAnchor="end" fontSize={10.5} fill="#6B7789">▼ Export from GB</text>
+      </>}
       <CursorLine scale={scale} height={height} />
       <NowLine scale={scale} nowMs={nowMs} height={height} />
     </svg>

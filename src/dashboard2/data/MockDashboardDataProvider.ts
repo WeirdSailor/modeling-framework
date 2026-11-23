@@ -1,17 +1,20 @@
-// Mock provider backed by mock-data.json (spec §11). Offsets are SP indices relative to the
+// Mock lines and service product names come from JSON; issue timelines use shared seeded fixtures.
+// Offsets are SP indices relative to the
 // current SP; offset 0 is anchored to the start of the SP containing now at fetch time.
 
 import rawMock from './mock-data.json'
+import { buildDemoInterconnectors } from '@/config/interconnectorFixtures'
+import { buildDemoServiceArea } from '@/config/serviceFixtures'
+import { buildConstraintArea } from './constraintData'
 import { MOCK_JITTER } from '../dashboard.config'
 import { SP_MS, floorToSp } from '../time'
 import type {
-  AreaData, AreaId, DashboardData, DashboardDataProvider, SpState, StripAction, StripAreaData, TimeWindow,
+  AreaData, AreaId, DashboardData, DashboardDataProvider, StripAreaData, TimeWindow,
 } from '../types'
 
 interface MockLinePoint { offset: number; requirement: number; available: number }
 interface MockStripArea {
   items: { id: string; name: string }[]
-  periods: Record<string, { itemStates: Record<string, SpState>; actions: StripAction[] }>
 }
 interface MockJson {
   forecastRunMinutesAgo: number
@@ -20,10 +23,8 @@ interface MockJson {
     negMargin: MockLinePoint[]
     inertia: MockLinePoint[]
     largestLoss: MockLinePoint[]
-    constraints: MockStripArea
     reserve: MockStripArea
     response: MockStripArea
-    interconnectors: { periods: { offset: number; netPositionMw: number }[] }
   }
 }
 
@@ -40,6 +41,8 @@ export function mockForecastRunAt(nowMs: number): number {
 
 /** Builds one area from the mock, filtered to the window (IC keeps the SP before window.start). */
 export function buildMockArea(id: AreaId, window: TimeWindow, nowMs: number): AreaData {
+  if (id === 'constraints') return buildConstraintArea(window, nowMs)
+  if (id === 'reserve' || id === 'response') return buildDemoServiceArea(id, mock.areas[id].items, window, nowMs)
   const anchor = floorToSp(nowMs)
   const startMs = Date.parse(window.start)
   const endMs = Date.parse(window.end)
@@ -61,30 +64,7 @@ export function buildMockArea(id: AreaId, window: TimeWindow, nowMs: number): Ar
     }
   }
 
-  if ((STRIP_IDS as readonly string[]).includes(id)) {
-    const area = mock.areas[id as typeof STRIP_IDS[number]]
-    const periods: StripAreaData['periods'] = []
-    // Every SP the mock covers (offsets −1…47) exists; only non-ok SPs are listed in the JSON.
-    for (let offset = -1; offset <= 47; offset++) {
-      const t = at(offset)
-      if (!inWin(t)) continue
-      const p = area.periods[String(offset)]
-      periods.push({
-        spStart: new Date(t).toISOString(),
-        itemStates: { ...(p?.itemStates ?? {}) },
-        actions: [...(p?.actions ?? [])],
-      })
-    }
-    return { kind: 'strip', id, items: area.items, periods }
-  }
-
-  return {
-    kind: 'ic',
-    id: 'interconnectors',
-    periods: mock.areas.interconnectors.periods
-      .filter(p => at(p.offset) >= startMs - SP_MS && at(p.offset) < endMs)
-      .map(p => ({ spStart: new Date(at(p.offset)).toISOString(), netPositionMw: p.netPositionMw })),
-  }
+  return buildDemoInterconnectors(window, nowMs)
 }
 
 export const ALL_AREA_IDS: AreaId[] = [...LINE_IDS, ...STRIP_IDS, 'interconnectors']

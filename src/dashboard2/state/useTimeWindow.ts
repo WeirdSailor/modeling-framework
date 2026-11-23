@@ -5,7 +5,7 @@ import {
   DEFAULT_HORIZON, HORIZONS, HORIZON_STORAGE_KEY, NOW_TICK_MS,
 } from '../dashboard.config'
 import { SP_MS, floorToSp, presetWindow, snapCustomRange } from '../time'
-import type { HorizonId } from '../types'
+import type { HorizonId, TimeWindow } from '../types'
 
 export type WindowMode =
   | { type: 'preset'; horizon: HorizonId }
@@ -24,8 +24,18 @@ function storeHorizon(h: HorizonId) {
 }
 
 /** Horizon / custom window state plus a Now ticker that also fires exactly at each SP boundary. */
-export function useTimeWindow() {
-  const [mode, setMode] = useState<WindowMode>(() => ({ type: 'preset', horizon: readStoredHorizon() }))
+export function useTimeWindow(initialWindow?: TimeWindow) {
+  const [mode, setMode] = useState<WindowMode>(() => {
+    if (initialWindow) {
+      const startMs = Date.parse(initialWindow.start), endMs = Date.parse(initialWindow.end)
+      if (Number.isFinite(startMs) && Number.isFinite(endMs) && endMs > startMs) {
+        const preset = HORIZONS.find(h => h.hours * 3_600_000 === endMs - startMs)
+        if (preset && startMs === floorToSp(Date.now())) return { type: 'preset', horizon: preset.id }
+        return { type: 'custom', startMs, endMs, returnTo: readStoredHorizon() }
+      }
+    }
+    return { type: 'preset', horizon: readStoredHorizon() }
+  })
   const [nowMs, setNowMs] = useState(() => Date.now())
 
   useEffect(() => {

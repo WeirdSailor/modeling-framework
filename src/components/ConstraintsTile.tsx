@@ -4,7 +4,6 @@ import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, use
 import { createPortal } from 'react-dom'
 import type { ConstraintTileInput } from '@/models/types'
 import {
-  DENSE_MODE_SP_THRESHOLD,
   buildConstraintTileViewModel,
   formatHHMM,
   formatPeriodTooltip,
@@ -17,7 +16,7 @@ import {
   type PeriodTooltipContent,
   type WindowedCell,
 } from '@/utils/constraintSummary'
-import { buildDemo24hRun, buildDemo4hRuns, floorToSpMs, getContractedServices } from '@/config/constraintFixtures'
+import { buildDemoConstraintRuns, floorToSpMs, getContractedServices } from '@/config/constraintFixtures'
 
 const REFRESH_MS = 60_000 // move the "now" marker roughly once a minute, without refetching
 
@@ -96,12 +95,8 @@ export default function ConstraintsTile({ spCount, onOpenConstraint }: Constrain
     const windowStartMs = anchorMs
     const windowEndMs = anchorMs + spCount * SP_MS
     const nowIso = new Date(nowMs).toISOString()
-    if (spCount <= 8) {
-      const { current, previous } = buildDemo4hRuns(nowMs)
-      return { window: { start: new Date(windowStartMs).toISOString(), end: new Date(windowEndMs).toISOString() }, now: nowIso, current, previous }
-    }
-    const current = buildDemo24hRun(nowMs)
-    return { window: { start: new Date(windowStartMs).toISOString(), end: new Date(windowEndMs).toISOString() }, now: nowIso, current }
+    const { current, previous } = buildDemoConstraintRuns(nowMs)
+    return { window: { start: new Date(windowStartMs).toISOString(), end: new Date(windowEndMs).toISOString() }, now: nowIso, current, previous }
   }, [nowMs, spCount])
 
   const vm = useMemo(() => buildConstraintTileViewModel(input), [input])
@@ -150,14 +145,17 @@ export default function ConstraintsTile({ spCount, onOpenConstraint }: Constrain
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '14px 16px 10px', flexWrap: 'wrap', gap: 10 }}>
         <div>
-          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>Active constraints</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>Active constraints</span>
+            <span style={{ fontSize: 10, color: 'var(--text-muted)', border: '1px solid var(--border)', borderRadius: 4, padding: '2px 6px' }}>Demo data</span>
+          </div>
           <div style={{ fontSize: 11, color: 'var(--text-soft)', fontFamily: 'var(--font-mono)', marginTop: 2 }}>
             {formatWindowRange(vm.windowStartMs, vm.windowEndMs)} · settlement periods · last updated {formatHHMM(new Date(vm.runTime).getTime())}
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
-          <Kpi value={vm.totals.active} label="Active" color="var(--red)" />
-          <Kpi value={vm.totals.near} label="Near" color="var(--amber)" />
+          <Kpi value={vm.totals.active} label="Active" color="#FF6B4A" />
+          <Kpi value={vm.totals.near} label="Near" color="#F2B53C" />
           <Kpi value={vm.totals.peakTogether} label="Peak together" color="var(--text)" />
           <SortToggle mode={sortMode} onChange={setSortMode} />
         </div>
@@ -181,7 +179,7 @@ export default function ConstraintsTile({ spCount, onOpenConstraint }: Constrain
           <div style={{ display: 'flex', alignItems: 'stretch' }}>
             <div style={{ flex: 1, minWidth: 0 }}>
               {/* Time axis */}
-              <TimeAxis vm={vm} gridTemplateColumns={gridTemplateColumns} denseMode={denseMode} />
+              <TimeAxis vm={vm} gridTemplateColumns={gridTemplateColumns} />
 
               {/* Rows */}
               <div style={{ padding: '2px 16px 6px' }}>
@@ -308,13 +306,13 @@ function buildChangesLine(vm: ConstraintTileViewModel): string | null {
 
 // ── Time axis ────────────────────────────────────────────────────────────
 
-function TimeAxis({ vm, gridTemplateColumns, denseMode }: { vm: ConstraintTileViewModel; gridTemplateColumns: string; denseMode: boolean }) {
+function TimeAxis({ vm, gridTemplateColumns }: { vm: ConstraintTileViewModel; gridTemplateColumns: string }) {
   const totalHours = (vm.windowEndMs - vm.windowStartMs) / 3_600_000
   const tickStepSp = totalHours <= 4 ? 1 : totalHours <= 12 ? 2 : 4
   return (
     <div style={{ padding: '2px 16px 4px', display: 'grid', gridTemplateColumns: ROW_GRID_COLUMNS, gap: 6 }}>
       <div />
-      <div style={{ position: 'relative', display: 'grid', gridTemplateColumns, gap: denseMode ? 1 : 3 }}>
+      <div style={{ position: 'relative', display: 'grid', gridTemplateColumns, gap: 4 }}>
         {vm.slotTimes.map((t, i) => (
           <div key={i} style={{ fontSize: 11, color: 'var(--text-soft)', fontFamily: 'var(--font-mono)', textAlign: 'left' }}>
             {i % tickStepSp === 0 ? formatHHMM(t) : ''}
@@ -357,7 +355,6 @@ function ConstraintRow({ row, vm, gridTemplateColumns, denseMode, onOpen, active
 }) {
   const isActive = row.status === 'active'
   const isWithin = row.status === 'within'
-  const color = isActive ? 'var(--red)' : isWithin ? 'var(--text-faint)' : 'var(--amber)'
   const [mouseHover, setMouseHover] = useState(false)
   const [focusedIndex, setFocusedIndex] = useState(0)
   const cellRefs = useRef<(HTMLDivElement | null)[]>([])
@@ -382,11 +379,11 @@ function ConstraintRow({ row, vm, gridTemplateColumns, denseMode, onOpen, active
     >
       {/* Name — the only remaining way to open the constraint's detail view */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-        {isActive
-          ? <span aria-hidden style={{ width: 8, height: 8, background: color, flexShrink: 0 }} />
-          : isWithin
-            ? <span aria-hidden style={{ width: 8, height: 8, borderRadius: '50%', border: `1px solid ${color}`, boxSizing: 'border-box', flexShrink: 0 }} />
-            : <span aria-hidden style={{ width: 8, height: 8, borderRadius: '50%', background: color, flexShrink: 0 }} />}
+        <span
+          aria-hidden
+          className={bandClass(isActive ? 'active' : isWithin ? 'within' : 'near')}
+          style={{ width: 10, height: 10, borderRadius: 3, boxSizing: 'border-box', flexShrink: 0 }}
+        />
         <span className="mono" style={{ fontSize: 12, fontWeight: 600, color: isWithin ? 'var(--text-muted)' : 'var(--text)' }}>{row.id}</span>
         {row.change === 'new' && (
           <span style={{ fontSize: 8, fontWeight: 700, color: 'var(--accent)', border: '1px solid var(--accent)', borderRadius: 3, padding: '1px 4px' }}>NEW</span>
@@ -394,7 +391,7 @@ function ConstraintRow({ row, vm, gridTemplateColumns, denseMode, onOpen, active
       </div>
 
       {/* Time strip */}
-      <div style={{ position: 'relative', display: 'grid', gridTemplateColumns, gap: denseMode ? 1 : 3 }}>
+      <div style={{ position: 'relative', display: 'grid', gridTemplateColumns, gap: 4 }}>
         {row.cells.map((cell, i) => (
           <Cell
             key={i}
@@ -422,23 +419,20 @@ function ConstraintRow({ row, vm, gridTemplateColumns, denseMode, onOpen, active
 
 // ── Cell ───────────────────────────────────────────────────────────────
 
-function bandClass(band: WindowedCell['band'], denseMode: boolean): string {
+function bandClass(band: WindowedCell['band']): string {
   switch (band) {
     case 'activeSevere': return 'cc-cell-active-severe'
     case 'active': return 'cc-cell-active'
-    // Below ~6px an outline gets swamped by the fill, so dense mode swaps the
-    // near band's border for a translucent amber fill instead.
-    case 'near': return denseMode ? 'cc-cell-near-dense' : 'cc-cell-near'
+    case 'near': return 'cc-cell-near'
     case 'noData': return 'cc-cell-nodata'
     default: return 'cc-cell-within'
   }
 }
 
-// Coloured text matching each band's outline — within/noData print no value.
+// Dashboard palette; light text keeps values readable over the violation hatch.
 function cellTextColor(band: WindowedCell['band']): string | undefined {
-  if (band === 'activeSevere') return '#FFD3D5'
-  if (band === 'active') return '#FFA3A7'
-  if (band === 'near') return '#E3A845'
+  if (isActiveBand(band)) return '#F2F5F8'
+  if (band === 'near') return '#F2B53C'
   return undefined
 }
 
@@ -501,7 +495,7 @@ function Cell({ row, index, cell, denseMode, isTabbable, isTooltipActive, isSele
       aria-label={label}
       aria-describedby={isTooltipActive ? TOOLTIP_ID : undefined}
       aria-pressed={isSelected}
-      className={bandClass(cell.band, denseMode)}
+      className={bandClass(cell.band)}
       onMouseEnter={handleShow}
       onMouseLeave={onScheduleHide}
       onFocus={() => { onFocusCell(); handleShow() }}
@@ -510,7 +504,7 @@ function Cell({ row, index, cell, denseMode, isTabbable, isTooltipActive, isSele
       onPointerUp={handlePointerUp}
       onClick={handleClick}
       style={{
-        height: denseMode ? 22 : 26, borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        height: denseMode ? 22 : 26, minWidth: 0, boxSizing: 'border-box', borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center',
         cursor: 'pointer',
         outline: isTooltipActive ? '2px solid #E6EAF0' : isSelected ? '2px solid var(--accent)' : 'none',
         outlineOffset: isTooltipActive || isSelected ? 1 : 0,
@@ -556,7 +550,7 @@ function SelectedCellDetail({ row, index }: { row: ConstraintRowSummary; index: 
       {content.flow && <DetailRow label={content.flow.label} value={content.flow.value} />}
       {content.limit && <DetailRow label={content.limit.label} value={content.limit.value} />}
       {content.margin && (
-        <DetailRow label={content.margin.label} value={content.margin.value} color={content.margin.negative ? '#FFA3A7' : undefined} />
+        <DetailRow label={content.margin.label} value={content.margin.value} color={content.margin.negative ? '#FF6B4A' : undefined} />
       )}
       <DetailRow label="State" value={content.state} />
 
@@ -658,7 +652,7 @@ function PeriodTooltip({ content, cellEl, containerEl }: {
       {content.margin && (
         <div>
           <span style={{ color: '#98A3B3' }}>{content.margin.label} </span>
-          <span style={{ color: content.margin.negative ? '#FFA3A7' : '#E6EAF0' }}>{content.margin.value}</span>
+          <span style={{ color: content.margin.negative ? '#FF6B4A' : '#E6EAF0' }}>{content.margin.value}</span>
         </div>
       )}
       <div style={{ color: '#98A3B3', marginTop: 2 }}>{content.state}</div>
@@ -701,10 +695,9 @@ export function ConstraintsTileSkeleton() {
 
 function Footer() {
   const items: { cls: string; label: string }[] = [
-    { cls: 'cc-cell-active-severe', label: '>105%' },
-    { cls: 'cc-cell-active', label: '100 to 105%' },
-    { cls: 'cc-cell-near', label: '95 to 100% near' },
-    { cls: 'cc-cell-within', label: '<95%' },
+    { cls: 'cc-cell-active', label: 'Violated >100%' },
+    { cls: 'cc-cell-near', label: 'Tight 95–100%' },
+    { cls: 'cc-cell-within', label: 'Within limits <95%' },
     { cls: 'cc-cell-nodata', label: 'No data' },
   ]
   return (
@@ -715,7 +708,7 @@ function Footer() {
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         {items.map(it => (
           <span key={it.label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <span className={it.cls} style={{ width: 14, height: 10, borderRadius: 2, display: 'inline-block' }} />
+            <span className={it.cls} style={{ width: 18, height: 12, borderRadius: 3, boxSizing: 'border-box', display: 'inline-block' }} />
             {it.label}
           </span>
         ))}

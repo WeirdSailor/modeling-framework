@@ -40,7 +40,7 @@ export const AREA_CONFIG: AreaConfig[] = [
   { id: 'reserve',         label: 'Reserve',  ariaName: 'Reserve',         kind: 'strip', noun: 'product', unit: 'MW', actionsSource: 'none' },
   { id: 'response',        label: 'Resp',     ariaName: 'Response',        kind: 'strip', noun: 'product', unit: 'MW', actionsSource: 'none' },
   { id: 'largestLoss',     label: 'Lrg Loss', ariaName: 'Largest loss',    kind: 'line',  bandAbove: 1000, bandBelow: 1000, tight: 100, unit: 'MW' },
-  { id: 'interconnectors', label: 'IntConnr', ariaName: 'Interconnectors', kind: 'ic',    band: 3000, amber: 1500, red: 2000, unit: 'MW' },
+  { id: 'interconnectors', label: 'IntCon',   ariaName: 'Interconnectors', kind: 'ic',    band: 3000, amber: 1500, red: 2000, unit: 'MW' },
 ]
 
 export const ROW_HEIGHT: Record<AreaKind, number> = { line: 84, strip: 62, ic: 96 }
@@ -58,10 +58,10 @@ export const AREA_SOURCES: AreaSources = {
   negMargin:       'mock',
   constraints:     'real',
   inertia:         'real',
-  reserve:         'real',
-  response:        'real',
+  reserve:         'mock',
+  response:        'mock',
   largestLoss:     'mock',
-  interconnectors: 'real',
+  interconnectors: 'mock',
 }
 
 export const AREA_SOURCES_STORAGE_KEY = 'd2:areaSources'

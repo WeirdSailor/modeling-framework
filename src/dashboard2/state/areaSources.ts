@@ -6,6 +6,11 @@ import {
 } from '../dashboard.config'
 import type { AreaId } from '../types'
 
+// Earlier saves included the old Real default for ICs, even when only another
+// row was edited. Adopt the new demo default once; subsequent explicit choices persist.
+const IC_SOURCE_VERSION = 1
+const STRIP_SOURCE_VERSION = 1
+
 // Stored overrides are merged over the AREA_SOURCES defaults, so an area added later (or a
 // malformed entry) falls back to its default instead of breaking the dashboard.
 function readStoredSources(): AreaSources {
@@ -18,13 +23,22 @@ function readStoredSources(): AreaSources {
         const v = (parsed as Record<string, unknown>)[id]
         if (v === 'real' || v === 'mock') merged[id] = v
       }
+      if ((parsed as Record<string, unknown>).__icSourceVersion !== IC_SOURCE_VERSION) {
+        merged.interconnectors = AREA_SOURCES.interconnectors
+      }
+      if ((parsed as Record<string, unknown>).__stripSourceVersion !== STRIP_SOURCE_VERSION) {
+        merged.reserve = AREA_SOURCES.reserve
+        merged.response = AREA_SOURCES.response
+      }
     }
   } catch { /* storage unavailable or malformed */ }
   return merged
 }
 
 function storeSources(sources: AreaSources) {
-  try { window.localStorage.setItem(AREA_SOURCES_STORAGE_KEY, JSON.stringify(sources)) } catch { /* storage unavailable */ }
+  try { window.localStorage.setItem(AREA_SOURCES_STORAGE_KEY, JSON.stringify({
+    ...sources, __icSourceVersion: IC_SOURCE_VERSION, __stripSourceVersion: STRIP_SOURCE_VERSION,
+  })) } catch { /* storage unavailable */ }
 }
 
 /** Per-area Real/Mock choice for Dashboard 2, persisted to localStorage. */

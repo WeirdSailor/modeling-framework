@@ -4,17 +4,17 @@
 
 import { useModellingStore } from '@/store/useModellingStore'
 import { getArea, type AreaId as StoreAreaId } from '@/config/areas'
-import { buildDemo24hRun, buildDemo4hRuns } from '@/config/constraintFixtures'
-import { bandForUtilisation } from '@/utils/constraintSummary'
 import { applyDraftToBaseline } from '@/utils/margin'
 import { applyDraftToAreaBaseline } from '@/utils/areaAggregates'
 import { workingPlanAsDraft } from '@/utils/workingPlan'
 import type {
-  AreaRequirementRow, BMUnit, ConstraintBand, DraftPlan, ModellingAction, SettlementPeriodData,
+  AreaRequirementRow, BMUnit, DraftPlan, ModellingAction, SettlementPeriodData,
 } from '@/models/types'
 import { CORRECT_ELEXON_SP_TO_UTC, STRIP_TIGHT_MW } from '../dashboard.config'
 import { draftCovers, itemStateFromHeadroom, overlayPeriods, type OverlayInput } from '../derive'
 import { SP_MS, settlementSpStartUtc } from '../time'
+import { interconnectorName, type InterconnectorReference } from './interconnectorReference'
+import { buildConstraintArea } from './constraintData'
 import type {
   AreaData, AreaId, DraftOverlay, IcAreaData, LineAreaData, LinePeriod, SpState, StripAreaData, StripPeriod,
   TimeWindow,
@@ -88,7 +88,7 @@ function addDays(date: string, days: number): string {
 
 interface Slot { startMs: number; sp: SettlementPeriodData }
 
-function slotsIn(ctx: RealContext, fromMs: number, toMs: number): Slot[] {
+function slotsIn(ctx: Pick<RealContext, 'settlementPeriods'>, fromMs: number, toMs: number): Slot[] {
   return ctx.settlementPeriods
     .map(sp => ({ startMs: slotStartMs(sp), sp }))
     .filter(s => s.startMs >= fromMs && s.startMs < toMs)
@@ -199,43 +199,17 @@ function areaStrip(
   return { kind: 'strip', id, items: storeAreas.map(a => ({ id: a, name: getArea(a).name })), periods }
 }
 
-// ── Constraints: same fixture runs the existing ConstraintsTile uses ─────
-
-const BAND_STATE: Record<ConstraintBand, SpState | null> = {
-  activeSevere: 'violated', active: 'violated', near: 'tight', within: 'ok', noData: null,
-}
-
-function constraints(ctx: RealContext, w: { startMs: number; endMs: number }): StripAreaData {
-  const nSp = Math.round((w.endMs - w.startMs) / SP_MS)
-  // Mirrors ConstraintsTile: 4h run for windows of ≤ 8 SPs, otherwise the 24h run.
-  const run = nSp <= 8 ? buildDemo4hRuns(ctx.nowMs).current : buildDemo24hRun(ctx.nowMs)
-  const bySlot = new Map<number, Record<string, SpState>>()
-  for (const c of run.constraints) {
-    for (const p of c.periods) {
-      const t = Date.parse(p.start)
-      if (t < w.startMs || t >= w.endMs) continue
-      const state = BAND_STATE[bandForUtilisation(p.limitMw > 0 ? (p.flowMw / p.limitMw) * 100 : null)]
-      if (state === null) continue
-      const states = bySlot.get(t) ?? {}
-      if (state !== 'ok') states[c.id] = state
-      bySlot.set(t, states)
-    }
-  }
-  return {
-    kind: 'strip',
-    id: 'constraints',
-    items: run.constraints.map(c => ({ id: c.id, name: c.name })),
-    periods: [...bySlot].sort((a, b) => a[0] - b[0]).map(([t, itemStates]) => ({ spStart: iso(t), itemStates, actions: [] })),
-  }
-}
-
 // ── Interconnectors: Σ PN over I_* BMUs (+ = import to GB) ────────────────
 
 // Unconfirmed slots (hasConfirmedPn = false) carry fetchAllData's D-1 proxy: yesterday's PN for the same
 // Elexon SP number — for today's AND tomorrow's slots alike. Each period records where its value really
 // comes from, so icSwings leaves a gap at the confirmed→estimate seam and at the midnight wrap inside the
 // estimates (today SP48 ← yesterday SP48, tomorrow SP1 ← yesterday SP1).
-function interconnectors(ctx: RealContext, w: { startMs: number; endMs: number }): IcAreaData {
+function interconnectors(
+  ctx: Pick<RealContext, 'settlementPeriods'>,
+  w: { startMs: number; endMs: number },
+  includes: (bmUnit: string) => boolean = bmUnit => bmUnit.startsWith('I_'),
+): IcAreaData {
   const periods: IcAreaData['periods'] = []
   const first = ctx.settlementPeriods.reduce<SettlementPeriodData | undefined>(
     (a, sp) => (!a || sp.settlementPeriod < a.settlementPeriod ? sp : a), undefined)
@@ -244,7 +218,7 @@ function interconnectors(ctx: RealContext, w: { startMs: number; endMs: number }
     let net = 0
     let found = false
     for (const [bmUnit, pn] of Object.entries(sp.pn)) {
-      if (!bmUnit.startsWith('I_')) continue
+      if (!includes(bmUnit)) continue
       net += pn
       found = true
     }
@@ -254,6 +228,35 @@ function interconnectors(ctx: RealContext, w: { startMs: number; endMs: number }
     periods.push({ spStart: iso(startMs), netPositionMw: net, estimated, sourceStart: iso(sourceMs) })
   }
   return { kind: 'ic', id: 'interconnectors', periods }
+}
+
+export interface InterconnectorRow {
+  id: string
+  name: string
+  area: IcAreaData
+}
+
+/** Apply the consolidated chart's time conversion and estimate seams to each connection. */
+export function buildInterconnectorRows(
+  window: TimeWindow, ctx: Pick<RealContext, 'settlementPeriods'>, references: InterconnectorReference[],
+): InterconnectorRow[] {
+  const groups = new Map<string, Set<string>>()
+  const byUnit = new Map(references.map(ref => [ref.bmUnitId, ref.interconnectorId]))
+  for (const ref of references) {
+    const group = groups.get(ref.interconnectorId) ?? new Set<string>()
+    group.add(ref.bmUnitId)
+    groups.set(ref.interconnectorId, group)
+  }
+  // Preserve unfamiliar units instead of silently dropping their contribution.
+  for (const sp of ctx.settlementPeriods) {
+    for (const bmUnit of Object.keys(sp.pn)) {
+      if (bmUnit.startsWith('I_') && !byUnit.has(bmUnit)) groups.set(bmUnit, new Set([bmUnit]))
+    }
+  }
+  const w = { startMs: Date.parse(window.start), endMs: Date.parse(window.end) }
+  return [...groups].map(([id, units]) => ({
+    id, name: interconnectorName(id), area: interconnectors(ctx, w, bmUnit => units.has(bmUnit)),
+  })).sort((a, b) => a.name.localeCompare(b.name))
 }
 
 // ── Dispatcher ───────────────────────────────────────────────────────────
@@ -266,7 +269,7 @@ export function buildRealArea(id: AreaId, window: TimeWindow, ctx: RealContext):
     case 'inertia':         return areaLine('inertia', 'inertia', ctx, w)
     case 'reserve':         return areaStrip('reserve', ['recovery_reserve', 'freq_control_reserve', 'general_reserve', 'contingency_reserve'], ctx, w)
     case 'response':        return areaStrip('response', ['response'], ctx, w)
-    case 'constraints':     return constraints(ctx, w)
+    case 'constraints':     return buildConstraintArea(window, ctx.nowMs)
     case 'interconnectors': return interconnectors(ctx, w)
     default:                return null // negMargin, largestLoss: no real source
   }

@@ -306,7 +306,7 @@ export default function Home() {
     setActiveTab('chart')
   }, [])
 
-  // Dashboard drill-down: Constraints retains its timeline; other areas open blank detail pages.
+  // Dashboard drill-down preserves the selected window for each detail page.
   const [constraintsSpCount, setConstraintsSpCount] = useState(8)
   const [dashboardDetail, setDashboardDetail] = useState<DrillDownEvent | null>(null)
   const handleDashboard2DrillDown = useCallback((e: DrillDownEvent) => {
@@ -754,6 +754,8 @@ export default function Home() {
         {activeTab === 'areaDetail' && dashboardDetail && dashboardDetail.areaId !== 'constraints' && (
           <OperationalAreaDetailPage
             areaId={dashboardDetail.areaId}
+            initialWindow={dashboardDetail.window}
+            source={d2Sources[dashboardDetail.areaId]}
             onBack={() => setActiveTab('dashboard2')}
           />
         )}

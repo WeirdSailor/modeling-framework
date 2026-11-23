@@ -1,14 +1,18 @@
 'use client'
 
-import { AREA_CONFIG } from '@/dashboard2/dashboard.config'
-import type { AreaId } from '@/dashboard2/types'
+import { AREA_CONFIG, AREA_SOURCES, type AreaSource } from '@/dashboard2/dashboard.config'
+import type { AreaId, TimeWindow } from '@/dashboard2/types'
+import InterconnectorsDetailPage from './InterconnectorsDetailPage'
 
 interface Props {
   areaId: Exclude<AreaId, 'constraints'>
+  initialWindow?: TimeWindow
+  source?: AreaSource
   onBack: () => void
 }
 
-export default function OperationalAreaDetailPage({ areaId, onBack }: Props) {
+export default function OperationalAreaDetailPage({ areaId, initialWindow, source, onBack }: Props) {
+  if (areaId === 'interconnectors') return <InterconnectorsDetailPage initialWindow={initialWindow} source={source ?? AREA_SOURCES.interconnectors} onBack={onBack} />
   const area = AREA_CONFIG.find(config => config.id === areaId)!
 
   return (

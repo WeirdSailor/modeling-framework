@@ -1,10 +1,11 @@
 // Dummy/fixture data for the "Active constraints" dashboard tile prototype.
 // Real transmission-constraint forecasts are not wired up yet — see CLAUDE.md.
-// Values below are lifted directly from the tile's design spec fixture table so the
-// derivation logic can be hand-verified against its worked examples.
+// The full-day demo groups issues into short events with clear recovery periods.
+// The original 4h worked example is retained separately for the design reference.
 
 import type { ForecastRun } from '@/models/types'
 import { SP_MS } from '@/utils/constraintSummary'
+import { demoIssueWindows, demoRandom, randomInt } from './demoRandom'
 
 interface ConstraintShape {
   id: string
@@ -81,35 +82,62 @@ export function buildDemo4hRuns(nowMs: number): { current: ForecastRun; previous
   return { current, previous }
 }
 
-// ── 24h / 48-SP fixture — gentle baseline + a couple of overnight single-SP breaches ──
+// ── 24h / 48-SP demo — sustained, intermittent and isolated issues ──
 
-function wavePattern(baseUtil: number, seed: number): number[] {
-  const out: number[] = []
-  for (let i = 0; i < 48; i++) {
-    const wave = Math.sin((i / 48) * Math.PI * 2 + seed) * 12
-    out.push(Math.round(Math.max(20, Math.min(94, baseUtil + wave))))
+const ISSUE_WINDOWS = demoIssueWindows('constraints-uneven-v1')
+
+const CURRENT_24H: ConstraintShape[] = CURRENT_4H.map((constraint, index) => {
+  const random = demoRandom('constraint-' + constraint.id)
+  let baseline = randomInt(random, 52, 83)
+  const utils = Array.from({ length: 48 }, () => {
+    baseline = Math.max(40, Math.min(92, baseline + randomInt(random, -6, 7)))
+    return baseline
+  })
+  const active = index < 6 || constraint.id === 'B7' || constraint.id === 'B13'
+  const near = index >= 6 && index <= 8
+  if (active || near) {
+    const eligible = ISSUE_WINDOWS.filter(w => index < 9 || w.start >= 24)
+    const required = index < 9 ? eligible.find(w => w.start < 24) : eligible[0]
+    for (const window of eligible) {
+      if (window !== required && random() < 0.45) continue
+      const offset = randomInt(random, 0, window.length - 1)
+      const length = randomInt(random, 1, window.length - offset)
+      for (let i = 0; i < length; i++) {
+        const breach = active && (i === 0 || random() < 0.65)
+        utils[window.start + offset + i] = breach
+          ? randomInt(random, constraint.id === 'B7a' ? 108 : 101, 113)
+          : randomInt(random, 95, 100)
+      }
+    }
   }
-  return out
-}
+  return { ...constraint, utils }
+})
 
-const BASE_24H: ConstraintShape[] = CURRENT_4H.map((c, i) => ({
-  id: c.id,
-  name: c.name,
-  limitMw: c.limitMw,
-  utils: wavePattern(55 + (i % 5) * 6, i * 0.7),
-}))
-
-// Inject two isolated overnight single-SP breaches (SP index 6 ~ 03:00, SP index 41 ~ 20:30
-// relative to a midnight-aligned window) to exercise the minimum-render-width rule.
-const CURRENT_24H: ConstraintShape[] = BASE_24H.map(c => {
-  if (c.id === 'B6')  { const utils = [...c.utils]; utils[6] = 108; return { ...c, utils } }
-  if (c.id === 'SC1') { const utils = [...c.utils]; utils[41] = 104; return { ...c, utils } }
+// Keep meaningful New / Cleared / Worse comparisons throughout the full day.
+const PREVIOUS_24H: ConstraintShape[] = CURRENT_24H.map(c => {
+  if (c.id === 'SC1' || c.id === 'B9') return { ...c, utils: c.utils.map(u => Math.min(u, 100)) }
+  if (c.id === 'B7a') return { ...c, utils: c.utils.map(u => Math.min(u, 105)) }
+  if (c.id === 'B14') {
+    const utils = [...c.utils]
+    const random = demoRandom('previous-B14')
+    utils[randomInt(random, 0, 23)] = randomInt(random, 101, 105)
+    utils[randomInt(random, 24, 47)] = randomInt(random, 101, 105)
+    return { ...c, utils }
+  }
   return c
 })
 
-export function buildDemo24hRun(nowMs: number): ForecastRun {
+/** One shared full-day forecast for Dashboard blocks and the constraint detail list. */
+export function buildDemoConstraintRuns(nowMs: number): { current: ForecastRun; previous: ForecastRun } {
   const anchorMs = floorToSpMs(nowMs)
-  return stampRun('current-24h', nowMs - 15 * 60 * 1000, anchorMs, CURRENT_24H)
+  return {
+    current: stampRun('current-24h', nowMs - 15 * 60 * 1000, anchorMs, CURRENT_24H),
+    previous: stampRun('previous-24h', nowMs - 45 * 60 * 1000, anchorMs, PREVIOUS_24H),
+  }
+}
+
+export function buildDemo24hRun(nowMs: number): ForecastRun {
+  return buildDemoConstraintRuns(nowMs).current
 }
 
 // ── Contracted services (dummy, per-constraint) ─────────────────────────
