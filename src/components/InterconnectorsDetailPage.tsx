@@ -5,7 +5,7 @@ import { Inter } from 'next/font/google'
 import { useModellingStore } from '@/store/useModellingStore'
 import { buildDemoInterconnectorRows } from '@/config/interconnectorFixtures'
 import {
-  AREA_CONFIG, CUSTOM_TICK_CANDIDATES, HEADER_HEIGHT, MIN_TICK_PX, PRESET_TICK_MINUTES, ROW_HEIGHT,
+  AREA_CONFIG, CUSTOM_TICK_CANDIDATES, HEADER_HEIGHT, MIN_TICK_PX, PRESET_TICK_MINUTES,
   type AreaSource, type IcAreaConfig,
 } from '@/dashboard2/dashboard.config'
 import { loadInterconnectorReference, type InterconnectorReference } from '@/dashboard2/data/interconnectorReference'
@@ -25,6 +25,7 @@ import styles from '@/dashboard2/dashboard2.module.css'
 const inter = Inter({ subsets: ['latin'], weight: ['400', '500', '600', '700'] })
 const cfg = AREA_CONFIG.find(area => area.id === 'interconnectors') as IcAreaConfig
 const noDrillDown = () => {}
+const DETAIL_ROW_HEIGHT = 72
 
 interface Props {
   initialWindow?: TimeWindow
@@ -93,7 +94,7 @@ export default function InterconnectorsDetailPage({ initialWindow, source, onBac
 
   return (
     <CursorContext.Provider value={cursor}>
-      <div className={`${styles.root} ${inter.className}`} aria-label="Interconnectors detail">
+      <div className={`${styles.root} ${styles.interconnectorsDetail} ${inter.className}`} aria-label="Interconnectors detail">
         <div className={styles.detailBreadcrumb}>
           <button type="button" className={styles.btn} onClick={onBack}>← Dashboard</button>
           <nav aria-label="Breadcrumb">Dashboard <span aria-hidden>/</span> <b aria-current="page">Interconnectors</b></nav>
@@ -128,13 +129,13 @@ export default function InterconnectorsDetailPage({ initialWindow, source, onBac
                 </div>
               )}
               {rows.map(row => (
-                <div key={row.id} className={styles.grid} role="group" aria-label={row.name} style={{ height: ROW_HEIGHT.ic }}>
+                <div key={row.id} className={styles.grid} role="group" aria-label={row.name} style={{ height: DETAIL_ROW_HEIGHT }}>
                   <div className={styles.left}>
                     <span className={styles.interconnectorName} title={row.id}>{row.name}</span>
                     <WorstValue cfg={{ ...cfg, label: row.name, ariaName: row.name }} area={row.area} startMs={win.startMs} endMs={win.endMs} />
                   </div>
                   <div className={styles.chartCell}>
-                    {width > 0 && <IcChart area={row.area} cfg={cfg} scale={scale} height={ROW_HEIGHT.ic} nowMs={nowMs} showDirectionLabels={false} onDrillDown={noDrillDown} />}
+                    {width > 0 && <IcChart area={row.area} cfg={cfg} scale={scale} height={DETAIL_ROW_HEIGHT} nowMs={nowMs} showDirectionLabels={false} onDrillDown={noDrillDown} />}
                   </div>
                 </div>
               ))}
