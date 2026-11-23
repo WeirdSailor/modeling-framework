@@ -28,6 +28,7 @@ import Dashboard from '@/components/Dashboard'
 import OperationalDashboard from '@/dashboard2/components/OperationalDashboard'
 import type { DrillDownEvent } from '@/dashboard2/types'
 import ConstraintsDetailPage from '@/components/ConstraintsDetailPage'
+import OperationalAreaDetailPage from '@/components/OperationalAreaDetailPage'
 import ScheduleTab from '@/components/schedule/ScheduleTab'
 import type { ScheduleFilters } from '@/utils/candidateFilters'
 import { workingPlanAsDraft, workingPlanDraftId } from '@/utils/workingPlan'
@@ -37,7 +38,7 @@ import type { AreaId } from '@/config/areas'
 import { AREAS, getArea } from '@/config/areas'
 import { computeAreaStatus } from '@/utils/areaAggregates'
 
-type Tab = 'dashboard' | 'dashboard2' | 'constraints' | 'workspace' | 'schedule' | 'chart' | 'promoted' | 'redeclare' | 'graph' | 'requirements'
+type Tab = 'dashboard' | 'dashboard2' | 'constraints' | 'areaDetail' | 'workspace' | 'schedule' | 'chart' | 'promoted' | 'redeclare' | 'graph' | 'requirements'
 type BatteryTab = 'summary' | 'redeclare' | 'reliability'
 
 interface ConfirmState {
@@ -305,12 +306,13 @@ export default function Home() {
     setActiveTab('chart')
   }, [])
 
-  // Dashboard 2 drill-down. CONSTRAINTS opens its level-2 detail page on the same horizon
-  // Dashboard 2 was showing; other areas have no detail view yet.
+  // Dashboard drill-down: Constraints retains its timeline; other areas open blank detail pages.
   const [constraintsSpCount, setConstraintsSpCount] = useState(8)
+  const [dashboardDetail, setDashboardDetail] = useState<DrillDownEvent | null>(null)
   const handleDashboard2DrillDown = useCallback((e: DrillDownEvent) => {
     if (e.areaId !== 'constraints') {
-      console.debug('[dashboard2] drill-down', e)
+      setDashboardDetail(e)
+      setActiveTab('areaDetail')
       return
     }
     if (e.window) {
@@ -630,7 +632,7 @@ export default function Home() {
         {/* Tab bar */}
         <div className="tab-bar">
           <button
-            className={`tab-btn${activeTab === 'dashboard2' || activeTab === 'constraints' ? ' active' : ''}`}
+            className={`tab-btn${activeTab === 'dashboard2' || activeTab === 'constraints' || activeTab === 'areaDetail' ? ' active' : ''}`}
             onClick={() => setActiveTab('dashboard2')}
           >
             Dashboard
@@ -745,6 +747,13 @@ export default function Home() {
         {activeTab === 'constraints' && (
           <ConstraintsDetailPage
             initialSpCount={constraintsSpCount}
+            onBack={() => setActiveTab('dashboard2')}
+          />
+        )}
+
+        {activeTab === 'areaDetail' && dashboardDetail && dashboardDetail.areaId !== 'constraints' && (
+          <OperationalAreaDetailPage
+            areaId={dashboardDetail.areaId}
             onBack={() => setActiveTab('dashboard2')}
           />
         )}
@@ -1003,6 +1012,11 @@ export default function Home() {
             unitServices={unitServices}
             settlementPeriods={settlementPeriods}
             onRemoveUnits={handleRemovePromotedUnits}
+            currentUser={currentUser}
+            onUpdateUnitWindow={updateUnitWindow}
+            onUpdateReason={updateUnitReason}
+            onUpdateOperationType={updateUnitOperationType}
+            onUpdateNotes={updateUnitNotes}
           />
         )}
 

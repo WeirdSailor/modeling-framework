@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import type { DraftPlan, BMUnit, ModellingAction, OperationType, UnitSnapshot, ServiceType, SettlementPeriodData } from '@/models/types'
+import type { DraftPlan, BMUnit, ModellingAction, OperationType, UnitSnapshot, ServiceType, SettlementPeriodData, UserId, PromotionAvailabilitySnapshot } from '@/models/types'
+import { OPERATION_TYPE_LABELS } from '@/models/types'
 
 const CHANGE_THRESHOLD = 10 // percent
 
@@ -48,7 +49,12 @@ interface Props {
   dataOverrides: Record<string, Partial<UnitSnapshot>>
   unitServices: Record<string, ServiceType>
   settlementPeriods: SettlementPeriodData[]
+  currentUser: UserId
   onRemoveUnits: (removals: { draftId: string; bmUnitId: string }[]) => void
+  onUpdateUnitWindow: (draftId: string, bmUnitId: string, fromPeriod: number, toPeriod: number | undefined) => void
+  onUpdateReason: (draftId: string, bmUnitId: string, reasonCode: ModellingAction['reasonCode']) => void
+  onUpdateOperationType: (draftId: string, bmUnitId: string, operationType: OperationType | undefined) => void
+  onUpdateNotes: (draftId: string, bmUnitId: string, notes: string) => void
 }
 
 interface PromotedRow {
@@ -73,6 +79,8 @@ interface PromotedRow {
   operationType?: OperationType
   notes: string
   snapshot?: UnitSnapshot
+  availabilitySnapshot?: PromotionAvailabilitySnapshot
+  editable: boolean
 }
 
 function slotLabel(slot: number, periods: SettlementPeriodData[]): string {
@@ -126,7 +134,8 @@ function TypeChip({ fuelType }: { fuelType: string }) {
 }
 
 export default function PromotedTab({
-  drafts, unitById, unitPnByBmUnit, dataOverrides, unitServices, settlementPeriods, onRemoveUnits,
+  drafts, unitById, unitPnByBmUnit, dataOverrides, unitServices, settlementPeriods, currentUser,
+  onRemoveUnits, onUpdateUnitWindow, onUpdateReason, onUpdateOperationType, onUpdateNotes,
 }: Props) {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [selectedReason, setSelectedReason] = useState<ModellingAction['reasonCode'] | null>(null)
@@ -166,11 +175,13 @@ export default function PromotedTab({
           operationType: action.operationType,
           notes: draft.unitNotes[action.bmUnitId] ?? '',
           snapshot: draft.dataSnapshot?.[action.bmUnitId],
+          availabilitySnapshot: draft.availabilitySnapshot?.[action.bmUnitId],
+          editable: draft.ownerId === currentUser,
         })
       }
     }
     return out
-  }, [promotedDrafts, unitById, unitPnByBmUnit])
+  }, [promotedDrafts, unitById, unitPnByBmUnit, currentUser])
 
   const reasonSummaries = useMemo(() =>
     REASON_ORDER.map(code => {
@@ -352,12 +363,14 @@ export default function PromotedTab({
               <th className="num">£ SEL</th>
               <th className="num">£ MEL</th>
               <th className="num">PN</th>
+              <th className="num" title="Avail captured at promotion (MW)">Avail</th>
+              <th className="num" title="Usable captured at promotion, including filters and de-rating (MW)">Usable</th>
               <th className="time-col">From</th>
               <th className="time-col">To</th>
               <th className="reason-col">Event</th>
               <th className="reason-col">Reason</th>
               <th>Draft</th>
-              <th>Notes</th>
+              <th className="notes-col">Notes</th>
             </tr>
           </thead>
           <tbody>
@@ -422,17 +435,69 @@ export default function PromotedTab({
                     {snap && <ChangeArrow current={effPriceToMel} snapshotVal={snap.priceToMel} unit="£" invertColors />}
                   </td>
                   <td className="mono num">{row.pn > 0 ? row.pn.toFixed(0) : '—'}</td>
-                  <td className="time-col">
-                    <span className="notes-readonly mono">{slotLabel(row.fromPeriod, settlementPeriods)}</span>
+                  <td className="mono num">{row.availabilitySnapshot?.availableMw.toFixed(0) ?? '—'}</td>
+                  <td className="mono num">{row.availabilitySnapshot?.usableMw.toFixed(0) ?? '—'}</td>
+                  <td className="time-col" onClick={e => e.stopPropagation()}>
+                    {row.editable ? (
+                      <select
+                        className="reason-select mono"
+                        aria-label={`From for ${row.nationalGridBmUnit} in ${row.draftName}`}
+                        value={row.fromPeriod}
+                        onChange={e => {
+                          const from = Number(e.target.value)
+                          onUpdateUnitWindow(row.draftId, row.bmUnitId, from, row.toPeriod === undefined ? undefined : Math.max(from, row.toPeriod))
+                        }}
+                      >
+                        {settlementPeriods.map(sp => (
+                          <option key={sp.settlementPeriod} value={sp.settlementPeriod}>{slotLabel(sp.settlementPeriod, settlementPeriods)}</option>
+                        ))}
+                      </select>
+                    ) : <span className="notes-readonly mono">{slotLabel(row.fromPeriod, settlementPeriods)}</span>}
                   </td>
-                  <td className="time-col">
-                    <span className="notes-readonly mono">{row.toPeriod !== undefined ? slotLabel(row.toPeriod, settlementPeriods) : '—'}</span>
+                  <td className="time-col" onClick={e => e.stopPropagation()}>
+                    {row.editable ? (
+                      <select
+                        className="reason-select mono"
+                        aria-label={`To for ${row.nationalGridBmUnit} in ${row.draftName}`}
+                        value={row.toPeriod ?? ''}
+                        onChange={e => {
+                          const to = e.target.value === '' ? undefined : Number(e.target.value)
+                          onUpdateUnitWindow(row.draftId, row.bmUnitId, to === undefined ? row.fromPeriod : Math.min(row.fromPeriod, to), to)
+                        }}
+                      >
+                        <option value="">—</option>
+                        {settlementPeriods.map(sp => (
+                          <option key={sp.settlementPeriod} value={sp.settlementPeriod}>{slotLabel(sp.settlementPeriod, settlementPeriods)}</option>
+                        ))}
+                      </select>
+                    ) : <span className="notes-readonly mono">{row.toPeriod !== undefined ? slotLabel(row.toPeriod, settlementPeriods) : '—'}</span>}
                   </td>
-                  <td className="reason-col">
-                    <span className="notes-readonly">{row.operationType ?? '—'}</span>
+                  <td className="reason-col" onClick={e => e.stopPropagation()}>
+                    {row.editable ? (
+                      <select
+                        className="reason-select"
+                        aria-label={`Event for ${row.nationalGridBmUnit} in ${row.draftName}`}
+                        value={row.operationType ?? ''}
+                        onChange={e => onUpdateOperationType(row.draftId, row.bmUnitId, (e.target.value as OperationType) || undefined)}
+                      >
+                        <option value="">—</option>
+                        {(Object.keys(OPERATION_TYPE_LABELS) as OperationType[]).map(type => (
+                          <option key={type} value={type} title={OPERATION_TYPE_LABELS[type]}>{type}</option>
+                        ))}
+                      </select>
+                    ) : <span className="notes-readonly">{row.operationType ?? '—'}</span>}
                   </td>
-                  <td className="reason-col">
-                    <span className="notes-readonly">{REASON_LABEL[row.reasonCode]}</span>
+                  <td className="reason-col" onClick={e => e.stopPropagation()}>
+                    {row.editable ? (
+                      <select
+                        className="reason-select"
+                        aria-label={`Reason for ${row.nationalGridBmUnit} in ${row.draftName}`}
+                        value={row.reasonCode}
+                        onChange={e => onUpdateReason(row.draftId, row.bmUnitId, e.target.value as ModellingAction['reasonCode'])}
+                      >
+                        {REASON_ORDER.map(code => <option key={code} value={code}>{REASON_LABEL[code]}</option>)}
+                      </select>
+                    ) : <span className="notes-readonly">{REASON_LABEL[row.reasonCode]}</span>}
                   </td>
                   <td>
                     <span style={{
@@ -445,8 +510,17 @@ export default function PromotedTab({
                       {row.draftName}
                     </span>
                   </td>
-                  <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                    {row.notes || <em className="muted">—</em>}
+                  <td className="notes-col" style={{ fontSize: 12, color: 'var(--text-muted)' }} onClick={e => e.stopPropagation()}>
+                    {row.editable ? (
+                      <input
+                        type="text"
+                        className="notes-input"
+                        aria-label={`Notes for ${row.nationalGridBmUnit} in ${row.draftName}`}
+                        value={row.notes}
+                        placeholder="Add a note…"
+                        onChange={e => onUpdateNotes(row.draftId, row.bmUnitId, e.target.value)}
+                      />
+                    ) : row.notes || <em className="muted">—</em>}
                   </td>
                 </tr>
               )

@@ -191,7 +191,7 @@ export default function ScheduleTab({
           actionCount={plan.length}
           onCancel={() => setCommitting(false)}
           onCommit={(name, description) => {
-            commitWorkingPlan(name, description)
+            commitWorkingPlan(name, description, filters)
             setCommitting(false)
             onCommitted(name)
           }}

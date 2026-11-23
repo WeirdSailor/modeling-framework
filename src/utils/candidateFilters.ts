@@ -7,23 +7,29 @@ export interface ScheduleFilters extends UnitFilterState {
   selectedCard: CardId
 }
 
+export type PromotionFilters = Pick<ScheduleFilters, 'gspFilter' | 'asFilter' | 'priceThreshold' | 'deRatePct'>
+
 export type CandidateCategory = 'constrained' | 'contracted' | 'highPrice' | 'usable'
 
-export interface FilteredCandidateRow extends CandidateRow {
+interface AvailabilityClassification {
   category: CandidateCategory
   service: ServiceType | undefined
   availableMw: number
   usableMw: number
 }
 
+export interface FilteredCandidateRow extends CandidateRow, AvailabilityClassification {}
+
+type AvailabilityInput = Pick<CandidateRow, 'bmUnitId' | 'fuelType' | 'gspGroup' | 'priceToMel' | 'mel' | 'pn'>
+
 /** Classify before hiding rows so excluded units remain inspectable on their cards.
  * Categories are exclusive, with the same precedence as Battery Summary.
  */
-export function classifyCandidates(
-  rows: CandidateRow[],
+export function classifyCandidates<T extends AvailabilityInput>(
+  rows: T[],
   filters: ScheduleFilters,
   unitServices: Record<string, ServiceType>,
-): FilteredCandidateRow[] {
+): (T & AvailabilityClassification)[] {
   const included = Object.keys(filters.gspFilter).filter(key => filters.gspFilter[key] === 'include')
   const excluded = new Set(Object.keys(filters.gspFilter).filter(key => filters.gspFilter[key] === 'exclude'))
   const priceLimit = Number(filters.priceThreshold)

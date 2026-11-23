@@ -2,7 +2,6 @@
 
 // One area row: left column (name + worst-in-window) and the chart slot.
 
-import type { KeyboardEvent } from 'react'
 import { ROW_HEIGHT, type AreaConfig } from '../dashboard.config'
 import type { XScale } from '../geometry'
 import type { AreaData, DrillDownEvent, IcAreaData, LineAreaData, StripAreaData } from '../types'
@@ -30,39 +29,22 @@ export default function AreaRow({ cfg, area, scale, nowMs, onDrillDown }: Props)
   } else {
     chart = <IcChart area={area as IcAreaData | undefined} cfg={cfg} scale={scale} height={height} nowMs={nowMs} onDrillDown={onDrillDown} />
   }
-  // Rows with a level-2 detail view: the whole left column opens it.
-  const hasDetail = cfg.kind === 'strip' && cfg.detailView === true
+  // Each operational area name opens its level-2 detail page.
   const openDetail = () => onDrillDown({ areaId: cfg.id, spStart: new Date(scale.startMs).toISOString() })
-  const onDetailKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
-    if (e.key !== 'Enter' && e.key !== ' ') return
-    e.preventDefault()
-    e.stopPropagation()
-    openDetail()
-  }
   return (
     <div className={styles.grid} role="group" aria-label={cfg.ariaName} style={{ height }}>
-      {hasDetail ? (
-        <div
-          className={`${styles.left} ${styles.leftLink}`}
-          role="link"
-          tabIndex={0}
+      <div className={styles.left}>
+        <button
+          type="button"
+          className={`${styles.name} ${styles.nameLink}`}
           aria-label={`Open ${cfg.ariaName.toLowerCase()} detail`}
           title={`Open ${cfg.ariaName.toLowerCase()} detail`}
           onClick={openDetail}
-          onKeyDown={onDetailKeyDown}
         >
-          <div className={styles.nameBlock}>
-            <div className={styles.name}>{cfg.label}</div>
-            <div className={styles.detailHint}>View details ›</div>
-          </div>
-          <WorstValue cfg={cfg} area={area} startMs={scale.startMs} endMs={scale.endMs} />
-        </div>
-      ) : (
-        <div className={styles.left}>
-          <div className={styles.name}>{cfg.label}</div>
-          <WorstValue cfg={cfg} area={area} startMs={scale.startMs} endMs={scale.endMs} />
-        </div>
-      )}
+          {cfg.label}
+        </button>
+        <WorstValue cfg={cfg} area={area} startMs={scale.startMs} endMs={scale.endMs} />
+      </div>
       <div className={styles.chartCell}>{chart}</div>
     </div>
   )

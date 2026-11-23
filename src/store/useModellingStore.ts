@@ -1,13 +1,15 @@
 import { create } from 'zustand'
 import type {
   ActionType, AreaRequirementRow, BMUnit, DraftPlan, ModellingAction, OperationType, ServiceType,
-  SettlementPeriodData, UnitSnapshot, UserId, WorkingPlanAction, WorkingPlanPatch,
+  SettlementPeriodData, UnitSnapshot, UserId, WorkingPlanAction, WorkingPlanPatch, PromotionAvailabilitySnapshot,
 } from '@/models/types'
 import { USERS } from '@/models/types'
 import { computeAggregates } from '@/utils/margin'
 import { computeAreaAvailabilities } from '@/utils/areaAggregates'
 import { slotValues } from '@/utils/actionEffects'
 import { toModellingActions } from '@/utils/workingPlan'
+import { scheduleAvailability } from '@/utils/scheduleAvailability'
+import { classifyCandidates, type PromotionFilters } from '@/utils/candidateFilters'
 
 const DRAFT_COLORS = ['#f59e0b', '#8b5cf6', '#06b6d4', '#f97316', '#ec4899']
 
@@ -80,7 +82,7 @@ interface ModellingState {
   removeFromWorkingPlan: (bmUnitId: string) => void
   clearWorkingPlan: () => void
   applyWindowToAll: () => void
-  commitWorkingPlan: (name: string, description: string) => string | null
+  commitWorkingPlan: (name: string, description: string, filters?: PromotionFilters) => string | null
   setAreaThreshold: (area: string, value: number) => void
   setAllAreaThresholds: (thresholds: Record<string, number>) => void
 
@@ -114,7 +116,7 @@ interface ModellingState {
   duplicateDraft: (id: string) => string
   shareDraft: (draftId: string, userId: UserId) => void
   unshareDraft: (draftId: string, userId: UserId) => void
-  promoteDraft: (id: string) => void
+  promoteDraft: (id: string, filters?: PromotionFilters) => void
   discardDraft: (id: string) => void
   reopenDraft: (id: string) => void
   deleteDraft: (id: string) => void
@@ -184,7 +186,7 @@ export const useModellingStore = create<ModellingState>((set, get) => ({
 
   // Saves the plan as a new draft and promotes it with the existing promoteDraft, which
   // snapshots unit data and runs refreshAllAggregates. Spec §4.2.
-  commitWorkingPlan: (name, description) => {
+  commitWorkingPlan: (name, description, filters) => {
     const state = get()
     const user = state.currentUser
     const plan = state.workingPlans[user] ?? []
@@ -199,7 +201,7 @@ export const useModellingStore = create<ModellingState>((set, get) => ({
       unitNotes, createdAt: Date.now(), ownerId: user, sharedWith: [],
     }
     set(s => ({ drafts: [...s.drafts, draft], ...withPlan(s, () => []) }))
-    get().promoteDraft(id)
+    get().promoteDraft(id, filters)
     return id
   },
 
@@ -460,6 +462,7 @@ export const useModellingStore = create<ModellingState>((set, get) => ({
         discardedAt: undefined,
         ownerId: state.currentUser,
         sharedWith: [],
+        availabilitySnapshot: undefined,
       }
       return { drafts: [...state.drafts, copy], activeDraftId: newId }
     })
@@ -484,15 +487,31 @@ export const useModellingStore = create<ModellingState>((set, get) => ({
       ),
     })),
 
-  promoteDraft: (id) =>
+  promoteDraft: (id, filters = { gspFilter: {}, asFilter: { sr: false, qr: false }, deRatePct: 0, priceThreshold: '' }) =>
     set(state => {
       const draft = state.drafts.find(d => d.id === id)
-      if (!draft) return {}
+      if (!draft || draft.status === 'promoted') return {}
       const dataSnapshot: Record<string, UnitSnapshot> = {}
+      const availabilitySnapshot: Record<string, PromotionAvailabilitySnapshot> = {}
       for (const action of draft.actions) {
         const u = state.units.find(u => u.bmUnitId === action.bmUnitId)
         if (!u) continue
         const ov = state.dataOverrides[action.bmUnitId] ?? {}
+        // Capture before promotion recalculates the baseline, using each action's own window.
+        const values = scheduleAvailability(action.bmUnitId, state.settlementPeriods, {
+          fromPeriod: action.fromPeriod,
+          toPeriod: action.toPeriod ?? 48,
+        })
+        if (values && !availabilitySnapshot[action.bmUnitId]) {
+          const [classified] = classifyCandidates([{
+            bmUnitId: u.bmUnitId, fuelType: u.fuelType, gspGroup: u.gspGroup,
+            priceToMel: u.priceToMel ?? 0, ...values,
+          }], { ...filters, typeFilter: new Set(), selectedCard: 'usable' }, state.unitServices)
+          availabilitySnapshot[action.bmUnitId] = {
+            availableMw: classified.availableMw,
+            usableMw: classified.usableMw,
+          }
+        }
         dataSnapshot[action.bmUnitId] = {
           mel:        ov.mel        ?? u.registeredCapacity,
           sel:        ov.sel        ?? u.sel        ?? 0,
@@ -505,7 +524,7 @@ export const useModellingStore = create<ModellingState>((set, get) => ({
       }
       const drafts = state.drafts.map(d =>
         d.id === id
-          ? { ...d, status: 'promoted' as const, promotedAt: Date.now(), dataSnapshot }
+          ? { ...d, status: 'promoted' as const, promotedAt: Date.now(), dataSnapshot, availabilitySnapshot }
           : d
       )
       return {

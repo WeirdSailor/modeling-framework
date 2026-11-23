@@ -99,6 +99,11 @@ export interface UnitSnapshot {
   priceToMel: number;
 }
 
+export interface PromotionAvailabilitySnapshot {
+  availableMw: number
+  usableMw: number
+}
+
 export interface AreaRequirementRow {
   sp: number           // 1–48 slot index within the rolling window
   requirement: number  // MW / GVAs / MVAr
@@ -153,4 +158,5 @@ export interface DraftPlan {
   ownerId: UserId;
   sharedWith: UserId[];
   dataSnapshot?: Record<string, UnitSnapshot>;
+  availabilitySnapshot?: Record<string, PromotionAvailabilitySnapshot>;
 }

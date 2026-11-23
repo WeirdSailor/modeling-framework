@@ -1,6 +1,6 @@
 'use client'
 
-// Candidate list shared by the three pickers, with click-to-sort headers (no sort = ranked order).
+// Candidate list shared by the three pickers, initially sorted by cheapest £ SEL.
 
 import { useMemo, useState } from 'react'
 import { TypeChip } from '@/components/AvailableTable'
@@ -22,13 +22,19 @@ interface Props {
 export default function CandidateTable({
   rows, showState = false, ticked, onToggle, onSetTicked, blockedReason, emptyText,
 }: Props) {
-  const [sort, setSort] = useState<{ key: SortKey; dir: 'asc' | 'desc' } | null>(null)
+  const [sort, setSort] = useState<{ key: SortKey; dir: 'asc' | 'desc' } | null>({ key: 'priceToSel', dir: 'asc' })
 
   const sorted = useMemo(() => {
     if (!sort) return rows
     const { key, dir } = sort
     return [...rows].sort((a, b) => {
       const av = a[key], bv = b[key]
+      // A zero SEL price is the candidate-row placeholder for missing price data.
+      if (key === 'priceToSel') {
+        const aMissing = av === undefined || av === 0
+        const bMissing = bv === undefined || bv === 0
+        if (aMissing || bMissing) return aMissing === bMissing ? 0 : aMissing ? 1 : -1
+      }
       if (av === undefined) return bv === undefined ? 0 : 1
       if (bv === undefined) return -1
       const cmp = typeof av === 'number' && typeof bv === 'number' ? av - bv : String(av).localeCompare(String(bv))
@@ -45,7 +51,9 @@ export default function CandidateTable({
   const allTicked = selectable.length > 0 && selectable.every(id => ticked.has(id))
 
   function cycleSort(key: SortKey) {
-    setSort(s => (!s || s.key !== key ? { key, dir: 'desc' } : s.dir === 'desc' ? { key, dir: 'asc' } : null))
+    const firstDir = key === 'priceToSel' ? 'asc' : 'desc'
+    setSort(s => (!s || s.key !== key ? { key, dir: firstDir }
+      : s.dir === firstDir ? { key, dir: firstDir === 'asc' ? 'desc' : 'asc' } : null))
   }
 
   function th(k: SortKey, label: string, numeric = true, title?: string) {
@@ -79,7 +87,7 @@ export default function CandidateTable({
             </th>
             {th('nationalGridBmUnit', 'BMU', false)}
             {th('fuelType', 'Type', false)}
-            <th>Service</th>
+            <th>AS</th>
             {showState && <th>State</th>}
             {th('ndz', 'NDZ')}
             {th('mzt', 'MZT', true, 'Minimum Zero Time (minutes)')}
@@ -89,10 +97,10 @@ export default function CandidateTable({
             {th('mel', 'MEL')}
             {th('priceToSel', '£ SEL')}
             {th('priceToMel', '£ MEL')}
-            {th('inertiaGvas', 'Inertia (GVAs)', true, 'Estimated inertia contribution when synchronised')}
+            {th('inertiaGvas', 'Inertia', true, 'Estimated inertia contribution when synchronised (GVAs)')}
             <th />
-            {th('availableMw', 'AVAIL.')}
-            {th('usableMw', 'Usable MW')}
+            {th('availableMw', 'AVAIL')}
+            {th('usableMw', 'Usable')}
             <th className="num" title="Running total of Usable MW for displayed units">CUMUL</th>
           </tr>
         </thead>
@@ -118,7 +126,6 @@ export default function CandidateTable({
                 <td>
                   <div className="bmu-cell-inner">
                     <span>{r.nationalGridBmUnit}</span>
-                    <span className="site-sub">{r.gspGroup}</span>
                   </div>
                 </td>
                 <td><TypeChip fuelType={r.fuelType} /></td>
