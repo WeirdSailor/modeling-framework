@@ -51,6 +51,7 @@ interface UnitRow {
 
 function getFuelDisplay(fuelType: string): { label: string; chipClass: string } {
   const map: Record<string, { label: string; chipClass: string }> = {
+    BATTERY: { label: 'Battery', chipClass: 'chip-battery' },
     CCGT:    { label: 'CCGT',    chipClass: 'chip-ccgt' },
     COAL:    { label: 'Coal',    chipClass: 'chip-coal' },
     NUCLEAR: { label: 'Nuclear', chipClass: 'chip-nuclear' },

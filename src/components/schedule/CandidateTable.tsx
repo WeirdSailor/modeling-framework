@@ -90,13 +90,13 @@ export default function CandidateTable({
             {th('sel', 'SEL')}
             {th('pn', 'PN')}
             {th('mel', 'MEL')}
-            {th('availableMw', 'AVAIL.')}
-            <th className="num" title="Running total of AVAIL. for displayed units">CUMUL</th>
             {th('usableMw', 'Usable MW')}
             {th('reg', 'Reg. cap')}
             {th('priceToSel', '£ SEL')}
             {th('priceToMel', '£ MEL')}
             <th />
+            {th('availableMw', 'AVAIL.')}
+            <th className="num" title="Running total of AVAIL. for displayed units">CUMUL</th>
           </tr>
         </thead>
         <tbody>
@@ -132,13 +132,13 @@ export default function CandidateTable({
                 <td className="num">{r.sel ? fmtMw(r.sel) : '—'}</td>
                 <td className="num">{fmtMw(r.pn)}</td>
                 <td className="num">{fmtMw(r.mel)}</td>
-                <td className="num">{fmtMw(r.availableMw)}</td>
-                <td className="num">{fmtMw(r.cumulativeMw)}</td>
                 <td className="num">{fmtMw(r.usableMw)}</td>
                 <td className="num">{fmtMw(r.reg)}</td>
                 <td className="num">{r.priceToSel || '—'}</td>
                 <td className="num">{r.priceToMel || '—'}</td>
                 <td className="schedule-hint">{blocked ?? ''}</td>
+                <td className="num">{fmtMw(r.availableMw)}</td>
+                <td className="num">{fmtMw(r.cumulativeMw)}</td>
               </tr>
             )
           })}

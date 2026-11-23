@@ -42,7 +42,8 @@ export function buildCandidateRows({ units, sp, settlementPeriods, planWindow, p
 
   const rows: CandidateRow[] = []
   for (const u of units) {
-    if (EXCLUDED_FUEL_TYPES.has(u.fuelType) || u.registeredCapacity <= 0) continue
+    // Schedule includes batteries; the Workspace display exclusions still apply to other types.
+    if ((u.fuelType !== 'BATTERY' && EXCLUDED_FUEL_TYPES.has(u.fuelType)) || u.registeredCapacity <= 0) continue
     if (promotedUnitIds.has(u.bmUnitId)) continue
     const qualifies = ACTION_TYPES.filter(t => isCandidate(t, u.bmUnitId, sp, u))
     if (qualifies.length === 0) continue
