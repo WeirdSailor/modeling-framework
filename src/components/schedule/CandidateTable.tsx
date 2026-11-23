@@ -1,19 +1,16 @@
 'use client'
 
-// Candidate list shared by the three pickers: checkbox, unit columns, optional State or
-// type-specific change column, click-to-sort headers (no sort = ranked order).
+// Candidate list shared by the three pickers, with click-to-sort headers (no sort = ranked order).
 
 import { useMemo, useState } from 'react'
-import type { ActionType } from '@/models/types'
 import { TypeChip } from '@/components/AvailableTable'
 import { cumulativeAvailability, type FilteredCandidateRow } from '@/utils/candidateFilters'
 import { fmtMw } from './scheduleUi'
 
-type SortKey = 'nationalGridBmUnit' | 'fuelType' | 'ndz' | 'sel' | 'pn' | 'mel' | 'reg' | 'priceToSel' | 'priceToMel' | 'change' | 'availableMw' | 'usableMw'
+type SortKey = 'nationalGridBmUnit' | 'fuelType' | 'ndz' | 'mzt' | 'mnzt' | 'inertiaGvas' | 'sel' | 'pn' | 'mel' | 'priceToSel' | 'priceToMel' | 'availableMw' | 'usableMw'
 
 interface Props {
   rows: FilteredCandidateRow[]
-  changeType?: ActionType                          // shows that type's +MW / −MW column
   showState?: boolean                              // shows Running / Off
   ticked: Set<string>
   onToggle: (bmUnitId: string) => void
@@ -23,21 +20,21 @@ interface Props {
 }
 
 export default function CandidateTable({
-  rows, changeType, showState = false, ticked, onToggle, onSetTicked, blockedReason, emptyText,
+  rows, showState = false, ticked, onToggle, onSetTicked, blockedReason, emptyText,
 }: Props) {
   const [sort, setSort] = useState<{ key: SortKey; dir: 'asc' | 'desc' } | null>(null)
 
   const sorted = useMemo(() => {
     if (!sort) return rows
     const { key, dir } = sort
-    const value = (r: FilteredCandidateRow): number | string =>
-      key === 'change' ? (changeType ? Math.abs(r.change[changeType]) : 0) : r[key]
     return [...rows].sort((a, b) => {
-      const av = value(a), bv = value(b)
+      const av = a[key], bv = b[key]
+      if (av === undefined) return bv === undefined ? 0 : 1
+      if (bv === undefined) return -1
       const cmp = typeof av === 'number' && typeof bv === 'number' ? av - bv : String(av).localeCompare(String(bv))
       return dir === 'asc' ? cmp : -cmp
     })
-  }, [rows, sort, changeType])
+  }, [rows, sort])
   const displayedRows = useMemo(() => cumulativeAvailability(sorted), [sorted])
 
   if (rows.length === 0) {
@@ -51,12 +48,13 @@ export default function CandidateTable({
     setSort(s => (!s || s.key !== key ? { key, dir: 'desc' } : s.dir === 'desc' ? { key, dir: 'asc' } : null))
   }
 
-  function th(k: SortKey, label: string, numeric = true) {
+  function th(k: SortKey, label: string, numeric = true, title?: string) {
     const active = sort !== null && sort.key === k
     const caret = sort !== null && sort.key === k ? (sort.dir === 'asc' ? '▲' : '▼') : '↕'
     return (
       <th
         key={k}
+        title={title}
         className={['sortable', numeric ? 'num' : '', active ? 'col-active' : ''].filter(Boolean).join(' ')}
         onClick={() => cycleSort(k)}
       >
@@ -64,8 +62,6 @@ export default function CandidateTable({
       </th>
     )
   }
-
-  const changeLabel = changeType === 'start' || changeType === 'capacity' ? '+MW' : '−MW'
 
   return (
     <div className="table-scroll">
@@ -85,18 +81,19 @@ export default function CandidateTable({
             {th('fuelType', 'Type', false)}
             <th>Service</th>
             {showState && <th>State</th>}
-            {changeType && th('change', changeLabel)}
             {th('ndz', 'NDZ')}
+            {th('mzt', 'MZT', true, 'Minimum Zero Time (minutes)')}
+            {th('mnzt', 'MNZT', true, 'Minimum Non-Zero Time (minutes)')}
             {th('sel', 'SEL')}
             {th('pn', 'PN')}
             {th('mel', 'MEL')}
-            {th('usableMw', 'Usable MW')}
-            {th('reg', 'Reg. cap')}
             {th('priceToSel', '£ SEL')}
             {th('priceToMel', '£ MEL')}
+            {th('inertiaGvas', 'Inertia (GVAs)', true, 'Estimated inertia contribution when synchronised')}
             <th />
             {th('availableMw', 'AVAIL.')}
-            <th className="num" title="Running total of AVAIL. for displayed units">CUMUL</th>
+            {th('usableMw', 'Usable MW')}
+            <th className="num" title="Running total of Usable MW for displayed units">CUMUL</th>
           </tr>
         </thead>
         <tbody>
@@ -127,17 +124,18 @@ export default function CandidateTable({
                 <td><TypeChip fuelType={r.fuelType} /></td>
                 <td>{r.service ? <span className={`chip chip-${r.service.toLowerCase()}`}>{r.service}</span> : '—'}</td>
                 {showState && <td>{r.running ? 'Running' : 'Off'}</td>}
-                {changeType && <td className="num">{fmtMw(Math.abs(r.change[changeType]))}</td>}
                 <td className="num">{r.ndz || '—'}</td>
+                <td className="num">{r.mzt ?? '—'}</td>
+                <td className="num">{r.mnzt ?? '—'}</td>
                 <td className="num">{r.sel ? fmtMw(r.sel) : '—'}</td>
                 <td className="num">{fmtMw(r.pn)}</td>
                 <td className="num">{fmtMw(r.mel)}</td>
-                <td className="num">{fmtMw(r.usableMw)}</td>
-                <td className="num">{fmtMw(r.reg)}</td>
                 <td className="num">{r.priceToSel || '—'}</td>
                 <td className="num">{r.priceToMel || '—'}</td>
+                <td className="num">{r.inertiaGvas.toLocaleString('en-GB', { maximumFractionDigits: 2 })}</td>
                 <td className="schedule-hint">{blocked ?? ''}</td>
                 <td className="num">{fmtMw(r.availableMw)}</td>
+                <td className="num">{fmtMw(r.usableMw)}</td>
                 <td className="num">{fmtMw(r.cumulativeMw)}</td>
               </tr>
             )

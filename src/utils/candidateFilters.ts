@@ -42,11 +42,11 @@ export function classifyCandidates(
   })
 }
 
-/** Call after filtering and sorting so the running total follows the displayed table. */
-export function cumulativeAvailability<T extends { availableMw: number }>(rows: T[]): (T & { cumulativeMw: number })[] {
+/** Sum usable MW after filtering and sorting so the running total follows the table. */
+export function cumulativeAvailability<T extends { usableMw: number }>(rows: T[]): (T & { cumulativeMw: number })[] {
   let cumulativeMw = 0
   return rows.map(row => {
-    cumulativeMw += row.availableMw
+    cumulativeMw += row.usableMw
     return { ...row, cumulativeMw }
   })
 }

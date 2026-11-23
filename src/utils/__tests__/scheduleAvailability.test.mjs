@@ -28,7 +28,7 @@ test('editing To updates AVAIL., CUMUL, and card totals from the same window val
     const values = scheduleAvailability('A', periods, { fromPeriod: 2, toPeriod })
     const rows = classifyCandidates([{ bmUnitId: 'A', fuelType: 'CCGT', gspGroup: '_A', priceToMel: 0, ...values }], filters, {})
     assert.equal(rows[0].availableMw, expected)
-    assert.equal(cumulativeAvailability(rows)[0].cumulativeMw, expected)
+    assert.equal(cumulativeAvailability(rows)[0].cumulativeMw, expected * 0.8)
     assert.equal(candidateCards(rows).total.sum, expected)
     assert.equal(candidateCards(rows).usable.sum, expected * 0.8)
   }

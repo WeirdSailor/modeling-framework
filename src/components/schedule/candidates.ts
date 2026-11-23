@@ -2,7 +2,8 @@
 
 import type { ActionType, BMUnit, SettlementPeriodData } from '@/models/types'
 import { ACTION_TYPES } from '@/models/types'
-import { changeMw, isCandidate, slotValues } from '@/utils/actionEffects'
+import { isCandidate, slotValues } from '@/utils/actionEffects'
+import { unitAreaContribution } from '@/utils/areaAggregates'
 import { scenarioScore } from '@/utils/scenarioRanking'
 import { EXCLUDED_FUEL_TYPES } from '@/utils/fuelTypes'
 import { scheduleAvailability } from '@/utils/scheduleAvailability'
@@ -17,11 +18,13 @@ export interface CandidateRow {
   reg: number
   sel: number
   ndz: number
+  mzt?: number
+  mnzt?: number
+  inertiaGvas: number
   priceToSel: number
   priceToMel: number
   running: boolean
   qualifies: ActionType[]                // action types this unit is a candidate for
-  change: Record<ActionType, number>     // signed MW per type (actionEffects.changeMw)
 }
 
 /**
@@ -59,16 +62,13 @@ export function buildCandidateRows({ units, sp, settlementPeriods, planWindow, p
       reg: v.reg,
       sel: u.sel ?? 0,
       ndz: u.ndz ?? 0,
+      mzt: u.mzt,
+      mnzt: u.mnzt,
+      inertiaGvas: unitAreaContribution(u.bmUnitId, 'inertia', sp, [u]),
       priceToSel: u.priceToSel ?? 0,
       priceToMel: u.priceToMel ?? 0,
       running: v.pn > 1,
       qualifies,
-      change: {
-        start:    changeMw('start', u.bmUnitId, sp, u),
-        deload:   changeMw('deload', u.bmUnitId, sp, u),
-        desync:   changeMw('desync', u.bmUnitId, sp, u),
-        capacity: changeMw('capacity', u.bmUnitId, sp, u),
-      },
     })
   }
 

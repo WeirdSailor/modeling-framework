@@ -74,15 +74,15 @@ test('empty candidate sets produce zero cards', () => {
   assert.ok(Object.values(candidateCards([])).every(card => card.count === 0 && card.sum === 0))
 })
 
-test('CUMUL follows the displayed sort order and resets for a filtered list', () => {
+test('CUMUL sums usable MW after de-rating and exclusions, following displayed sort order', () => {
   const rows = classifyCandidates([
     row('A', { mel: 200, pn: 50 }), row('B', { mel: 200, pn: 100 }),
     row('C', { mel: 200, pn: 175, priceToMel: 200 }),
-  ], filters({ priceThreshold: '150' }), {})
-  assert.deepEqual(cumulativeAvailability(rows).map(r => r.cumulativeMw), [150, 250, 275])
+  ], filters({ priceThreshold: '150', deRatePct: 20 }), {})
+  assert.deepEqual(cumulativeAvailability(rows).map(r => r.cumulativeMw), [120, 200, 200])
   const visible = rows.filter(r => matchesCandidateCard(r, 'usable')).sort((a, b) => a.availableMw - b.availableMw)
   const displayed = cumulativeAvailability(visible)
-  assert.deepEqual(displayed.map(r => [r.bmUnitId, r.cumulativeMw]), [['B', 100], ['A', 250]])
+  assert.deepEqual(displayed.map(r => [r.bmUnitId, r.cumulativeMw]), [['B', 80], ['A', 200]])
   assert.equal(displayed.at(-1).cumulativeMw, candidateCards(rows).usable.sum)
   assert.equal('cumulativeMw' in rows[0], false)
   assert.deepEqual(cumulativeAvailability([]), [])

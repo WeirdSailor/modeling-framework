@@ -79,7 +79,6 @@ export default function PickerTabs({ rows, inPlan, onAdd, timeLabel, activeActio
       </div>
       <CandidateTable
         rows={list}
-        changeType={tab}
         ticked={ticked}
         onToggle={toggle}
         onSetTicked={setMany}

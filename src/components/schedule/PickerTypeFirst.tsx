@@ -44,7 +44,6 @@ export default function PickerTypeFirst({ rows, inPlan, onAdd, timeLabel, active
       </div>
       <CandidateTable
         rows={list}
-        changeType={type}
         ticked={ticked}
         onToggle={id => setTicked(t => toggleIn(t, id))}
         onSetTicked={(ids, on) => setTicked(t => setManyIn(t, ids, on))}
